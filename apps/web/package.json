@@ -1,0 +1,35 @@
+{
+  "name": "@salimon/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@emotion/cache": "^11.14.0",
+    "@emotion/react": "latest",
+    "@emotion/styled": "latest",
+    "@salimon/api-client": "workspace:*",
+    "@salimon/domain": "workspace:*",
+    "@salimon/store": "workspace:*",
+    "@salimon/types": "workspace:*",
+    "@salimon/ui-tokens": "workspace:*",
+    "lucide-react": "latest",
+    "mobx-react-lite": "latest",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "latest",
+    "typescript": "latest"
+  }
+}

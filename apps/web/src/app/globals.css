@@ -1,0 +1,37 @@
+:root {
+  --background: #f6f7f3;
+  --foreground: #17201a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--background);
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  color: var(--foreground);
+  background:
+    linear-gradient(180deg, rgba(246, 247, 243, 0.96), rgba(246, 247, 243, 1)),
+    radial-gradient(circle at 10% 0%, rgba(15, 139, 141, 0.12), transparent 28%);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}

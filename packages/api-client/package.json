@@ -1,0 +1,21 @@
+{
+  "name": "@salimon/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@salimon/domain": "workspace:*",
+    "@salimon/types": "workspace:*",
+    "@supabase/supabase-js": "latest",
+    "axios": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "latest"
+  }
+}
