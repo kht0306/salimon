@@ -183,6 +183,8 @@ export const MetricLabel = styled.div`
 export const MetricValue = styled.div<{ $tone?: "expense" | "income" }>`
   margin-top: 4px;
   color: ${({ $tone }) => ($tone === "income" ? colors.green : $tone === "expense" ? colors.coral : colors.ink)};
-  font-size: 20px;
+  font-size: clamp(15px, 1.35vw, 20px);
   font-weight: 800;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
 `

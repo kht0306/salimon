@@ -11,3 +11,20 @@ build/
 coverage/
 *.tsbuildinfo
 *.log
+
+# Vercel local project metadata
+.vercel/
+
+# Supabase local CLI state
+supabase/.temp/
+supabase/.branches/
+supabase/.env
+
+# Monorepo/build tool caches
+.turbo/
+
+# Future React Native / Expo local state
+.expo/
+android/.gradle/
+android/app/build/
+ios/Pods/
