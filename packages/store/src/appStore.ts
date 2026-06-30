@@ -1,4 +1,9 @@
-import { LocalFinanceRepository, type FinanceData } from "@salimon/api-client"
+import {
+  checkSupabaseConnection,
+  LocalFinanceRepository,
+  type FinanceData,
+  type SupabaseConnectionCheck,
+} from "@salimon/api-client"
 import {
   createCategory,
   createDefaultCategories,
@@ -43,7 +48,16 @@ export class AppStore {
   selectedLedgerId: string
   selectedMonth: string
   selectedDate: string
-  activeView: "calendar" | "categories" | "shared" | "sms" | "samples" = "calendar"
+  activeView: "calendar" | "categories" | "shared" | "sms" | "samples" | "connection" = "calendar"
+  supabaseConnection: SupabaseConnectionCheck = {
+    state: "idle",
+    hasUrl: false,
+    hasAnonKey: false,
+    canReachAuth: false,
+    canReachSchema: false,
+    isAuthenticated: false,
+    message: "아직 연결 확인을 실행하지 않았습니다.",
+  }
 
   constructor(repository = new LocalFinanceRepository()) {
     this.repository = repository
@@ -131,6 +145,15 @@ export class AppStore {
 
   setView(view: AppStore["activeView"]): void {
     this.activeView = view
+  }
+
+  async checkSupabase(): Promise<void> {
+    this.supabaseConnection = {
+      ...this.supabaseConnection,
+      state: "checking",
+      message: "Supabase 연결을 확인하는 중입니다.",
+    }
+    this.supabaseConnection = await checkSupabaseConnection()
   }
 
   switchLedger(ledgerId: string): void {

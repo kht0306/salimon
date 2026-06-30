@@ -1,10 +1,11 @@
 "use client"
 
 import { observer } from "mobx-react-lite"
-import { CalendarDays, ClipboardCheck, Layers3, MessageSquareText, RotateCcw, Tags, Users } from "lucide-react"
+import { CalendarDays, ClipboardCheck, Database, Layers3, MessageSquareText, RotateCcw, Tags, Users } from "lucide-react"
 import { StoreProvider, useAppStore } from "./StoreProvider"
 import { CalendarGrid } from "./components/CalendarGrid"
 import { CategoryManager } from "./components/CategoryManager"
+import { ConnectionPanel } from "./components/ConnectionPanel"
 import { SampleSubmissionPanel } from "./components/SampleSubmissionPanel"
 import { SharedLedgerPanel } from "./components/SharedLedgerPanel"
 import { SmsCandidatePanel } from "./components/SmsCandidatePanel"
@@ -76,6 +77,9 @@ const DashboardContent = observer(function DashboardContent() {
           <NavButton $active={store.activeView === "samples"} onClick={() => store.setView("samples")}>
             <ClipboardCheck size={17} /> 샘플
           </NavButton>
+          <NavButton $active={store.activeView === "connection"} onClick={() => store.setView("connection")}>
+            <Database size={17} /> 연결
+          </NavButton>
         </Nav>
 
         <Button $variant="ghost" onClick={store.resetDemo} title="데모 데이터 초기화">
@@ -99,6 +103,7 @@ const DashboardContent = observer(function DashboardContent() {
         {store.activeView === "shared" ? <SharedLedgerPanel /> : null}
         {store.activeView === "sms" ? <SmsCandidatePanel /> : null}
         {store.activeView === "samples" ? <SampleSubmissionPanel /> : null}
+        {store.activeView === "connection" ? <ConnectionPanel /> : null}
       </Workspace>
 
       <TransactionPanel />

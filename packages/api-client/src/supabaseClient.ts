@@ -1,5 +1,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 
+declare const process: {
+  env: Record<string, string | undefined>
+}
+
 let browserClient: SupabaseClient | null = null
 
 export function getSupabaseBrowserClient(): SupabaseClient | null {
@@ -19,9 +23,8 @@ export function getSupabaseBrowserClient(): SupabaseClient | null {
 }
 
 function getRuntimeEnv(): Record<string, string | undefined> {
-  const runtime = globalThis as typeof globalThis & {
-    process?: { env?: Record<string, string | undefined> }
+  return {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   }
-
-  return runtime.process?.env ?? {}
 }
