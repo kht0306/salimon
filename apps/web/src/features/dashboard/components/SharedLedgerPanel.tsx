@@ -17,7 +17,7 @@ export const SharedLedgerPanel = observer(function SharedLedgerPanel() {
     <Panel>
       <PanelHeader>
         <PanelTitle>공동 가계부</PanelTitle>
-        <Button $variant="primary" onClick={() => store.createInvite()}>
+        <Button $variant="primary" onClick={() => void store.createInvite()} disabled={!store.authUser || !store.selectedLedgerId}>
           <Link size={16} /> 초대 생성
         </Button>
       </PanelHeader>
@@ -29,11 +29,12 @@ export const SharedLedgerPanel = observer(function SharedLedgerPanel() {
         </Field>
         <Button
           $variant="soft"
-          onClick={() => {
-            store.createSharedLedger(name)
-            setName("")
+          onClick={async () => {
+            if (await store.createSharedLedger(name)) {
+              setName("")
+            }
           }}
-          disabled={!name.trim()}
+          disabled={!name.trim() || !store.authUser}
         >
           <Plus size={16} /> 생성
         </Button>

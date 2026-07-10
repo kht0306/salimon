@@ -17,16 +17,17 @@ export const CategoryManager = observer(function CategoryManager() {
   const [icon, setIcon] = useState(iconOptions[0])
   const [color, setColor] = useState(colorOptions[0])
 
-  function create() {
-    store.createExpenseCategory(name, icon, color)
-    setName("")
+  async function create() {
+    if (await store.createExpenseCategory(name, icon, color)) {
+      setName("")
+    }
   }
 
   return (
     <Panel>
       <PanelHeader>
         <PanelTitle>지출 카테고리</PanelTitle>
-        <Button $variant="primary" onClick={create} disabled={!name.trim()}>
+        <Button $variant="primary" onClick={() => void create()} disabled={!name.trim() || !store.authUser}>
           <Plus size={16} /> 추가
         </Button>
       </PanelHeader>
@@ -70,14 +71,14 @@ export const CategoryManager = observer(function CategoryManager() {
             </CategoryInfo>
             <Button
               title="색상 저장"
-              onClick={() => store.updateCategory(category.id, { color: category.color })}
+              onClick={() => void store.updateCategory(category.id, { color: category.color })}
             >
               <Save size={15} />
             </Button>
             <Button
               $variant="danger"
               disabled={category.isDefault || category.name === "기타"}
-              onClick={() => store.archiveCategory(category.id)}
+              onClick={() => void store.archiveCategory(category.id)}
             >
               <Archive size={15} /> 비활성화
             </Button>

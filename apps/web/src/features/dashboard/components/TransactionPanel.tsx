@@ -55,13 +55,13 @@ export const TransactionPanel = observer(function TransactionPanel() {
     setEditing(null)
   }
 
-  function save() {
+  async function save() {
     const amount = Number(draft.amount)
     if (!Number.isFinite(amount) || amount <= 0) {
       return
     }
 
-    store.saveTransaction({
+    const saved = await store.saveTransaction({
       id: editing?.id,
       ledgerId: store.selectedLedgerId,
       type: draft.type as "expense" | "income" | "transfer",
@@ -72,7 +72,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
       merchantName: draft.merchantName || undefined,
       memo: draft.memo || undefined,
     })
-    closeForm()
+    if (saved) {
+      closeForm()
+    }
   }
 
   return (
@@ -82,7 +84,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           <PanelTitle>{formatKoreanDate(store.selectedDate)}</PanelTitle>
           <Subtle>{store.selectedDateTransactions.length}건</Subtle>
         </div>
-        <IconButton $variant="primary" title="거래 추가" onClick={openNew}>
+        <IconButton $variant="primary" title="거래 추가" onClick={openNew} disabled={!store.authUser || !store.selectedLedgerId}>
           <Plus size={17} />
         </IconButton>
       </PanelTop>
@@ -163,7 +165,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
             <Textarea value={draft.memo} onChange={(event) => setDraft({ ...draft, memo: event.target.value })} />
           </Field>
 
-          <Button $variant="primary" onClick={save}>
+          <Button $variant="primary" onClick={() => void save()}>
             <Save size={16} /> 저장
           </Button>
         </Editor>
@@ -192,7 +194,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 <IconButton
                   $variant="danger"
                   title="삭제"
-                  onClick={() => store.softDeleteTransaction(transaction.id)}
+                  onClick={() => void store.softDeleteTransaction(transaction.id)}
                 >
                   <Trash2 size={15} />
                 </IconButton>

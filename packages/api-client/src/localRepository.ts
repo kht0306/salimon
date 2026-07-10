@@ -25,6 +25,25 @@ export interface FinanceData {
 
 const storageKey = "salimon:finance-data:v1"
 
+export function createEmptyFinanceData(): FinanceData {
+  return {
+    profile: {
+      id: "",
+      nickname: "로그인 필요",
+      defaultCurrency: "KRW",
+      timezone: "Asia/Seoul",
+    },
+    ledgers: [],
+    members: [],
+    invitations: [],
+    categories: [],
+    paymentMethods: [],
+    transactions: [],
+    smsCandidates: [],
+    cardMessageSamples: [],
+  }
+}
+
 export class LocalFinanceRepository {
   load(): FinanceData {
     if (typeof window === "undefined") {

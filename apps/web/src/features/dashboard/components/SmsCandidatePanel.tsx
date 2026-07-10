@@ -46,7 +46,7 @@ export const SmsCandidatePanel = observer(function SmsCandidatePanel() {
             </CandidateTop>
             <Masked>{candidate.maskedMessage}</Masked>
             <Actions>
-              <Button $variant="primary" onClick={() => store.registerSmsCandidate(candidate.id)}>
+              <Button $variant="primary" onClick={() => void store.registerSmsCandidate(candidate.id)}>
                 <CheckCircle2 size={15} /> 기타 등록
               </Button>
               <Button onClick={() => store.markSmsCandidateLater(candidate.id)}>

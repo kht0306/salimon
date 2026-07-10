@@ -7,7 +7,7 @@ import {
   Database,
   Layers3,
   MessageSquareText,
-  RotateCcw,
+  RefreshCw,
   Tags,
   Users,
 } from "lucide-react"
@@ -53,7 +53,9 @@ const DashboardContent = observer(function DashboardContent() {
           value={store.selectedLedgerId}
           onChange={(event) => store.switchLedger(event.target.value)}
           aria-label="가계부 선택"
+          disabled={store.data.ledgers.length === 0}
         >
+          {store.data.ledgers.length === 0 ? <option value="">로그인 후 가계부를 불러옵니다</option> : null}
           {store.data.ledgers.map((ledger) => (
             <option key={ledger.id} value={ledger.id}>
               {ledger.name}
@@ -94,8 +96,13 @@ const DashboardContent = observer(function DashboardContent() {
           </NavButton>
         </Nav>
 
-        <Button $variant="ghost" onClick={store.resetDemo} title="데모 데이터 초기화">
-          <RotateCcw size={16} /> 초기화
+        <Button
+          $variant="ghost"
+          onClick={() => void store.refreshFinanceData()}
+          disabled={!store.authUser || store.dataState === "loading"}
+          title="Supabase 데이터 새로고침"
+        >
+          <RefreshCw size={16} /> 새로고침
         </Button>
       </Sidebar>
 
@@ -116,6 +123,7 @@ const DashboardContent = observer(function DashboardContent() {
         {store.activeView === "sms" ? <SmsCandidatePanel /> : null}
         {store.activeView === "samples" ? <SampleSubmissionPanel /> : null}
         {store.activeView === "connection" ? <ConnectionPanel /> : null}
+        {store.dataError ? <DataError role="alert">{store.dataError}</DataError> : null}
       </Workspace>
 
       <TransactionPanel />
@@ -224,4 +232,10 @@ const UserBadge = styled.div<{ $connected: boolean }>`
   padding: 7px 10px;
   font-size: 12px;
   font-weight: 750;
+`
+
+const DataError = styled.p`
+  margin: 14px 0 0;
+  color: ${colors.coral};
+  font-size: 13px;
 `

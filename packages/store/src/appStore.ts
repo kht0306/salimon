@@ -1,19 +1,18 @@
 import {
   checkSupabaseConnection,
+  createEmptyFinanceData,
   ensureAuthenticatedWorkspace,
   getCurrentAuthSession,
-  LocalFinanceRepository,
   observeAuthSession,
   signInWithKakao,
   signOutFromSupabase,
+  SupabaseFinanceRepository,
   type AuthSessionInfo,
   type AuthUserInfo,
   type FinanceData,
   type SupabaseConnectionCheck,
 } from "@salimon/api-client"
 import {
-  createCategory,
-  createDefaultCategories,
   findOtherCategory,
   fromDateTimeLocalValue,
   maskSensitiveText,
@@ -24,7 +23,6 @@ import {
 } from "@salimon/domain"
 import { makeAutoObservable } from "mobx"
 import type {
-  CardMessageSample,
   Category,
   Ledger,
   LedgerInvitation,
@@ -50,7 +48,7 @@ export interface TransactionDraft {
 }
 
 export class AppStore {
-  private repository: LocalFinanceRepository
+  private repository: SupabaseFinanceRepository
   data: FinanceData
   selectedLedgerId: string
   selectedMonth: string
@@ -59,7 +57,10 @@ export class AppStore {
   authState: "loading" | "authenticated" | "anonymous" | "error" = "loading"
   authUser: AuthUserInfo | null = null
   authError: string | null = null
+  dataState: "idle" | "loading" | "ready" | "error" = "idle"
+  dataError: string | null = null
   private initializedWorkspaceUserId: string | null = null
+  private workspaceInitialization: Promise<void> | null = null
   supabaseConnection: SupabaseConnectionCheck = {
     state: "idle",
     hasUrl: false,
@@ -70,10 +71,10 @@ export class AppStore {
     message: "아직 연결 확인을 실행하지 않았습니다.",
   }
 
-  constructor(repository = new LocalFinanceRepository()) {
+  constructor(repository = new SupabaseFinanceRepository()) {
     this.repository = repository
-    this.data = repository.load()
-    this.selectedLedgerId = this.data.ledgers[0]?.id ?? ""
+    this.data = createEmptyFinanceData()
+    this.selectedLedgerId = ""
     this.selectedMonth = toMonthKey(new Date())
     this.selectedDate = toDateKey(new Date())
     makeAutoObservable(this, {}, { autoBind: true })
@@ -149,9 +150,22 @@ export class AppStore {
     }
   }
 
-  resetDemo(): void {
-    this.hydrate(this.repository.reset())
-    this.persist()
+  async refreshFinanceData(): Promise<void> {
+    if (!this.authUser) {
+      this.hydrate(createEmptyFinanceData())
+      this.dataState = "idle"
+      return
+    }
+
+    this.dataState = "loading"
+    this.dataError = null
+    try {
+      this.hydrate(await this.repository.load(this.authUser.id))
+      this.dataState = "ready"
+    } catch (error) {
+      this.dataState = "error"
+      this.dataError = error instanceof Error ? error.message : "가계부 데이터를 불러오지 못했습니다."
+    }
   }
 
   setView(view: AppStore["activeView"]): void {
@@ -203,6 +217,9 @@ export class AppStore {
       this.authUser = null
       this.authState = "anonymous"
       this.initializedWorkspaceUserId = null
+      this.workspaceInitialization = null
+      this.hydrate(createEmptyFinanceData())
+      this.dataState = "idle"
       await this.checkSupabase()
     } catch (error) {
       this.setAuthError(error)
@@ -221,152 +238,132 @@ export class AppStore {
     this.selectedMonth = moveMonth(this.selectedMonth, amount)
   }
 
-  saveTransaction(draft: TransactionDraft): void {
-    const now = new Date().toISOString()
+  async saveTransaction(draft: TransactionDraft): Promise<boolean> {
+    if (!this.authUser || !draft.ledgerId) {
+      return false
+    }
+
     const categoryId =
       draft.categoryId ||
       (draft.type === "expense" ? findOtherCategory(this.data.categories, draft.ledgerId)?.id : undefined)
 
-    if (draft.id) {
-      this.data.transactions = this.data.transactions.map((transaction) =>
-        transaction.id === draft.id
-          ? {
-              ...transaction,
-              ...draft,
-              categoryId,
-              transactionAt: fromDateTimeLocalValue(draft.transactionAt),
-              updatedBy: this.profile.id,
-              updatedAt: now,
-            }
-          : transaction,
-      )
-    } else {
-      this.data.transactions.unshift({
-        id: createId("tx"),
-        ledgerId: draft.ledgerId,
-        createdBy: this.profile.id,
-        type: draft.type,
-        status: draft.status,
-        amount: draft.amount,
-        currency: "KRW",
-        transactionAt: fromDateTimeLocalValue(draft.transactionAt),
+    try {
+      await this.repository.saveTransaction(this.authUser.id, {
+        ...draft,
         categoryId,
-        merchantName: draft.merchantName,
-        memo: draft.memo,
-        sourceType: draft.sourceType ?? "manual",
-        sourceHash: draft.sourceHash,
-        parseConfidence: draft.parseConfidence,
-        createdAt: now,
-        updatedAt: now,
+        transactionAt: fromDateTimeLocalValue(draft.transactionAt),
       })
+      await this.refreshFinanceData()
+      return this.dataState === "ready"
+    } catch (error) {
+      this.setDataError(error)
+      return false
     }
-
-    this.persist()
   }
 
-  softDeleteTransaction(transactionId: string): void {
-    const now = new Date().toISOString()
-    this.data.transactions = this.data.transactions.map((transaction) =>
-      transaction.id === transactionId ? { ...transaction, deletedAt: now, updatedAt: now } : transaction,
-    )
-    this.persist()
+  async softDeleteTransaction(transactionId: string): Promise<void> {
+    if (!this.authUser) return
+
+    try {
+      await this.repository.softDeleteTransaction(transactionId, this.authUser.id)
+      await this.refreshFinanceData()
+    } catch (error) {
+      this.setDataError(error)
+    }
   }
 
-  createExpenseCategory(name: string, icon: string, color: string): void {
+  async createExpenseCategory(name: string, icon: string, color: string): Promise<boolean> {
     const trimmed = name.trim()
-    if (!trimmed || !this.selectedLedgerId) {
-      return
+    if (!trimmed || !this.selectedLedgerId || !this.authUser) {
+      return false
     }
 
     const duplicate = this.expenseCategories.some((category) => category.name.toLowerCase() === trimmed.toLowerCase())
     if (duplicate) {
-      return
+      return false
     }
 
-    this.data.categories.push(
-      createCategory(
-        this.selectedLedgerId,
-        this.profile.id,
-        "expense",
-        trimmed,
+    try {
+      await this.repository.createExpenseCategory({
+        ledgerId: this.selectedLedgerId,
+        userId: this.authUser.id,
+        name: trimmed,
         icon,
         color,
-        this.expenseCategories.length,
-      ),
-    )
-    this.persist()
+        sortOrder: this.expenseCategories.length,
+      })
+      await this.refreshFinanceData()
+      return this.dataState === "ready"
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
   }
 
-  updateCategory(categoryId: string, patch: Partial<Pick<Category, "name" | "icon" | "color">>): void {
-    this.data.categories = this.data.categories.map((category) =>
-      category.id === categoryId ? { ...category, ...patch } : category,
-    )
-    this.persist()
+  async updateCategory(categoryId: string, patch: Partial<Pick<Category, "name" | "icon" | "color">>): Promise<void> {
+    try {
+      await this.repository.updateCategory(categoryId, patch)
+      await this.refreshFinanceData()
+    } catch (error) {
+      this.setDataError(error)
+    }
   }
 
-  archiveCategory(categoryId: string): void {
-    this.data.categories = this.data.categories.map((category) => {
-      if (category.id !== categoryId || category.isDefault || category.name === "기타") {
-        return category
-      }
+  async archiveCategory(categoryId: string): Promise<void> {
+    const category = this.data.categories.find((item) => item.id === categoryId)
+    if (!category || category.isDefault || category.name === "기타") return
 
-      return { ...category, isArchived: true }
-    })
-    this.persist()
+    try {
+      await this.repository.updateCategory(categoryId, { isArchived: true })
+      await this.refreshFinanceData()
+    } catch (error) {
+      this.setDataError(error)
+    }
   }
 
-  createSharedLedger(name: string): void {
+  async createSharedLedger(name: string): Promise<boolean> {
     const trimmed = name.trim()
-    if (!trimmed) {
-      return
+    if (!trimmed || !this.authUser) {
+      return false
     }
 
-    const ledgerId = createId("ledger")
-    const now = new Date().toISOString()
-    this.data.ledgers.push({
-      id: ledgerId,
-      ownerId: this.profile.id,
-      name: trimmed,
-      type: "shared",
-      currency: "KRW",
-      role: "owner",
-    })
-    this.data.members.push({
-      id: createId("member"),
-      ledgerId,
-      userId: this.profile.id,
-      nickname: this.profile.nickname,
-      role: "owner",
-      status: "active",
-      joinedAt: now,
-    })
-    this.data.categories.push(...createDefaultCategories(ledgerId, this.profile.id))
-    this.selectedLedgerId = ledgerId
-    this.persist()
-  }
-
-  createInvite(): LedgerInvitation {
-    const now = new Date()
-    const invitation: LedgerInvitation = {
-      id: createId("invite"),
-      ledgerId: this.selectedLedgerId,
-      invitedBy: this.profile.id,
-      inviteCode: Math.random().toString(36).slice(2, 8).toUpperCase(),
-      roleToGrant: "member",
-      status: "active",
-      createdAt: now.toISOString(),
-      expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    try {
+      const ledgerId = await this.repository.createSharedLedger(trimmed)
+      await this.refreshFinanceData()
+      this.selectedLedgerId = ledgerId
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
     }
-    this.data.invitations.unshift(invitation)
-    this.persist()
-    return invitation
   }
 
-  revokeInvite(invitationId: string): void {
-    this.data.invitations = this.data.invitations.map((invitation) =>
-      invitation.id === invitationId ? { ...invitation, status: "revoked" } : invitation,
-    )
-    this.persist()
+  async createInvite(): Promise<LedgerInvitation | null> {
+    if (!this.authUser || !this.selectedLedgerId) return null
+
+    const inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase()
+    try {
+      await this.repository.createInvite({
+        ledgerId: this.selectedLedgerId,
+        userId: this.authUser.id,
+        inviteCode,
+        inviteTokenHash: createId("invite-token"),
+      })
+      await this.refreshFinanceData()
+      return this.data.invitations.find((invitation) => invitation.inviteCode === inviteCode) ?? null
+    } catch (error) {
+      this.setDataError(error)
+      return null
+    }
+  }
+
+  async revokeInvite(invitationId: string): Promise<void> {
+    try {
+      await this.repository.revokeInvite(invitationId)
+      await this.refreshFinanceData()
+    } catch (error) {
+      this.setDataError(error)
+    }
   }
 
   detectSmsCandidate(rawText: string): void {
@@ -395,7 +392,6 @@ export class AppStore {
       lastPromptedAt: now.toISOString(),
       reviewDeadlineAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     })
-    this.persist()
   }
 
   markSmsCandidateLater(candidateId: string): void {
@@ -409,17 +405,15 @@ export class AppStore {
           }
         : candidate,
     )
-    this.persist()
   }
 
   ignoreSmsCandidate(candidateId: string): void {
     this.data.smsCandidates = this.data.smsCandidates.map((candidate) =>
       candidate.id === candidateId ? { ...candidate, status: "ignored" } : candidate,
     )
-    this.persist()
   }
 
-  registerSmsCandidate(candidateId: string, categoryId?: string): void {
+  async registerSmsCandidate(candidateId: string, categoryId?: string): Promise<void> {
     const candidate = this.data.smsCandidates.find((item) => item.id === candidateId)
     if (!candidate) {
       return
@@ -427,7 +421,7 @@ export class AppStore {
 
     const parsed = candidate.parsed
     const date = new Date(parsed.transactionAt)
-    this.saveTransaction({
+    const saved = await this.saveTransaction({
       ledgerId: candidate.targetLedgerId ?? this.selectedLedgerId,
       type: parsed.type,
       status: "confirmed",
@@ -443,40 +437,43 @@ export class AppStore {
       parseConfidence: parsed.confidence,
     })
 
-    this.data.smsCandidates = this.data.smsCandidates.map((item) =>
-      item.id === candidateId
-        ? {
-            ...item,
-            status: categoryId ? "registered" : "auto_registered_other",
-          }
-        : item,
-    )
-    this.persist()
+    if (saved) {
+      this.data.smsCandidates = this.data.smsCandidates.map((item) =>
+        item.id === candidateId
+          ? {
+              ...item,
+              status: categoryId ? "registered" : "auto_registered_other",
+            }
+          : item,
+      )
+    }
   }
 
-  submitCardMessageSample(input: {
+  async submitCardMessageSample(input: {
     cardCompanyName?: string
     message: string
     expectedAmount?: number
     expectedMerchantName?: string
     expectedTransactionAt?: string
-  }): void {
+  }): Promise<boolean> {
+    if (!this.authUser) return false
+
     const parsed = parseCardSmsText(input.message)
-    const sample: CardMessageSample = {
-      id: createId("sample"),
-      submittedBy: this.profile.id,
-      cardCompanyName: input.cardCompanyName,
-      maskedMessage: maskSensitiveText(input.message),
-      expectedAmount: input.expectedAmount,
-      expectedMerchantName: input.expectedMerchantName,
-      expectedTransactionAt: input.expectedTransactionAt,
-      parseResult: parsed,
-      consentVersion: "2026-06-28",
-      status: "submitted",
-      createdAt: new Date().toISOString(),
+    try {
+      await this.repository.submitCardMessageSample(this.authUser.id, {
+        cardCompanyName: input.cardCompanyName,
+        maskedMessage: maskSensitiveText(input.message),
+        expectedAmount: input.expectedAmount,
+        expectedMerchantName: input.expectedMerchantName,
+        expectedTransactionAt: input.expectedTransactionAt,
+        parseResult: parsed,
+      })
+      await this.refreshFinanceData()
+      return this.dataState === "ready"
+    } catch (error) {
+      this.setDataError(error)
+      return false
     }
-    this.data.cardMessageSamples.unshift(sample)
-    this.persist()
   }
 
   private async applyAuthSession(session: AuthSessionInfo | null): Promise<void> {
@@ -484,6 +481,9 @@ export class AppStore {
       this.authUser = null
       this.authState = "anonymous"
       this.initializedWorkspaceUserId = null
+      this.workspaceInitialization = null
+      this.hydrate(createEmptyFinanceData())
+      this.dataState = "idle"
       return
     }
 
@@ -491,18 +491,14 @@ export class AppStore {
     this.authState = "authenticated"
     this.authError = null
 
-    if (this.initializedWorkspaceUserId !== session.user.id) {
-      this.initializedWorkspaceUserId = session.user.id
-      try {
-        await ensureAuthenticatedWorkspace()
-      } catch (error) {
-        this.initializedWorkspaceUserId = null
-        this.setAuthError(error)
-        return
-      }
+    try {
+      await this.ensureWorkspace(session.user.id)
+    } catch (error) {
+      this.setAuthError(error)
+      return
     }
 
-    await this.checkSupabase()
+    await Promise.all([this.refreshFinanceData(), this.checkSupabase()])
   }
 
   private setAuthError(error: unknown): void {
@@ -510,8 +506,30 @@ export class AppStore {
     this.authError = error instanceof Error ? error.message : "인증 처리 중 알 수 없는 오류가 발생했습니다."
   }
 
-  private persist(): void {
-    this.repository.save(this.data)
+  private setDataError(error: unknown): void {
+    this.dataState = "error"
+    this.dataError = error instanceof Error ? error.message : "가계부 데이터를 저장하지 못했습니다."
+  }
+
+  private async ensureWorkspace(userId: string): Promise<void> {
+    if (this.initializedWorkspaceUserId !== userId) {
+      this.initializedWorkspaceUserId = userId
+      this.workspaceInitialization = ensureAuthenticatedWorkspace().then(() => undefined)
+    }
+
+    const initialization = this.workspaceInitialization
+    try {
+      await initialization
+    } catch (error) {
+      if (this.initializedWorkspaceUserId === userId) {
+        this.initializedWorkspaceUserId = null
+      }
+      throw error
+    } finally {
+      if (this.workspaceInitialization === initialization) {
+        this.workspaceInitialization = null
+      }
+    }
   }
 }
 

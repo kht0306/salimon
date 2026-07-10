@@ -18,25 +18,27 @@ export const SampleSubmissionPanel = observer(function SampleSubmissionPanel() {
   const [consent, setConsent] = useState(false)
   const masked = useMemo(() => maskSensitiveText(message), [message])
 
-  function submit() {
-    store.submitCardMessageSample({
+  async function submit() {
+    const submitted = await store.submitCardMessageSample({
       cardCompanyName: company || undefined,
       message,
       expectedAmount: amount ? Number(amount) : undefined,
       expectedMerchantName: merchant || undefined,
     })
-    setCompany("")
-    setMessage("")
-    setAmount("")
-    setMerchant("")
-    setConsent(false)
+    if (submitted) {
+      setCompany("")
+      setMessage("")
+      setAmount("")
+      setMerchant("")
+      setConsent(false)
+    }
   }
 
   return (
     <Panel>
       <PanelHeader>
         <PanelTitle>카드 문자 샘플</PanelTitle>
-        <Button $variant="primary" disabled={!message.trim() || !consent} onClick={submit}>
+        <Button $variant="primary" disabled={!message.trim() || !consent || !store.authUser} onClick={() => void submit()}>
           <Send size={16} /> 제출
         </Button>
       </PanelHeader>
