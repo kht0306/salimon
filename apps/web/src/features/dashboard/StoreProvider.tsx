@@ -12,6 +12,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     store.hydrate(repository.load())
+    const unsubscribe = store.observeAuth()
+    void store.initializeAuth()
+
+    return unsubscribe
   }, [repository, store])
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>

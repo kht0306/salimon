@@ -1,9 +1,19 @@
 "use client"
 
 import { observer } from "mobx-react-lite"
-import { CalendarDays, ClipboardCheck, Database, Layers3, MessageSquareText, RotateCcw, Tags, Users } from "lucide-react"
+import {
+  CalendarDays,
+  ClipboardCheck,
+  Database,
+  Layers3,
+  MessageSquareText,
+  RotateCcw,
+  Tags,
+  Users,
+} from "lucide-react"
 import { StoreProvider, useAppStore } from "./StoreProvider"
 import { CalendarGrid } from "./components/CalendarGrid"
+import { AuthControls } from "./components/AuthControls"
 import { CategoryManager } from "./components/CategoryManager"
 import { ConnectionPanel } from "./components/ConnectionPanel"
 import { SampleSubmissionPanel } from "./components/SampleSubmissionPanel"
@@ -33,9 +43,11 @@ const DashboardContent = observer(function DashboardContent() {
           <BrandMark>Sa</BrandMark>
           <div>
             <BrandName>Salimon</BrandName>
-            <BrandSub>{store.profile.nickname}</BrandSub>
+            <BrandSub>{store.authUser?.nickname ?? store.profile.nickname}</BrandSub>
           </div>
         </Brand>
+
+        <AuthControls />
 
         <LedgerSelect
           value={store.selectedLedgerId}
@@ -95,7 +107,7 @@ const DashboardContent = observer(function DashboardContent() {
             </Eyebrow>
             <PageTitle>{store.currentLedger?.name ?? "가계부"}</PageTitle>
           </div>
-          <UserBadge>로컬 MVP</UserBadge>
+          <UserBadge $connected={Boolean(store.authUser)}>{store.authUser ? "카카오 연결됨" : "로그인 필요"}</UserBadge>
         </Topline>
 
         {store.activeView === "calendar" ? <CalendarGrid /> : null}
@@ -204,11 +216,11 @@ const PageTitle = styled.h1`
   letter-spacing: 0;
 `
 
-const UserBadge = styled.div`
+const UserBadge = styled.div<{ $connected: boolean }>`
   border: 1px solid ${colors.border};
   border-radius: 999px;
-  background: #fff;
-  color: ${colors.muted};
+  background: ${({ $connected }) => ($connected ? "#eef7f4" : "#fff")};
+  color: ${({ $connected }) => ($connected ? colors.green : colors.muted)};
   padding: 7px 10px;
   font-size: 12px;
   font-weight: 750;

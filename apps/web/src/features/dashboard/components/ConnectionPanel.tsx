@@ -59,8 +59,8 @@ export const ConnectionPanel = observer(function ConnectionPanel() {
 
         <Note>
           {status.isAuthenticated
-            ? "현재 Supabase 세션이 있습니다."
-            : "현재는 로그인 전 상태입니다. Kakao Auth를 붙이면 여기서 세션 상태까지 함께 확인합니다."}
+            ? `${store.authUser?.nickname ?? "사용자"}님의 Supabase 세션이 연결되어 있습니다.`
+            : "현재는 로그인 전 상태입니다. 사이드바에서 카카오 로그인을 진행해 주세요."}
         </Note>
       </Content>
     </Panel>

@@ -1,6 +1,13 @@
 import {
   checkSupabaseConnection,
+  ensureAuthenticatedWorkspace,
+  getCurrentAuthSession,
   LocalFinanceRepository,
+  observeAuthSession,
+  signInWithKakao,
+  signOutFromSupabase,
+  type AuthSessionInfo,
+  type AuthUserInfo,
   type FinanceData,
   type SupabaseConnectionCheck,
 } from "@salimon/api-client"
@@ -49,6 +56,10 @@ export class AppStore {
   selectedMonth: string
   selectedDate: string
   activeView: "calendar" | "categories" | "shared" | "sms" | "samples" | "connection" = "calendar"
+  authState: "loading" | "authenticated" | "anonymous" | "error" = "loading"
+  authUser: AuthUserInfo | null = null
+  authError: string | null = null
+  private initializedWorkspaceUserId: string | null = null
   supabaseConnection: SupabaseConnectionCheck = {
     state: "idle",
     hasUrl: false,
@@ -154,6 +165,48 @@ export class AppStore {
       message: "Supabase 연결을 확인하는 중입니다.",
     }
     this.supabaseConnection = await checkSupabaseConnection()
+  }
+
+  async initializeAuth(): Promise<void> {
+    this.authState = "loading"
+    this.authError = null
+
+    try {
+      await this.applyAuthSession(await getCurrentAuthSession())
+    } catch (error) {
+      this.setAuthError(error)
+    }
+  }
+
+  observeAuth(): () => void {
+    return observeAuthSession((_event, session) => {
+      void this.applyAuthSession(session)
+    })
+  }
+
+  async loginWithKakao(): Promise<void> {
+    this.authState = "loading"
+    this.authError = null
+
+    try {
+      await signInWithKakao()
+    } catch (error) {
+      this.setAuthError(error)
+    }
+  }
+
+  async logout(): Promise<void> {
+    this.authError = null
+
+    try {
+      await signOutFromSupabase()
+      this.authUser = null
+      this.authState = "anonymous"
+      this.initializedWorkspaceUserId = null
+      await this.checkSupabase()
+    } catch (error) {
+      this.setAuthError(error)
+    }
   }
 
   switchLedger(ledgerId: string): void {
@@ -391,7 +444,12 @@ export class AppStore {
     })
 
     this.data.smsCandidates = this.data.smsCandidates.map((item) =>
-      item.id === candidateId ? { ...item, status: categoryId ? "registered" : "auto_registered_other" } : item,
+      item.id === candidateId
+        ? {
+            ...item,
+            status: categoryId ? "registered" : "auto_registered_other",
+          }
+        : item,
     )
     this.persist()
   }
@@ -419,6 +477,37 @@ export class AppStore {
     }
     this.data.cardMessageSamples.unshift(sample)
     this.persist()
+  }
+
+  private async applyAuthSession(session: AuthSessionInfo | null): Promise<void> {
+    if (!session) {
+      this.authUser = null
+      this.authState = "anonymous"
+      this.initializedWorkspaceUserId = null
+      return
+    }
+
+    this.authUser = session.user
+    this.authState = "authenticated"
+    this.authError = null
+
+    if (this.initializedWorkspaceUserId !== session.user.id) {
+      this.initializedWorkspaceUserId = session.user.id
+      try {
+        await ensureAuthenticatedWorkspace()
+      } catch (error) {
+        this.initializedWorkspaceUserId = null
+        this.setAuthError(error)
+        return
+      }
+    }
+
+    await this.checkSupabase()
+  }
+
+  private setAuthError(error: unknown): void {
+    this.authState = "error"
+    this.authError = error instanceof Error ? error.message : "인증 처리 중 알 수 없는 오류가 발생했습니다."
   }
 
   private persist(): void {
