@@ -1,20 +1,28 @@
 "use client"
 
 import styled from "@emotion/styled"
-import { colors } from "@salimon/ui-tokens"
+import { colors, radii } from "@salimon/ui-tokens"
 import { Archive, Plus, Save } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useState } from "react"
 import { useAppStore } from "../StoreProvider"
-import { Button, Field, Input, Panel, PanelHeader, PanelTitle, Select } from "../styles"
+import { Button, Field, IconButton, Input, Panel, PanelHeader, PanelTitle, Select } from "../styles"
 
 const colorOptions = ["#2d6a4f", "#e4572e", "#277da1", "#f4a261", "#7b2cbf", "#6c757d"]
-const iconOptions = ["utensils", "coffee", "bus", "shopping-bag", "home", "more-horizontal"]
+const iconOptions = [
+  { value: "utensils", label: "식비" },
+  { value: "coffee", label: "카페" },
+  { value: "bus", label: "교통" },
+  { value: "shopping-bag", label: "쇼핑" },
+  { value: "home", label: "주거" },
+  { value: "more-horizontal", label: "기타" },
+]
+const iconLabels = Object.fromEntries(iconOptions.map((option) => [option.value, option.label]))
 
 export const CategoryManager = observer(function CategoryManager() {
   const store = useAppStore()
   const [name, setName] = useState("")
-  const [icon, setIcon] = useState(iconOptions[0])
+  const [icon, setIcon] = useState(iconOptions[0].value)
   const [color, setColor] = useState(colorOptions[0])
 
   async function create() {
@@ -41,8 +49,8 @@ export const CategoryManager = observer(function CategoryManager() {
           아이콘
           <Select value={icon} onChange={(event) => setIcon(event.target.value)}>
             {iconOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </Select>
@@ -67,21 +75,24 @@ export const CategoryManager = observer(function CategoryManager() {
             <ColorDot $color={category.color} />
             <CategoryInfo>
               <strong>{category.name}</strong>
-              <span>{category.isDefault ? "기본" : "사용자"} · {category.icon}</span>
+              <span>{category.isDefault ? "기본" : "사용자"} · {iconLabels[category.icon] ?? category.icon}</span>
             </CategoryInfo>
-            <Button
+            <IconButton
               title="색상 저장"
+              aria-label={`${category.name} 색상 저장`}
               onClick={() => void store.updateCategory(category.id, { color: category.color })}
             >
               <Save size={15} />
-            </Button>
-            <Button
+            </IconButton>
+            <IconButton
               $variant="danger"
+              title="카테고리 비활성화"
+              aria-label={`${category.name} 비활성화`}
               disabled={category.isDefault || category.name === "기타"}
               onClick={() => void store.archiveCategory(category.id)}
             >
-              <Archive size={15} /> 비활성화
-            </Button>
+              <Archive size={15} />
+            </IconButton>
           </CategoryRow>
         ))}
       </CategoryList>
@@ -95,6 +106,8 @@ const CategoryComposer = styled.div`
   gap: 12px;
   padding: 16px 18px;
   align-items: end;
+  border-bottom: 1px solid ${colors.border};
+  background: ${colors.panelSubtle};
 
   @media (max-width: 720px) {
     grid-template-columns: 1fr;
@@ -109,18 +122,17 @@ const Swatches = styled.div`
 `
 
 const Swatch = styled.button<{ $color: string; $selected: boolean }>`
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  border: 3px solid ${({ $selected }) => ($selected ? colors.ink : "#fff")};
+  width: 24px;
+  height: 24px;
+  border-radius: ${radii.xs};
+  border: 2px solid ${({ $selected }) => ($selected ? colors.ink : "#fff")};
   outline: 1px solid ${colors.border};
   background: ${({ $color }) => $color};
 `
 
 const CategoryList = styled.div`
   display: grid;
-  gap: 8px;
-  padding: 0 18px 18px;
+  padding: 4px 18px 12px;
 `
 
 const CategoryRow = styled.div`
@@ -128,16 +140,14 @@ const CategoryRow = styled.div`
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
-  border: 1px solid ${colors.border};
-  border-radius: 8px;
-  background: #fff;
-  padding: 10px;
+  border-bottom: 1px solid ${colors.border};
+  padding: 10px 0;
 `
 
 const ColorDot = styled.span<{ $color: string }>`
   width: 14px;
   height: 14px;
-  border-radius: 999px;
+  border-radius: ${radii.round};
   background: ${({ $color }) => $color};
 `
 

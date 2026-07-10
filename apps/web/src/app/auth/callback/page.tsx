@@ -1,7 +1,7 @@
 "use client"
 
 import { completeAuthCallback, ensureAuthenticatedWorkspace } from "@salimon/api-client"
-import { colors } from "@salimon/ui-tokens"
+import { colors, radii, shadows } from "@salimon/ui-tokens"
 import styled from "@emotion/styled"
 import { CheckCircle2, LoaderCircle, TriangleAlert } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -63,7 +63,7 @@ const CallbackMain = styled.main`
   display: grid;
   place-items: center;
   background: ${colors.canvas};
-  padding: 20px;
+  padding: 24px;
 `
 
 const StatusPanel = styled.section`
@@ -73,19 +73,22 @@ const StatusPanel = styled.section`
   gap: 14px;
   align-items: start;
   border: 1px solid ${colors.border};
-  border-radius: 8px;
+  border-radius: ${radii.md};
   background: #fff;
-  padding: 20px;
+  box-shadow: ${shadows.panel};
+  padding: 24px;
 
   h1 {
     margin: 0;
-    font-size: 18px;
+    font-size: 16px;
+    font-weight: 650;
     line-height: 1.3;
   }
 
   p {
     margin: 6px 0 0;
     color: ${colors.muted};
+    font-size: 13px;
     line-height: 1.5;
   }
 

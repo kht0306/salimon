@@ -2,8 +2,8 @@
 
 import styled from "@emotion/styled"
 import { buildMonthCalendar, formatKrw, fromMonthKey, toDateKey } from "@salimon/domain"
-import { colors } from "@salimon/ui-tokens"
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
+import { colors, radii } from "@salimon/ui-tokens"
+import { CalendarCheck2, ChevronLeft, ChevronRight } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useMemo } from "react"
 import { useAppStore } from "../StoreProvider"
@@ -35,47 +35,53 @@ export const CalendarGrid = observer(function CalendarGrid() {
             store.selectDate(toDateKey(new Date()))
           }}
         >
-          <Plus size={16} /> 오늘
+          <CalendarCheck2 size={15} /> 오늘
         </Button>
       </PanelHeader>
 
-      <WeekHeader>
-        {weekdayLabels.map((label) => (
-          <Weekday key={label}>{label}</Weekday>
-        ))}
-      </WeekHeader>
-      <Grid>
-        {days.map((day) => {
-          const transactions = store.monthTransactions.filter(
-            (transaction) => toDateKey(new Date(transaction.transactionAt)) === day.date,
-          )
-          const expense = transactions
-            .filter((transaction) => transaction.type === "expense" && transaction.status !== "excluded")
-            .reduce((sum, transaction) => sum + transaction.amount, 0)
-          const income = transactions
-            .filter((transaction) => transaction.type === "income" && transaction.status !== "excluded")
-            .reduce((sum, transaction) => sum + transaction.amount, 0)
+      <CalendarViewport>
+        <CalendarBody>
+          <WeekHeader>
+            {weekdayLabels.map((label) => (
+              <Weekday key={label}>{label}</Weekday>
+            ))}
+          </WeekHeader>
+          <Grid>
+            {days.map((day) => {
+              const transactions = store.monthTransactions.filter(
+                (transaction) => toDateKey(new Date(transaction.transactionAt)) === day.date,
+              )
+              const expense = transactions
+                .filter((transaction) => transaction.type === "expense" && transaction.status !== "excluded")
+                .reduce((sum, transaction) => sum + transaction.amount, 0)
+              const income = transactions
+                .filter((transaction) => transaction.type === "income" && transaction.status !== "excluded")
+                .reduce((sum, transaction) => sum + transaction.amount, 0)
 
-          return (
-            <DayCell
-              key={day.date}
-              type="button"
-              $selected={store.selectedDate === day.date}
-              $muted={!day.isCurrentMonth}
-              onClick={() => store.selectDate(day.date)}
-            >
-              <DayTop>
-                <DayNumber $today={day.isToday}>{day.dayOfMonth}</DayNumber>
-                {transactions.length > 0 ? <Count>{transactions.length}</Count> : null}
-              </DayTop>
-              <DayAmounts>
-                {expense > 0 ? <Expense>-{formatKrw(expense)}</Expense> : null}
-                {income > 0 ? <Income>+{formatKrw(income)}</Income> : null}
-              </DayAmounts>
-            </DayCell>
-          )
-        })}
-      </Grid>
+              return (
+                <DayCell
+                  key={day.date}
+                  type="button"
+                  aria-label={`${day.date}, 거래 ${transactions.length}건`}
+                  aria-pressed={store.selectedDate === day.date}
+                  $selected={store.selectedDate === day.date}
+                  $muted={!day.isCurrentMonth}
+                  onClick={() => store.selectDate(day.date)}
+                >
+                  <DayTop>
+                    <DayNumber $today={day.isToday}>{day.dayOfMonth}</DayNumber>
+                    {transactions.length > 0 ? <Count>{transactions.length}</Count> : null}
+                  </DayTop>
+                  <DayAmounts>
+                    {expense > 0 ? <Expense>-{formatKrw(expense)}</Expense> : null}
+                    {income > 0 ? <Income>+{formatKrw(income)}</Income> : null}
+                  </DayAmounts>
+                </DayCell>
+              )
+            })}
+          </Grid>
+        </CalendarBody>
+      </CalendarViewport>
     </Panel>
   )
 })
@@ -83,47 +89,75 @@ export const CalendarGrid = observer(function CalendarGrid() {
 const MonthControls = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+
+  h2 {
+    min-width: 104px;
+    text-align: center;
+  }
+`
+
+const CalendarViewport = styled.div`
+  overflow-x: auto;
+`
+
+const CalendarBody = styled.div`
+  min-width: 680px;
+
+  @media (max-width: 640px) {
+    min-width: 0;
+  }
 `
 
 const WeekHeader = styled.div`
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  padding: 10px 12px 0;
+  border-bottom: 1px solid ${colors.border};
+  background: ${colors.panelSubtle};
 `
 
 const Weekday = styled.div`
   color: ${colors.muted};
-  font-size: 12px;
-  font-weight: 750;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 600;
   text-align: center;
 `
 
 const Grid = styled.div`
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 1px;
-  padding: 12px;
-
-  @media (max-width: 640px) {
-    padding: 8px;
-  }
 `
 
 const DayCell = styled.button<{ $selected: boolean; $muted: boolean }>`
   min-width: 0;
-  min-height: 104px;
-  aspect-ratio: 1.1 / 1;
-  border: 1px solid ${({ $selected }) => ($selected ? colors.teal : colors.border)};
-  border-radius: 8px;
-  background: ${({ $selected }) => ($selected ? "#eef7f4" : "#fff")};
-  color: ${({ $muted }) => ($muted ? "#a1aaa3" : colors.ink)};
-  padding: 9px;
+  min-height: 108px;
+  border: 0;
+  border-right: 1px solid ${colors.border};
+  border-bottom: 1px solid ${colors.border};
+  border-radius: 0;
+  background: ${({ $selected, $muted }) => ($selected ? colors.tealSoft : $muted ? colors.panelSubtle : "#fff")};
+  color: ${({ $muted }) => ($muted ? colors.subtle : colors.ink)};
+  padding: 10px;
   text-align: left;
   overflow: hidden;
+  box-shadow: ${({ $selected }) => ($selected ? `inset 0 0 0 1px ${colors.teal}` : "none")};
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+
+  &:nth-of-type(7n) {
+    border-right: 0;
+  }
+
+  &:nth-last-of-type(-n + 7) {
+    border-bottom: 0;
+  }
+
+  &:hover {
+    background: ${({ $selected }) => ($selected ? colors.tealSoft : colors.panelSubtle)};
+  }
 
   @media (max-width: 640px) {
-    min-height: 74px;
+    min-height: 76px;
     padding: 6px;
   }
 `
@@ -136,37 +170,46 @@ const DayTop = styled.div`
 `
 
 const DayNumber = styled.span<{ $today: boolean }>`
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: inline-grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: ${radii.round};
   background: ${({ $today }) => ($today ? colors.ink : "transparent")};
   color: ${({ $today }) => ($today ? "#fff" : "inherit")};
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 650;
+
+  @media (max-width: 640px) {
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+  }
 `
 
 const Count = styled.span`
-  min-width: 20px;
-  height: 20px;
+  min-width: 18px;
+  height: 18px;
   display: grid;
   place-items: center;
-  border-radius: 999px;
-  background: #f1efe7;
+  border-radius: ${radii.round};
+  background: #f4f4f5;
   color: ${colors.muted};
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 650;
 `
 
 const DayAmounts = styled.div`
   display: grid;
-  gap: 3px;
-  margin-top: 9px;
-  font-size: 12px;
-  font-weight: 760;
+  gap: 2px;
+  margin-top: 10px;
+  font-family: var(--font-geist-mono);
+  font-size: 11px;
+  font-weight: 600;
 
   @media (max-width: 640px) {
-    font-size: 10px;
+    margin-top: 6px;
+    font-size: 9px;
   }
 `
 

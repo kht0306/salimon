@@ -1,7 +1,7 @@
 "use client"
 
 import styled from "@emotion/styled"
-import { colors } from "@salimon/ui-tokens"
+import { colors, radii } from "@salimon/ui-tokens"
 import { CheckCircle2, Database, RefreshCw, ShieldCheck, TriangleAlert, Wifi } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useEffect } from "react"
@@ -69,8 +69,6 @@ export const ConnectionPanel = observer(function ConnectionPanel() {
 
 const Content = styled.div`
   display: grid;
-  gap: 14px;
-  padding: 18px;
 `
 
 const StatusCard = styled.div<{ $state: string }>`
@@ -78,11 +76,10 @@ const StatusCard = styled.div<{ $state: string }>`
   grid-template-columns: auto minmax(0, 1fr);
   gap: 12px;
   align-items: start;
-  border: 1px solid ${({ $state }) => ($state === "configured" ? "rgba(45, 106, 79, 0.32)" : colors.border)};
-  border-radius: 8px;
-  background: ${({ $state }) => ($state === "configured" ? "#eef7f4" : "#fffaf0")};
+  border-bottom: 1px solid ${colors.border};
+  background: ${({ $state }) => ($state === "configured" ? colors.greenSoft : "#fffbeb")};
   color: ${({ $state }) => ($state === "configured" ? colors.green : colors.ink)};
-  padding: 14px;
+  padding: 16px 18px;
 
   p {
     margin: 4px 0 0;
@@ -93,10 +90,16 @@ const StatusCard = styled.div<{ $state: string }>`
 const Checks = styled.div`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  padding: 8px 18px;
 
   @media (max-width: 720px) {
     grid-template-columns: 1fr;
+
+    > div {
+      padding-right: 0;
+      padding-left: 0;
+      border-left: 0;
+    }
   }
 `
 
@@ -106,10 +109,17 @@ const CheckItem = styled.div<{ $ok: boolean }>`
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
-  border: 1px solid ${colors.border};
-  border-radius: 8px;
-  background: #fff;
-  padding: 12px;
+  border-bottom: 1px solid ${colors.border};
+  padding: 12px 0;
+
+  &:nth-of-type(odd) {
+    padding-right: 14px;
+  }
+
+  &:nth-of-type(even) {
+    padding-left: 14px;
+    border-left: 1px solid ${colors.border};
+  }
 
   svg,
   strong {
@@ -122,8 +132,10 @@ const CheckItem = styled.div<{ $ok: boolean }>`
 `
 
 const Note = styled.div`
-  border: 1px dashed ${colors.border};
-  border-radius: 8px;
+  margin: 10px 18px 16px;
+  border-radius: ${radii.sm};
+  background: ${colors.panelSubtle};
   color: ${colors.muted};
   padding: 12px;
+  font-size: 12px;
 `

@@ -2,14 +2,30 @@
 
 import styled from "@emotion/styled"
 import { formatKrw } from "@salimon/domain"
-import { colors } from "@salimon/ui-tokens"
-import { Archive, Bell, CheckCircle2, Clock3, Plus, SearchCheck, XCircle } from "lucide-react"
+import type { SmsCandidateStatus } from "@salimon/types"
+import { colors, radii } from "@salimon/ui-tokens"
+import { Archive, Bell, CheckCircle2, Clock3, SearchCheck, XCircle } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useState } from "react"
 import { useAppStore } from "../StoreProvider"
 import { Button, Field, Panel, PanelHeader, PanelTitle, Textarea } from "../styles"
 
 const example = "[카드사] 06/28 12:34 스타벅스 5,800원 승인"
+const examples = [
+  { label: "국민카드", value: "[국민카드] 06/28 12:34 5,800원 스타벅스 승인" },
+  { label: "체크카드", value: "체크카드 15,000원 사용 CU편의점" },
+  { label: "현대카드", value: "현대카드 일시불 승인 23,400원 쿠팡" },
+]
+const statusLabels: Record<SmsCandidateStatus, string> = {
+  detected: "감지됨",
+  notified: "알림",
+  deferred: "보류",
+  opened: "확인 중",
+  registered: "등록됨",
+  ignored: "제외됨",
+  auto_registered_other: "기타 등록",
+  needs_review: "검토 필요",
+}
 
 export const SmsCandidatePanel = observer(function SmsCandidatePanel() {
   const store = useAppStore()
@@ -42,7 +58,7 @@ export const SmsCandidatePanel = observer(function SmsCandidatePanel() {
                   {formatKrw(candidate.parsed.amount)} · 신뢰도 {Math.round(candidate.parsed.confidence * 100)}%
                 </Meta>
               </div>
-              <Status>{candidate.status}</Status>
+              <Status>{statusLabels[candidate.status]}</Status>
             </CandidateTop>
             <Masked>{candidate.maskedMessage}</Masked>
             <Actions>
@@ -68,13 +84,9 @@ export const SmsCandidatePanel = observer(function SmsCandidatePanel() {
       </CandidateList>
 
       <QuickExamples>
-        {[
-          "[국민카드] 06/28 12:34 5,800원 스타벅스 승인",
-          "체크카드 15,000원 사용 CU편의점",
-          "현대카드 일시불 승인 23,400원 쿠팡",
-        ].map((item) => (
-          <Button key={item} onClick={() => setRawText(item)}>
-            <Plus size={14} /> 예시
+        {examples.map((item) => (
+          <Button key={item.label} onClick={() => setRawText(item.value)}>
+            {item.label}
           </Button>
         ))}
       </QuickExamples>
@@ -84,17 +96,19 @@ export const SmsCandidatePanel = observer(function SmsCandidatePanel() {
 
 const Composer = styled.div`
   padding: 16px 18px;
+  border-bottom: 1px solid ${colors.border};
+  background: ${colors.panelSubtle};
 `
 
 const CandidateList = styled.div`
   display: grid;
   gap: 10px;
-  padding: 0 18px 18px;
+  padding: 16px 18px;
 `
 
 const Candidate = styled.article`
   border: 1px solid ${colors.border};
-  border-radius: 8px;
+  border-radius: ${radii.sm};
   background: #fff;
   padding: 12px;
 `
@@ -113,17 +127,25 @@ const Meta = styled.div`
 `
 
 const Status = styled.span`
-  border: 1px solid ${colors.border};
-  border-radius: 999px;
-  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: ${colors.muted};
-  font-size: 12px;
+  font-size: 11px;
+
+  &::before {
+    width: 6px;
+    height: 6px;
+    border-radius: ${radii.round};
+    background: ${colors.amber};
+    content: "";
+  }
 `
 
 const Masked = styled.div`
   margin-top: 10px;
-  border-radius: 8px;
-  background: #f6f7f3;
+  border-radius: ${radii.sm};
+  background: ${colors.panelSubtle};
   padding: 10px;
   color: ${colors.ink};
   font-size: 13px;
@@ -137,18 +159,19 @@ const Actions = styled.div`
 `
 
 const Empty = styled.div`
-  min-height: 100px;
-  display: grid;
-  place-items: center;
-  gap: 8px;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   color: ${colors.muted};
-  border: 1px dashed ${colors.border};
-  border-radius: 8px;
+  border-bottom: 1px solid ${colors.border};
+  font-size: 12px;
 `
 
 const QuickExamples = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 0 18px 18px;
+  padding: 0 18px 16px;
 `

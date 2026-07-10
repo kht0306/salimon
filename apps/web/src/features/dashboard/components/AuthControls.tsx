@@ -1,9 +1,10 @@
 "use client"
 
 import styled from "@emotion/styled"
-import { colors } from "@salimon/ui-tokens"
+import { colors, radii } from "@salimon/ui-tokens"
 import { LogOut, MessageCircle, UserRound } from "lucide-react"
 import { observer } from "mobx-react-lite"
+import Image from "next/image"
 import { useAppStore } from "../StoreProvider"
 
 export const AuthControls = observer(function AuthControls() {
@@ -15,7 +16,11 @@ export const AuthControls = observer(function AuthControls() {
       <AuthSection>
         <Account>
           <Avatar aria-hidden="true">
-            {store.authUser.avatarUrl ? <AvatarImage src={store.authUser.avatarUrl} alt="" /> : <UserRound size={17} />}
+            {store.authUser.avatarUrl ? (
+              <AvatarImage src={store.authUser.avatarUrl} width={30} height={30} unoptimized alt="" />
+            ) : (
+              <UserRound size={17} />
+            )}
           </Avatar>
           <AccountCopy>
             <strong>{store.authUser.nickname}</strong>
@@ -47,17 +52,18 @@ const AuthSection = styled.div`
 `
 
 const KakaoButton = styled.button`
-  min-height: 42px;
+  min-height: 36px;
   width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: ${radii.sm};
   background: #fee500;
   color: #191919;
-  font-weight: 750;
+  font-size: 13px;
+  font-weight: 600;
 
   &:hover:not(:disabled) {
     background: #f4dc00;
@@ -72,27 +78,27 @@ const KakaoButton = styled.button`
 const Account = styled.div`
   min-width: 0;
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
   align-items: center;
   gap: 9px;
   border: 1px solid ${colors.border};
-  border-radius: 8px;
+  border-radius: ${radii.sm};
   background: #fff;
-  padding: 8px;
+  padding: 7px;
 `
 
 const Avatar = styled.div`
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
   overflow: hidden;
   border-radius: 50%;
-  background: #eef7f4;
-  color: ${colors.green};
+  background: ${colors.tealSoft};
+  color: ${colors.teal};
 `
 
-const AvatarImage = styled.img`
+const AvatarImage = styled(Image)`
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -120,18 +126,18 @@ const AccountCopy = styled.div`
 `
 
 const IconAction = styled.button`
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: ${radii.sm};
   background: transparent;
   color: ${colors.muted};
 
   &:hover {
     border-color: ${colors.border};
-    background: #fbfcf8;
+    background: ${colors.panelSubtle};
     color: ${colors.ink};
   }
 `

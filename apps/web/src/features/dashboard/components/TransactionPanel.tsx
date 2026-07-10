@@ -3,12 +3,18 @@
 import styled from "@emotion/styled"
 import { formatKoreanDate, formatKoreanTime, formatKrw, getDateTimeLocalValue } from "@salimon/domain"
 import type { Transaction } from "@salimon/types"
-import { colors } from "@salimon/ui-tokens"
+import { colors, radii } from "@salimon/ui-tokens"
 import { Check, Pencil, Plus, Save, Trash2, X } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useMemo, useState } from "react"
 import { useAppStore } from "../StoreProvider"
 import { Button, Field, IconButton, Input, PanelTitle, Select, SidePanel, Textarea } from "../styles"
+
+const statusLabels: Record<Transaction["status"], string> = {
+  pending: "대기",
+  confirmed: "확정",
+  excluded: "제외",
+}
 
 export const TransactionPanel = observer(function TransactionPanel() {
   const store = useAppStore()
@@ -180,25 +186,27 @@ export const TransactionPanel = observer(function TransactionPanel() {
               <TransactionBody>
                 <TransactionName>{transaction.merchantName || transaction.memo || "거래"}</TransactionName>
                 <TransactionMeta>
-                  {category?.name ?? "기타"} · {transaction.status}
+                  {category?.name ?? "기타"} · {statusLabels[transaction.status]}
                 </TransactionMeta>
               </TransactionBody>
-              <Amount $type={transaction.type}>
-                {transaction.type === "income" ? "+" : "-"}
-                {formatKrw(transaction.amount)}
-              </Amount>
-              <ActionCluster>
-                <IconButton title="수정" onClick={() => openEdit(transaction)}>
-                  <Pencil size={15} />
-                </IconButton>
-                <IconButton
-                  $variant="danger"
-                  title="삭제"
-                  onClick={() => void store.softDeleteTransaction(transaction.id)}
-                >
-                  <Trash2 size={15} />
-                </IconButton>
-              </ActionCluster>
+              <TransactionEnd>
+                <Amount $type={transaction.type}>
+                  {transaction.type === "income" ? "+" : "-"}
+                  {formatKrw(transaction.amount)}
+                </Amount>
+                <ActionCluster>
+                  <CompactAction title="수정" onClick={() => openEdit(transaction)}>
+                    <Pencil size={14} />
+                  </CompactAction>
+                  <CompactAction
+                    $variant="danger"
+                    title="삭제"
+                    onClick={() => void store.softDeleteTransaction(transaction.id)}
+                  >
+                    <Trash2 size={14} />
+                  </CompactAction>
+                </ActionCluster>
+              </TransactionEnd>
             </TransactionItem>
           )
         })}
@@ -219,7 +227,9 @@ const PanelTop = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid ${colors.border};
 `
 
 const Subtle = styled.div`
@@ -232,8 +242,8 @@ const Editor = styled.div`
   display: grid;
   gap: 12px;
   border: 1px solid ${colors.border};
-  border-radius: 8px;
-  background: #fff;
+  border-radius: ${radii.md};
+  background: ${colors.panelSubtle};
   padding: 14px;
   margin-bottom: 16px;
 `
@@ -252,20 +262,18 @@ const TwoColumns = styled.div`
 
 const TransactionList = styled.div`
   display: grid;
-  gap: 8px;
 `
 
 const TransactionItem = styled.article`
   display: grid;
-  grid-template-columns: 50px minmax(0, 1fr) auto;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
   gap: 10px;
-  align-items: center;
-  border: 1px solid ${colors.border};
-  border-radius: 8px;
-  background: #fff;
-  padding: 10px;
+  align-items: start;
+  border-bottom: 1px solid ${colors.border};
+  padding: 12px 0;
 
-  &:hover > div:last-of-type {
+  &:hover > div:last-of-type > div:last-of-type,
+  &:focus-within > div:last-of-type > div:last-of-type {
     opacity: 1;
   }
 `
@@ -274,6 +282,7 @@ const TransactionTime = styled.div`
   color: ${colors.muted};
   font-family: var(--font-geist-mono);
   font-size: 12px;
+  line-height: 20px;
 `
 
 const TransactionBody = styled.div`
@@ -284,7 +293,8 @@ const TransactionName = styled.div`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 760;
+  font-size: 13px;
+  font-weight: 600;
 `
 
 const TransactionMeta = styled.div`
@@ -295,24 +305,42 @@ const TransactionMeta = styled.div`
 
 const Amount = styled.div<{ $type: Transaction["type"] }>`
   color: ${({ $type }) => ($type === "income" ? colors.green : $type === "expense" ? colors.coral : colors.blue)};
-  font-weight: 850;
+  font-family: var(--font-geist-mono);
+  font-size: 12px;
+  font-weight: 650;
   white-space: nowrap;
 `
 
+const TransactionEnd = styled.div`
+  display: grid;
+  justify-items: end;
+  gap: 7px;
+`
+
 const ActionCluster = styled.div`
-  grid-column: 1 / -1;
   display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  opacity: 0.88;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 140ms ease;
+
+  @media (hover: none) {
+    opacity: 1;
+  }
+`
+
+const CompactAction = styled(IconButton)`
+  width: 28px;
+  min-height: 28px;
+  border-color: ${colors.border};
 `
 
 const Empty = styled.div`
-  min-height: 120px;
-  display: grid;
-  place-items: center;
-  gap: 8px;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   color: ${colors.muted};
-  border: 1px dashed ${colors.border};
-  border-radius: 8px;
+  border-bottom: 1px solid ${colors.border};
+  font-size: 12px;
 `

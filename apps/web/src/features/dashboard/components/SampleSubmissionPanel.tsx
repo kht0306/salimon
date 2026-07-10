@@ -2,7 +2,7 @@
 
 import styled from "@emotion/styled"
 import { maskSensitiveText } from "@salimon/domain"
-import { colors } from "@salimon/ui-tokens"
+import { colors, radii } from "@salimon/ui-tokens"
 import { Send } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useMemo, useState } from "react"
@@ -88,6 +88,8 @@ const FormGrid = styled.div`
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   padding: 16px 18px;
+  border-bottom: 1px solid ${colors.border};
+  background: ${colors.panelSubtle};
 
   label:last-child {
     grid-column: 1 / -1;
@@ -101,13 +103,19 @@ const FormGrid = styled.div`
 const Preview = styled.div`
   display: grid;
   gap: 8px;
-  padding: 0 18px 18px;
+  padding: 16px 18px;
+  border-bottom: 1px solid ${colors.border};
+
+  > strong {
+    font-size: 12px;
+    font-weight: 600;
+  }
 `
 
 const Masked = styled.div`
   min-height: 48px;
   border: 1px solid ${colors.border};
-  border-radius: 8px;
+  border-radius: ${radii.sm};
   background: #fff;
   padding: 10px;
 `
@@ -122,17 +130,14 @@ const Consent = styled.label`
 
 const Submissions = styled.div`
   display: grid;
-  gap: 8px;
-  padding: 0 18px 18px;
+  padding: 4px 18px 12px;
 `
 
 const Submission = styled.div`
   display: grid;
   gap: 4px;
-  border: 1px solid ${colors.border};
-  border-radius: 8px;
-  background: #fff;
-  padding: 10px;
+  border-bottom: 1px solid ${colors.border};
+  padding: 10px 0;
 
   span {
     color: ${colors.muted};

@@ -1,12 +1,15 @@
 "use client"
 
 import styled from "@emotion/styled"
-import { colors } from "@salimon/ui-tokens"
+import { colors, radii } from "@salimon/ui-tokens"
 import { Copy, Link, Plus, UserMinus } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useState } from "react"
 import { useAppStore } from "../StoreProvider"
 import { Button, Field, Input, Panel, PanelHeader, PanelTitle } from "../styles"
+
+const roleLabels = { owner: "소유자", admin: "관리자", member: "멤버", viewer: "뷰어" } as const
+const invitationLabels = { active: "사용 가능", accepted: "수락됨", expired: "만료됨", revoked: "취소됨" } as const
 
 export const SharedLedgerPanel = observer(function SharedLedgerPanel() {
   const store = useAppStore()
@@ -48,7 +51,7 @@ export const SharedLedgerPanel = observer(function SharedLedgerPanel() {
               <Avatar>{member.nickname.slice(0, 1)}</Avatar>
               <div>
                 <strong>{member.nickname}</strong>
-                <Meta>{member.role}</Meta>
+                <Meta>{roleLabels[member.role]}</Meta>
               </div>
               <Button $variant="danger" disabled={member.role === "owner"}>
                 <UserMinus size={15} /> 내보내기
@@ -65,7 +68,7 @@ export const SharedLedgerPanel = observer(function SharedLedgerPanel() {
             <Row key={invitation.id}>
               <Code>{invitation.inviteCode}</Code>
               <div>
-                <strong>{invitation.status}</strong>
+                <strong>{invitationLabels[invitation.status]}</strong>
                 <Meta>{new Date(invitation.expiresAt).toLocaleDateString("ko-KR")} 만료</Meta>
               </div>
               <Button onClick={() => navigator.clipboard?.writeText(invitation.inviteCode)}>
@@ -86,20 +89,27 @@ const Composer = styled.div`
   gap: 12px;
   align-items: end;
   padding: 16px 18px;
+  border-bottom: 1px solid ${colors.border};
+  background: ${colors.panelSubtle};
 `
 
 const Section = styled.section`
-  padding: 0 18px 18px;
+  padding: 16px 18px 4px;
+
+  & + & {
+    border-top: 1px solid ${colors.border};
+  }
 `
 
 const SectionTitle = styled.h3`
   margin: 0 0 10px;
-  font-size: 14px;
+  color: ${colors.muted};
+  font-size: 12px;
+  font-weight: 600;
 `
 
 const Rows = styled.div`
   display: grid;
-  gap: 8px;
 `
 
 const Row = styled.div`
@@ -107,10 +117,8 @@ const Row = styled.div`
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  border: 1px solid ${colors.border};
-  border-radius: 8px;
-  background: #fff;
-  padding: 10px;
+  border-bottom: 1px solid ${colors.border};
+  padding: 10px 0;
 `
 
 const Avatar = styled.div`
@@ -118,10 +126,10 @@ const Avatar = styled.div`
   height: 34px;
   display: grid;
   place-items: center;
-  border-radius: 999px;
-  background: #eef7f4;
-  color: ${colors.green};
-  font-weight: 850;
+  border-radius: ${radii.round};
+  background: ${colors.tealSoft};
+  color: ${colors.teal};
+  font-weight: 700;
 `
 
 const Meta = styled.div`
@@ -133,15 +141,15 @@ const Meta = styled.div`
 const Code = styled.div`
   min-width: 76px;
   font-family: var(--font-geist-mono);
-  font-weight: 850;
-  color: ${colors.teal};
+  font-weight: 650;
+  color: ${colors.blue};
 `
 
 const Empty = styled.div`
-  min-height: 84px;
-  display: grid;
-  place-items: center;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
   color: ${colors.muted};
-  border: 1px dashed ${colors.border};
-  border-radius: 8px;
+  border-bottom: 1px solid ${colors.border};
+  font-size: 12px;
 `

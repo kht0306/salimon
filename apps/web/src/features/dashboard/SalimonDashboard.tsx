@@ -5,11 +5,11 @@ import {
   CalendarDays,
   ClipboardCheck,
   Database,
-  Layers3,
   MessageSquareText,
   RefreshCw,
   Tags,
   Users,
+  WalletCards,
 } from "lucide-react"
 import { StoreProvider, useAppStore } from "./StoreProvider"
 import { CalendarGrid } from "./components/CalendarGrid"
@@ -23,7 +23,7 @@ import { TransactionPanel } from "./components/TransactionPanel"
 import { Button, Metric, MetricLabel, MetricRow, MetricValue, Sidebar, Shell, Workspace } from "./styles"
 import { formatKrw } from "@salimon/domain"
 import styled from "@emotion/styled"
-import { colors } from "@salimon/ui-tokens"
+import { colors, radii, spacing } from "@salimon/ui-tokens"
 
 export function SalimonDashboard() {
   return (
@@ -40,28 +40,28 @@ const DashboardContent = observer(function DashboardContent() {
     <Shell>
       <Sidebar>
         <Brand>
-          <BrandMark>Sa</BrandMark>
-          <div>
-            <BrandName>Salimon</BrandName>
-            <BrandSub>{store.authUser?.nickname ?? store.profile.nickname}</BrandSub>
-          </div>
+          <BrandMark aria-hidden="true">S</BrandMark>
+          <BrandName>Salimon</BrandName>
         </Brand>
 
-        <AuthControls />
-
-        <LedgerSelect
-          value={store.selectedLedgerId}
-          onChange={(event) => store.switchLedger(event.target.value)}
-          aria-label="가계부 선택"
-          disabled={store.data.ledgers.length === 0}
-        >
-          {store.data.ledgers.length === 0 ? <option value="">로그인 후 가계부를 불러옵니다</option> : null}
-          {store.data.ledgers.map((ledger) => (
-            <option key={ledger.id} value={ledger.id}>
-              {ledger.name}
-            </option>
-          ))}
-        </LedgerSelect>
+        <LedgerField>
+          <LedgerLabel>
+            <WalletCards size={14} /> 가계부
+          </LedgerLabel>
+          <LedgerSelect
+            value={store.selectedLedgerId}
+            onChange={(event) => store.switchLedger(event.target.value)}
+            aria-label="가계부 선택"
+            disabled={store.data.ledgers.length === 0}
+          >
+            {store.data.ledgers.length === 0 ? <option value="">로그인 후 불러오기</option> : null}
+            {store.data.ledgers.map((ledger) => (
+              <option key={ledger.id} value={ledger.id}>
+                {ledger.name}
+              </option>
+            ))}
+          </LedgerSelect>
+        </LedgerField>
 
         <MetricRow>
           <Metric>
@@ -75,46 +75,76 @@ const DashboardContent = observer(function DashboardContent() {
         </MetricRow>
 
         <Nav>
-          <NavButton $active={store.activeView === "calendar"} onClick={() => store.setView("calendar")}>
+          <NavButton
+            $active={store.activeView === "calendar"}
+            aria-current={store.activeView === "calendar" ? "page" : undefined}
+            onClick={() => store.setView("calendar")}
+          >
             <CalendarDays size={17} /> 캘린더
           </NavButton>
-          <NavButton $active={store.activeView === "categories"} onClick={() => store.setView("categories")}>
+          <NavButton
+            $active={store.activeView === "categories"}
+            aria-current={store.activeView === "categories" ? "page" : undefined}
+            onClick={() => store.setView("categories")}
+          >
             <Tags size={17} /> 카테고리
           </NavButton>
-          <NavButton $active={store.activeView === "shared"} onClick={() => store.setView("shared")}>
+          <NavButton
+            $active={store.activeView === "shared"}
+            aria-current={store.activeView === "shared" ? "page" : undefined}
+            onClick={() => store.setView("shared")}
+          >
             <Users size={17} /> 공동
           </NavButton>
-          <NavButton $active={store.activeView === "sms"} onClick={() => store.setView("sms")}>
+          <NavButton
+            $active={store.activeView === "sms"}
+            aria-current={store.activeView === "sms" ? "page" : undefined}
+            onClick={() => store.setView("sms")}
+          >
             <MessageSquareText size={17} /> 문자 후보
             {store.deferredSmsCandidates.length > 0 ? <Pill>{store.deferredSmsCandidates.length}</Pill> : null}
           </NavButton>
-          <NavButton $active={store.activeView === "samples"} onClick={() => store.setView("samples")}>
+          <NavButton
+            $active={store.activeView === "samples"}
+            aria-current={store.activeView === "samples" ? "page" : undefined}
+            onClick={() => store.setView("samples")}
+          >
             <ClipboardCheck size={17} /> 샘플
           </NavButton>
-          <NavButton $active={store.activeView === "connection"} onClick={() => store.setView("connection")}>
+          <NavButton
+            $active={store.activeView === "connection"}
+            aria-current={store.activeView === "connection" ? "page" : undefined}
+            onClick={() => store.setView("connection")}
+          >
             <Database size={17} /> 연결
           </NavButton>
         </Nav>
 
-        <Button
-          $variant="ghost"
-          onClick={() => void store.refreshFinanceData()}
-          disabled={!store.authUser || store.dataState === "loading"}
-          title="Supabase 데이터 새로고침"
-        >
-          <RefreshCw size={16} /> 새로고침
-        </Button>
+        <SidebarFooter>
+          <Button
+            $variant="ghost"
+            onClick={() => void store.refreshFinanceData()}
+            disabled={!store.authUser || store.dataState === "loading"}
+            title="Supabase 데이터 새로고침"
+          >
+            <RefreshCw size={15} /> {store.dataState === "loading" ? "동기화 중" : "새로고침"}
+          </Button>
+          <AuthControls />
+        </SidebarFooter>
       </Sidebar>
 
       <Workspace>
         <Topline>
           <div>
             <Eyebrow>
-              <Layers3 size={15} /> {store.currentLedger?.type === "shared" ? "공동 가계부" : "개인 가계부"}
+              가계부 / {store.currentLedger?.type === "shared" ? "공동" : "개인"}
             </Eyebrow>
             <PageTitle>{store.currentLedger?.name ?? "가계부"}</PageTitle>
           </div>
-          <UserBadge $connected={Boolean(store.authUser)}>{store.authUser ? "카카오 연결됨" : "로그인 필요"}</UserBadge>
+          <ConnectionStatus $connected={Boolean(store.authUser)}>
+            <StatusDot />
+            {store.authUser ? "동기화됨" : "로그인 필요"}
+          </ConnectionStatus>
         </Topline>
 
         {store.activeView === "calendar" ? <CalendarGrid /> : null}
@@ -134,70 +164,115 @@ const DashboardContent = observer(function DashboardContent() {
 const Brand = styled.div`
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: ${spacing[3]};
+  padding: 0 ${spacing[1]} ${spacing[2]};
 `
 
 const BrandMark = styled.div`
-  width: 42px;
-  height: 42px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  border-radius: 8px;
+  border-radius: ${radii.sm};
   background: ${colors.ink};
   color: #fff;
-  font-weight: 850;
+  font-size: 14px;
+  font-weight: 700;
 `
 
 const BrandName = styled.div`
-  font-size: 18px;
-  font-weight: 850;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
 `
 
-const BrandSub = styled.div`
+const LedgerField = styled.label`
+  display: grid;
+  gap: ${spacing[2]};
+`
+
+const LedgerLabel = styled.span`
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: ${colors.muted};
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
 `
 
 const LedgerSelect = styled.select`
   width: 100%;
-  min-height: 40px;
-  border: 1px solid ${colors.border};
-  border-radius: 8px;
+  min-height: 36px;
+  border: 1px solid ${colors.borderStrong};
+  border-radius: ${radii.sm};
   background: #fff;
   color: ${colors.ink};
   padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
 `
 
 const Nav = styled.nav`
   display: grid;
-  gap: 6px;
+  gap: 2px;
+
+  @media (max-width: 820px) {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
 `
 
 const NavButton = styled.button<{ $active: boolean }>`
-  min-height: 40px;
+  min-height: 36px;
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  border: 1px solid ${({ $active }) => ($active ? "rgba(15, 139, 141, 0.42)" : "transparent")};
-  border-radius: 8px;
-  background: ${({ $active }) => ($active ? "#eef7f4" : "transparent")};
-  color: ${({ $active }) => ($active ? colors.green : colors.ink)};
+  border: 1px solid transparent;
+  border-radius: ${radii.sm};
+  background: ${({ $active }) => ($active ? "#f0f0f2" : "transparent")};
+  color: ${({ $active }) => ($active ? colors.ink : colors.muted)};
   padding: 0 10px;
+  font-size: 13px;
+  font-weight: ${({ $active }) => ($active ? 600 : 500)};
   text-align: left;
+  white-space: nowrap;
+  transition: background-color 140ms ease, color 140ms ease;
+
+  &:hover {
+    background: ${colors.panelSubtle};
+    color: ${colors.ink};
+  }
 `
 
 const Pill = styled.span`
   margin-left: auto;
-  min-width: 22px;
-  height: 22px;
+  min-width: 18px;
+  height: 18px;
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: ${radii.round};
   background: ${colors.coral};
   color: #fff;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 10px;
+  font-weight: 700;
+`
+
+const SidebarFooter = styled.div`
+  display: grid;
+  gap: ${spacing[2]};
+  margin-top: auto;
+  padding-top: ${spacing[3]};
+  border-top: 1px solid ${colors.border};
+
+  > button {
+    width: 100%;
+  }
+
+  @media (max-width: 820px) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  }
 `
 
 const Topline = styled.div`
@@ -205,33 +280,41 @@ const Topline = styled.div`
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: ${spacing[5]};
 `
 
 const Eyebrow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 6px;
   color: ${colors.muted};
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 500;
 `
 
 const PageTitle = styled.h1`
-  margin: 3px 0 0;
-  font-size: clamp(26px, 4vw, 38px);
-  line-height: 1.08;
+  margin: 4px 0 0;
+  font-size: 26px;
+  font-weight: 650;
+  line-height: 1.2;
   letter-spacing: 0;
 `
 
-const UserBadge = styled.div<{ $connected: boolean }>`
-  border: 1px solid ${colors.border};
-  border-radius: 999px;
-  background: ${({ $connected }) => ($connected ? "#eef7f4" : "#fff")};
-  color: ${({ $connected }) => ($connected ? colors.green : colors.muted)};
-  padding: 7px 10px;
+const ConnectionStatus = styled.div<{ $connected: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: ${colors.muted};
+  padding-top: 7px;
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 500;
+
+  > span {
+    background: ${({ $connected }) => ($connected ? colors.green : colors.subtle)};
+  }
+`
+
+const StatusDot = styled.span`
+  width: 7px;
+  height: 7px;
+  border-radius: ${radii.round};
 `
 
 const DataError = styled.p`
