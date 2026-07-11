@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   Database,
   MessageSquareText,
+  ListFilter,
   RefreshCw,
   Tags,
   Users,
@@ -20,10 +21,24 @@ import { SampleSubmissionPanel } from "./components/SampleSubmissionPanel"
 import { SharedLedgerPanel } from "./components/SharedLedgerPanel"
 import { SmsCandidatePanel } from "./components/SmsCandidatePanel"
 import { TransactionPanel } from "./components/TransactionPanel"
-import { Button, Metric, MetricLabel, MetricRow, MetricValue, Sidebar, Shell, Workspace } from "./styles"
+import { TransactionListPanel } from "./components/TransactionListPanel"
+import {
+  Button,
+  Metric,
+  MetricLabel,
+  MetricRow,
+  MetricValue,
+  Sidebar,
+  Shell,
+  Workspace,
+} from "./styles"
 import { formatKrw } from "@salimon/domain"
 import styled from "@emotion/styled"
 import { colors, radii, spacing } from "@salimon/ui-tokens"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+
+const isLocalDevelopment = process.env.NODE_ENV === "development"
 
 export function SalimonDashboard() {
   return (
@@ -35,6 +50,23 @@ export function SalimonDashboard() {
 
 const DashboardContent = observer(function DashboardContent() {
   const store = useAppStore()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (store.authState !== "loading" && !store.authUser) {
+      router.replace("/login")
+    }
+  }, [router, store.authState, store.authUser])
+
+  if (!store.authUser) {
+    return (
+      <AuthLoading>
+        {store.authState === "loading"
+          ? "로그인 상태를 확인하고 있습니다."
+          : "로그인 페이지로 이동합니다."}
+      </AuthLoading>
+    )
+  }
 
   return (
     <Shell>
@@ -54,7 +86,9 @@ const DashboardContent = observer(function DashboardContent() {
             aria-label="가계부 선택"
             disabled={store.data.ledgers.length === 0}
           >
-            {store.data.ledgers.length === 0 ? <option value="">로그인 후 불러오기</option> : null}
+            {store.data.ledgers.length === 0 ? (
+              <option value="">로그인 후 불러오기</option>
+            ) : null}
             {store.data.ledgers.map((ledger) => (
               <option key={ledger.id} value={ledger.id}>
                 {ledger.name}
@@ -66,15 +100,28 @@ const DashboardContent = observer(function DashboardContent() {
         <MetricRow>
           <Metric>
             <MetricLabel>월 지출</MetricLabel>
-            <MetricValue $tone="expense">{formatKrw(store.monthExpenseTotal)}</MetricValue>
+            <MetricValue $tone="expense">
+              {formatKrw(store.monthExpenseTotal)}
+            </MetricValue>
           </Metric>
           <Metric>
             <MetricLabel>월 수입</MetricLabel>
-            <MetricValue $tone="income">{formatKrw(store.monthIncomeTotal)}</MetricValue>
+            <MetricValue $tone="income">
+              {formatKrw(store.monthIncomeTotal)}
+            </MetricValue>
           </Metric>
         </MetricRow>
 
         <Nav>
+          <NavButton
+            $active={store.activeView === "transactions"}
+            aria-current={
+              store.activeView === "transactions" ? "page" : undefined
+            }
+            onClick={() => store.setView("transactions")}
+          >
+            <ListFilter size={17} /> 거래 목록
+          </NavButton>
           <NavButton
             $active={store.activeView === "calendar"}
             aria-current={store.activeView === "calendar" ? "page" : undefined}
@@ -84,7 +131,9 @@ const DashboardContent = observer(function DashboardContent() {
           </NavButton>
           <NavButton
             $active={store.activeView === "categories"}
-            aria-current={store.activeView === "categories" ? "page" : undefined}
+            aria-current={
+              store.activeView === "categories" ? "page" : undefined
+            }
             onClick={() => store.setView("categories")}
           >
             <Tags size={17} /> 카테고리
@@ -102,7 +151,9 @@ const DashboardContent = observer(function DashboardContent() {
             onClick={() => store.setView("sms")}
           >
             <MessageSquareText size={17} /> 문자 후보
-            {store.deferredSmsCandidates.length > 0 ? <Pill>{store.deferredSmsCandidates.length}</Pill> : null}
+            {store.deferredSmsCandidates.length > 0 ? (
+              <Pill>{store.deferredSmsCandidates.length}</Pill>
+            ) : null}
           </NavButton>
           <NavButton
             $active={store.activeView === "samples"}
@@ -111,13 +162,17 @@ const DashboardContent = observer(function DashboardContent() {
           >
             <ClipboardCheck size={17} /> 샘플
           </NavButton>
-          <NavButton
-            $active={store.activeView === "connection"}
-            aria-current={store.activeView === "connection" ? "page" : undefined}
-            onClick={() => store.setView("connection")}
-          >
-            <Database size={17} /> 연결
-          </NavButton>
+          {isLocalDevelopment ? (
+            <NavButton
+              $active={store.activeView === "connection"}
+              aria-current={
+                store.activeView === "connection" ? "page" : undefined
+              }
+              onClick={() => store.setView("connection")}
+            >
+              <Database size={17} /> 연결
+            </NavButton>
+          ) : null}
         </Nav>
 
         <SidebarFooter>
@@ -127,7 +182,8 @@ const DashboardContent = observer(function DashboardContent() {
             disabled={!store.authUser || store.dataState === "loading"}
             title="Supabase 데이터 새로고침"
           >
-            <RefreshCw size={15} /> {store.dataState === "loading" ? "동기화 중" : "새로고침"}
+            <RefreshCw size={15} />{" "}
+            {store.dataState === "loading" ? "동기화 중" : "새로고침"}
           </Button>
           <AuthControls />
         </SidebarFooter>
@@ -137,7 +193,8 @@ const DashboardContent = observer(function DashboardContent() {
         <Topline>
           <div>
             <Eyebrow>
-              가계부 / {store.currentLedger?.type === "shared" ? "공동" : "개인"}
+              가계부 /{" "}
+              {store.currentLedger?.type === "shared" ? "공동" : "개인"}
             </Eyebrow>
             <PageTitle>{store.currentLedger?.name ?? "가계부"}</PageTitle>
           </div>
@@ -148,18 +205,31 @@ const DashboardContent = observer(function DashboardContent() {
         </Topline>
 
         {store.activeView === "calendar" ? <CalendarGrid /> : null}
+        {store.activeView === "transactions" ? <TransactionListPanel /> : null}
         {store.activeView === "categories" ? <CategoryManager /> : null}
         {store.activeView === "shared" ? <SharedLedgerPanel /> : null}
         {store.activeView === "sms" ? <SmsCandidatePanel /> : null}
         {store.activeView === "samples" ? <SampleSubmissionPanel /> : null}
-        {store.activeView === "connection" ? <ConnectionPanel /> : null}
-        {store.dataError ? <DataError role="alert">{store.dataError}</DataError> : null}
+        {isLocalDevelopment && store.activeView === "connection" ? (
+          <ConnectionPanel />
+        ) : null}
+        {store.dataError ? (
+          <DataError role="alert">{store.dataError}</DataError>
+        ) : null}
       </Workspace>
 
-      <TransactionPanel />
+      <TransactionPanel key={store.selectedLedgerId} />
     </Shell>
   )
 })
+
+const AuthLoading = styled.main`
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  background: ${colors.canvas};
+  color: ${colors.muted};
+`
 
 const Brand = styled.div`
   display: flex;
@@ -238,7 +308,9 @@ const NavButton = styled.button<{ $active: boolean }>`
   font-weight: ${({ $active }) => ($active ? 600 : 500)};
   text-align: left;
   white-space: nowrap;
-  transition: background-color 140ms ease, color 140ms ease;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
 
   &:hover {
     background: ${colors.panelSubtle};
@@ -307,7 +379,8 @@ const ConnectionStatus = styled.div<{ $connected: boolean }>`
   font-weight: 500;
 
   > span {
-    background: ${({ $connected }) => ($connected ? colors.green : colors.subtle)};
+    background: ${({ $connected }) =>
+      $connected ? colors.green : colors.subtle};
   }
 `
 

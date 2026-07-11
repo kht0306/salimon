@@ -11,7 +11,7 @@ import type {
   TransactionStatus,
   TransactionType,
 } from "@salimon/types"
-import type { FinanceData } from "./localRepository"
+import type { FinanceData } from "./financeData"
 import { getSupabaseBrowserClient } from "./supabaseClient"
 
 type Row = Record<string, unknown>
@@ -26,6 +26,7 @@ export interface RemoteTransactionInput {
   categoryId?: string
   merchantName?: string
   memo?: string
+  actorUserId?: string
   sourceType?: TransactionSourceType
   sourceHash?: string
   parseConfidence?: number
@@ -43,36 +44,55 @@ export interface RemoteSampleInput {
 export class SupabaseFinanceRepository {
   async load(userId: string): Promise<FinanceData> {
     const client = requireSupabaseClient()
-    const [profileResult, ledgersResult, membersResult, categoriesResult, transactionsResult, invitationsResult, samplesResult] =
-      await Promise.all([
-        client.from("profiles").select("id, kakao_id, nickname, avatar_url, default_currency, timezone").single(),
-        client.from("ledgers").select("id, owner_id, name, type, currency").order("created_at"),
-        client
-          .from("ledger_members")
-          .select("id, ledger_id, user_id, nickname, role, status, joined_at")
-          .eq("status", "active")
-          .order("joined_at"),
-        client
-          .from("categories")
-          .select("id, ledger_id, created_by, type, name, icon, color, sort_order, is_default, is_archived")
-          .order("sort_order"),
-        client
-          .from("transactions")
-          .select(
-            "id, ledger_id, created_by, updated_by, type, status, amount, currency, transaction_at, category_id, payment_method_id, merchant_name, memo, source_type, source_app, source_sender, source_hash, parse_confidence, created_at, updated_at, deleted_at",
-          )
-          .order("transaction_at", { ascending: false }),
-        client
-          .from("ledger_invitations")
-          .select("id, ledger_id, invited_by, invite_code, role_to_grant, status, expires_at, created_at")
-          .order("created_at", { ascending: false }),
-        client
-          .from("card_message_samples")
-          .select(
-            "id, submitted_by, card_company_name, masked_message, expected_amount, expected_merchant_name, expected_transaction_at, parse_result, consent_version, status, created_at",
-          )
-          .order("created_at", { ascending: false }),
-      ])
+    const [
+      profileResult,
+      ledgersResult,
+      membersResult,
+      categoriesResult,
+      transactionsResult,
+      invitationsResult,
+      samplesResult,
+    ] = await Promise.all([
+      client
+        .from("profiles")
+        .select(
+          "id, kakao_id, nickname, avatar_url, default_currency, timezone",
+        )
+        .single(),
+      client
+        .from("ledgers")
+        .select("id, owner_id, name, type, currency")
+        .order("created_at"),
+      client
+        .from("ledger_members")
+        .select("id, ledger_id, user_id, nickname, role, status, joined_at")
+        .eq("status", "active")
+        .order("joined_at"),
+      client
+        .from("categories")
+        .select(
+          "id, ledger_id, created_by, type, name, icon, color, sort_order, is_default, is_archived",
+        )
+        .order("sort_order"),
+      client
+        .from("transactions")
+        .select(
+          "id, ledger_id, created_by, updated_by, actor_user_id, type, status, amount, currency, transaction_at, category_id, payment_method_id, merchant_name, memo, source_type, source_app, source_sender, source_hash, parse_confidence, created_at, updated_at, deleted_at",
+        )
+        .order("transaction_at", { ascending: false }),
+      client
+        .from("ledger_invitations")
+        .select(
+          "id, ledger_id, invited_by, invite_code, role_to_grant, status, expires_at, created_at",
+        )
+        .order("created_at", { ascending: false }),
+      client
+        .from("card_message_samples")
+        .select(
+          "id, submitted_by, card_company_name, masked_message, expected_amount, expected_merchant_name, expected_transaction_at, parse_result, consent_version, status, created_at",
+        )
+        .order("created_at", { ascending: false }),
+    ])
 
     const results = [
       profileResult,
@@ -89,22 +109,31 @@ export class SupabaseFinanceRepository {
     }
 
     const profile = mapProfile(profileResult.data as Row)
-    const members = ((membersResult.data ?? []) as Row[]).map((row) => mapMember(row, profile, userId))
+    const members = ((membersResult.data ?? []) as Row[]).map((row) =>
+      mapMember(row, profile, userId),
+    )
 
     return {
       profile,
-      ledgers: ((ledgersResult.data ?? []) as Row[]).map((row) => mapLedger(row, members, userId)),
+      ledgers: ((ledgersResult.data ?? []) as Row[]).map((row) =>
+        mapLedger(row, members, userId),
+      ),
       members,
       invitations: ((invitationsResult.data ?? []) as Row[]).map(mapInvitation),
       categories: ((categoriesResult.data ?? []) as Row[]).map(mapCategory),
       paymentMethods: [],
-      transactions: ((transactionsResult.data ?? []) as Row[]).map(mapTransaction),
+      transactions: ((transactionsResult.data ?? []) as Row[]).map(
+        mapTransaction,
+      ),
       smsCandidates: [],
       cardMessageSamples: ((samplesResult.data ?? []) as Row[]).map(mapSample),
     }
   }
 
-  async saveTransaction(userId: string, input: RemoteTransactionInput): Promise<void> {
+  async saveTransaction(
+    userId: string,
+    input: RemoteTransactionInput,
+  ): Promise<void> {
     const client = requireSupabaseClient()
     const payload = {
       ledger_id: input.ledgerId,
@@ -115,6 +144,7 @@ export class SupabaseFinanceRepository {
       category_id: input.categoryId ?? null,
       merchant_name: input.merchantName ?? null,
       memo: input.memo ?? null,
+      actor_user_id: input.actorUserId ?? userId,
       source_type: input.sourceType ?? "manual",
       source_hash: input.sourceHash ?? null,
       parse_confidence: input.parseConfidence ?? null,
@@ -124,15 +154,24 @@ export class SupabaseFinanceRepository {
 
     const result = input.id
       ? await client.from("transactions").update(payload).eq("id", input.id)
-      : await client.from("transactions").insert({ ...payload, created_by: userId })
+      : await client
+          .from("transactions")
+          .insert({ ...payload, created_by: userId })
     throwIfError(result.error)
   }
 
-  async softDeleteTransaction(transactionId: string, userId: string): Promise<void> {
+  async softDeleteTransaction(
+    transactionId: string,
+    userId: string,
+  ): Promise<void> {
     const client = requireSupabaseClient()
     const { error } = await client
       .from("transactions")
-      .update({ deleted_at: new Date().toISOString(), updated_by: userId, updated_at: new Date().toISOString() })
+      .update({
+        deleted_at: new Date().toISOString(),
+        updated_by: userId,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", transactionId)
     throwIfError(error)
   }
@@ -159,21 +198,31 @@ export class SupabaseFinanceRepository {
     throwIfError(error)
   }
 
-  async updateCategory(categoryId: string, patch: Partial<Pick<Category, "name" | "icon" | "color" | "isArchived">>): Promise<void> {
+  async updateCategory(
+    categoryId: string,
+    patch: Partial<Pick<Category, "name" | "icon" | "color" | "isArchived">>,
+  ): Promise<void> {
     const client = requireSupabaseClient()
-    const payload: Record<string, unknown> = { updated_at: new Date().toISOString() }
+    const payload: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    }
     if (patch.name !== undefined) payload.name = patch.name
     if (patch.icon !== undefined) payload.icon = patch.icon
     if (patch.color !== undefined) payload.color = patch.color
     if (patch.isArchived !== undefined) payload.is_archived = patch.isArchived
 
-    const { error } = await client.from("categories").update(payload).eq("id", categoryId)
+    const { error } = await client
+      .from("categories")
+      .update(payload)
+      .eq("id", categoryId)
     throwIfError(error)
   }
 
   async createSharedLedger(name: string): Promise<string> {
     const client = requireSupabaseClient()
-    const { data, error } = await client.rpc("create_shared_ledger", { ledger_name: name })
+    const { data, error } = await client.rpc("create_shared_ledger", {
+      ledger_name: name,
+    })
     throwIfError(error)
     if (typeof data !== "string") {
       throw new Error("공동 가계부 생성 결과를 확인할 수 없습니다.")
@@ -182,7 +231,12 @@ export class SupabaseFinanceRepository {
     return data
   }
 
-  async createInvite(input: { ledgerId: string; userId: string; inviteCode: string; inviteTokenHash: string }): Promise<void> {
+  async createInvite(input: {
+    ledgerId: string
+    userId: string
+    inviteCode: string
+    inviteTokenHash: string
+  }): Promise<void> {
     const client = requireSupabaseClient()
     const now = new Date()
     const { error } = await client.from("ledger_invitations").insert({
@@ -192,18 +246,39 @@ export class SupabaseFinanceRepository {
       invite_token_hash: input.inviteTokenHash,
       role_to_grant: "member",
       status: "active",
-      expires_at: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      expires_at: new Date(
+        now.getTime() + 7 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
     })
     throwIfError(error)
   }
 
+  async acceptInvite(inviteCode: string): Promise<string> {
+    const client = requireSupabaseClient()
+    const { data, error } = await client.rpc("accept_ledger_invite", {
+      submitted_code: inviteCode,
+    })
+    throwIfError(error)
+    if (typeof data !== "string") {
+      throw new Error("초대 수락 결과를 확인할 수 없습니다.")
+    }
+
+    return data
+  }
+
   async revokeInvite(invitationId: string): Promise<void> {
     const client = requireSupabaseClient()
-    const { error } = await client.from("ledger_invitations").update({ status: "revoked" }).eq("id", invitationId)
+    const { error } = await client
+      .from("ledger_invitations")
+      .update({ status: "revoked" })
+      .eq("id", invitationId)
     throwIfError(error)
   }
 
-  async submitCardMessageSample(userId: string, input: RemoteSampleInput): Promise<void> {
+  async submitCardMessageSample(
+    userId: string,
+    input: RemoteSampleInput,
+  ): Promise<void> {
     const client = requireSupabaseClient()
     const { error } = await client.from("card_message_samples").insert({
       submitted_by: userId,
@@ -247,7 +322,9 @@ function mapProfile(row: Row): Profile {
 
 function mapLedger(row: Row, members: LedgerMember[], userId: string): Ledger {
   const id = stringValue(row.id)
-  const ownMembership = members.find((member) => member.ledgerId === id && member.userId === userId)
+  const ownMembership = members.find(
+    (member) => member.ledgerId === id && member.userId === userId,
+  )
   return {
     id,
     ownerId: stringValue(row.owner_id),
@@ -263,7 +340,9 @@ function mapMember(row: Row, profile: Profile, userId: string): LedgerMember {
     id: stringValue(row.id),
     ledgerId: stringValue(row.ledger_id),
     userId: stringValue(row.user_id),
-    nickname: optionalString(row.nickname) ?? (stringValue(row.user_id) === userId ? profile.nickname : "공동 멤버"),
+    nickname:
+      optionalString(row.nickname) ??
+      (stringValue(row.user_id) === userId ? profile.nickname : "공동 멤버"),
     role: mapRole(row.role),
     status: row.status === "removed" ? "removed" : "active",
     joinedAt: stringValue(row.joined_at),
@@ -304,6 +383,8 @@ function mapTransaction(row: Row): Transaction {
     ledgerId: stringValue(row.ledger_id),
     createdBy: stringValue(row.created_by),
     updatedBy: optionalString(row.updated_by),
+    actorUserId:
+      optionalString(row.actor_user_id) ?? stringValue(row.created_by),
     type: mapTransactionType(row.type),
     status: mapTransactionStatus(row.status),
     amount: numberValue(row.amount),
@@ -317,7 +398,10 @@ function mapTransaction(row: Row): Transaction {
     sourceApp: optionalString(row.source_app),
     sourceSender: optionalString(row.source_sender),
     sourceHash: optionalString(row.source_hash),
-    parseConfidence: row.parse_confidence === null ? undefined : numberValue(row.parse_confidence),
+    parseConfidence:
+      row.parse_confidence === null
+        ? undefined
+        : numberValue(row.parse_confidence),
     createdAt: stringValue(row.created_at),
     updatedAt: stringValue(row.updated_at),
     deletedAt: optionalString(row.deleted_at),
@@ -330,10 +414,14 @@ function mapSample(row: Row): CardMessageSample {
     submittedBy: stringValue(row.submitted_by),
     cardCompanyName: optionalString(row.card_company_name),
     maskedMessage: stringValue(row.masked_message),
-    expectedAmount: row.expected_amount === null ? undefined : numberValue(row.expected_amount),
+    expectedAmount:
+      row.expected_amount === null
+        ? undefined
+        : numberValue(row.expected_amount),
     expectedMerchantName: optionalString(row.expected_merchant_name),
     expectedTransactionAt: optionalString(row.expected_transaction_at),
-    parseResult: (row.parse_result as CardMessageSample["parseResult"]) ?? undefined,
+    parseResult:
+      (row.parse_result as CardMessageSample["parseResult"]) ?? undefined,
     consentVersion: stringValue(row.consent_version),
     status: mapSampleStatus(row.status),
     createdAt: stringValue(row.created_at),
@@ -353,7 +441,9 @@ function numberValue(value: unknown): number {
 }
 
 function mapRole(value: unknown): Ledger["role"] {
-  return value === "owner" || value === "admin" || value === "viewer" ? value : "member"
+  return value === "owner" || value === "admin" || value === "viewer"
+    ? value
+    : "member"
 }
 
 function mapTransactionType(value: unknown): TransactionType {
@@ -365,11 +455,17 @@ function mapTransactionStatus(value: unknown): TransactionStatus {
 }
 
 function mapSourceType(value: unknown): TransactionSourceType {
-  return value === "android_sms_notification" || value === "paste" || value === "import" ? value : "manual"
+  return value === "android_sms_notification" ||
+    value === "paste" ||
+    value === "import"
+    ? value
+    : "manual"
 }
 
 function mapInvitationStatus(value: unknown): LedgerInvitation["status"] {
-  return value === "accepted" || value === "expired" || value === "revoked" ? value : "active"
+  return value === "accepted" || value === "expired" || value === "revoked"
+    ? value
+    : "active"
 }
 
 function mapInvitationRole(value: unknown): LedgerInvitation["roleToGrant"] {
@@ -377,5 +473,7 @@ function mapInvitationRole(value: unknown): LedgerInvitation["roleToGrant"] {
 }
 
 function mapSampleStatus(value: unknown): CardMessageSample["status"] {
-  return value === "reviewing" || value === "applied" || value === "rejected" ? value : "submitted"
+  return value === "reviewing" || value === "applied" || value === "rejected"
+    ? value
+    : "submitted"
 }

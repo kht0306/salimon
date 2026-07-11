@@ -8,19 +8,41 @@ import { useState } from "react"
 import { useAppStore } from "../StoreProvider"
 import { Button, Field, Input, Panel, PanelHeader, PanelTitle } from "../styles"
 
-const roleLabels = { owner: "소유자", admin: "관리자", member: "멤버", viewer: "뷰어" } as const
-const invitationLabels = { active: "사용 가능", accepted: "수락됨", expired: "만료됨", revoked: "취소됨" } as const
+const roleLabels = {
+  owner: "소유자",
+  admin: "관리자",
+  member: "멤버",
+  viewer: "뷰어",
+} as const
+const invitationLabels = {
+  active: "사용 가능",
+  accepted: "수락됨",
+  expired: "만료됨",
+  revoked: "취소됨",
+} as const
 
 export const SharedLedgerPanel = observer(function SharedLedgerPanel() {
   const store = useAppStore()
   const [name, setName] = useState("")
-  const invitations = store.data.invitations.filter((invite) => invite.ledgerId === store.selectedLedgerId)
+  const [inviteCode, setInviteCode] = useState("")
+  const invitations = store.data.invitations.filter(
+    (invite) => invite.ledgerId === store.selectedLedgerId,
+  )
 
   return (
     <Panel>
       <PanelHeader>
         <PanelTitle>공동 가계부</PanelTitle>
-        <Button $variant="primary" onClick={() => void store.createInvite()} disabled={!store.authUser || !store.selectedLedgerId}>
+        <Button
+          $variant="primary"
+          onClick={() => void store.createInvite()}
+          disabled={!store.authUser || store.currentLedger?.type !== "shared"}
+          title={
+            store.currentLedger?.type === "shared"
+              ? "초대코드 생성"
+              : "공동 가계부에서만 초대할 수 있습니다."
+          }
+        >
           <Link size={16} /> 초대 생성
         </Button>
       </PanelHeader>
@@ -28,7 +50,10 @@ export const SharedLedgerPanel = observer(function SharedLedgerPanel() {
       <Composer>
         <Field>
           새 공동 가계부
-          <Input value={name} onChange={(event) => setName(event.target.value)} />
+          <Input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
         </Field>
         <Button
           $variant="soft"
@@ -40,6 +65,32 @@ export const SharedLedgerPanel = observer(function SharedLedgerPanel() {
           disabled={!name.trim() || !store.authUser}
         >
           <Plus size={16} /> 생성
+        </Button>
+      </Composer>
+
+      <Composer>
+        <Field>
+          받은 초대코드
+          <Input
+            value={inviteCode}
+            maxLength={6}
+            autoCapitalize="characters"
+            onChange={(event) =>
+              setInviteCode(
+                event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""),
+              )
+            }
+            placeholder="6자리 코드 입력"
+          />
+        </Field>
+        <Button
+          $variant="primary"
+          disabled={inviteCode.length !== 6 || !store.authUser}
+          onClick={async () => {
+            if (await store.acceptInvite(inviteCode)) setInviteCode("")
+          }}
+        >
+          <Link size={16} /> 참여하기
         </Button>
       </Composer>
 
@@ -69,9 +120,16 @@ export const SharedLedgerPanel = observer(function SharedLedgerPanel() {
               <Code>{invitation.inviteCode}</Code>
               <div>
                 <strong>{invitationLabels[invitation.status]}</strong>
-                <Meta>{new Date(invitation.expiresAt).toLocaleDateString("ko-KR")} 만료</Meta>
+                <Meta>
+                  {new Date(invitation.expiresAt).toLocaleDateString("ko-KR")}{" "}
+                  만료
+                </Meta>
               </div>
-              <Button onClick={() => navigator.clipboard?.writeText(invitation.inviteCode)}>
+              <Button
+                onClick={() =>
+                  navigator.clipboard?.writeText(invitation.inviteCode)
+                }
+              >
                 <Copy size={15} /> 복사
               </Button>
             </Row>

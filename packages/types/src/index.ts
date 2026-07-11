@@ -89,6 +89,7 @@ export interface Transaction {
   ledgerId: string
   createdBy: string
   updatedBy?: string
+  actorUserId?: string
   type: TransactionType
   status: TransactionStatus
   amount: number

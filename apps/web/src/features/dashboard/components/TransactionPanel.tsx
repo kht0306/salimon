@@ -1,19 +1,39 @@
 "use client"
 
 import styled from "@emotion/styled"
-import { formatKoreanDate, formatKoreanTime, formatKrw, getDateTimeLocalValue } from "@salimon/domain"
+import {
+  formatKoreanDate,
+  formatKoreanTime,
+  formatKrw,
+  getDateTimeLocalValue,
+} from "@salimon/domain"
 import type { Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import { Check, Pencil, Plus, Save, Trash2, X } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useMemo, useState } from "react"
 import { useAppStore } from "../StoreProvider"
-import { Button, Field, IconButton, Input, PanelTitle, Select, SidePanel, Textarea } from "../styles"
+import {
+  Button,
+  Field,
+  IconButton,
+  Input,
+  PanelTitle,
+  Select,
+  SidePanel,
+  Textarea,
+} from "../styles"
 
 const statusLabels: Record<Transaction["status"], string> = {
   pending: "대기",
   confirmed: "확정",
   excluded: "제외",
+}
+
+const typeLabels: Record<Transaction["type"], string> = {
+  expense: "지출",
+  income: "수입",
+  transfer: "이체",
 }
 
 export const TransactionPanel = observer(function TransactionPanel() {
@@ -29,9 +49,10 @@ export const TransactionPanel = observer(function TransactionPanel() {
       type: "expense",
       status: "confirmed",
       categoryId: store.expenseCategories[0]?.id ?? "",
+      actorUserId: store.authUser?.id ?? "",
       transactionAt: `${selectedDate}T12:00`,
     }),
-    [selectedDate, store.expenseCategories],
+    [selectedDate, store.expenseCategories, store.authUser?.id],
   )
 
   const [draft, setDraft] = useState(initialDraft)
@@ -51,6 +72,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
       type: transaction.type,
       status: transaction.status,
       categoryId: transaction.categoryId ?? "",
+      actorUserId: transaction.actorUserId ?? transaction.createdBy,
       transactionAt: getDateTimeLocalValue(transaction.transactionAt),
     })
     setAdding(true)
@@ -63,7 +85,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
 
   async function save() {
     const amount = Number(draft.amount)
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
       return
     }
 
@@ -77,6 +99,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
       categoryId: draft.categoryId || undefined,
       merchantName: draft.merchantName || undefined,
       memo: draft.memo || undefined,
+      actorUserId: draft.actorUserId || undefined,
     })
     if (saved) {
       closeForm()
@@ -90,7 +113,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
           <PanelTitle>{formatKoreanDate(store.selectedDate)}</PanelTitle>
           <Subtle>{store.selectedDateTransactions.length}건</Subtle>
         </div>
-        <IconButton $variant="primary" title="거래 추가" onClick={openNew} disabled={!store.authUser || !store.selectedLedgerId}>
+        <IconButton
+          $variant="primary"
+          title="거래 추가"
+          onClick={openNew}
+          disabled={!store.authUser || !store.selectedLedgerId}
+        >
           <Plus size={17} />
         </IconButton>
       </PanelTop>
@@ -107,7 +135,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
           <TwoColumns>
             <Field>
               유형
-              <Select value={draft.type} onChange={(event) => setDraft({ ...draft, type: event.target.value })}>
+              <Select
+                value={draft.type}
+                onChange={(event) =>
+                  setDraft({ ...draft, type: event.target.value })
+                }
+              >
                 <option value="expense">지출</option>
                 <option value="income">수입</option>
                 <option value="transfer">이체</option>
@@ -115,7 +148,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
             </Field>
             <Field>
               상태
-              <Select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value })}>
+              <Select
+                value={draft.status}
+                onChange={(event) =>
+                  setDraft({ ...draft, status: event.target.value })
+                }
+              >
                 <option value="confirmed">확정</option>
                 <option value="pending">대기</option>
                 <option value="excluded">제외</option>
@@ -126,9 +164,17 @@ export const TransactionPanel = observer(function TransactionPanel() {
           <Field>
             금액
             <Input
+              type="text"
               inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="off"
               value={draft.amount}
-              onChange={(event) => setDraft({ ...draft, amount: event.target.value })}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  amount: event.target.value.replace(/\D/g, ""),
+                })
+              }
             />
           </Field>
 
@@ -137,15 +183,35 @@ export const TransactionPanel = observer(function TransactionPanel() {
             <Input
               type="datetime-local"
               value={draft.transactionAt}
-              onChange={(event) => setDraft({ ...draft, transactionAt: event.target.value })}
+              onChange={(event) =>
+                setDraft({ ...draft, transactionAt: event.target.value })
+              }
             />
+          </Field>
+
+          <Field>
+            행위자
+            <Select
+              value={draft.actorUserId}
+              onChange={(event) =>
+                setDraft({ ...draft, actorUserId: event.target.value })
+              }
+            >
+              {store.currentMembers.map((member) => (
+                <option key={member.userId} value={member.userId}>
+                  {member.nickname}
+                </option>
+              ))}
+            </Select>
           </Field>
 
           <Field>
             카테고리
             <Select
               value={draft.categoryId}
-              onChange={(event) => setDraft({ ...draft, categoryId: event.target.value })}
+              onChange={(event) =>
+                setDraft({ ...draft, categoryId: event.target.value })
+              }
             >
               <option value="">기타 자동 적용</option>
               {store.currentCategories
@@ -162,13 +228,20 @@ export const TransactionPanel = observer(function TransactionPanel() {
             가맹점/내용
             <Input
               value={draft.merchantName}
-              onChange={(event) => setDraft({ ...draft, merchantName: event.target.value })}
+              onChange={(event) =>
+                setDraft({ ...draft, merchantName: event.target.value })
+              }
             />
           </Field>
 
           <Field>
             메모
-            <Textarea value={draft.memo} onChange={(event) => setDraft({ ...draft, memo: event.target.value })} />
+            <Textarea
+              value={draft.memo}
+              onChange={(event) =>
+                setDraft({ ...draft, memo: event.target.value })
+              }
+            />
           </Field>
 
           <Button $variant="primary" onClick={() => void save()}>
@@ -179,29 +252,66 @@ export const TransactionPanel = observer(function TransactionPanel() {
 
       <TransactionList>
         {store.selectedDateTransactions.map((transaction) => {
-          const category = store.data.categories.find((item) => item.id === transaction.categoryId)
+          const category = store.data.categories.find(
+            (item) => item.id === transaction.categoryId,
+          )
+          const registrant =
+            store.currentMembers.find(
+              (member) => member.userId === transaction.createdBy,
+            )?.nickname ?? "알 수 없음"
+          const actor =
+            store.currentMembers.find(
+              (member) => member.userId === transaction.actorUserId,
+            )?.nickname ?? registrant
           return (
             <TransactionItem key={transaction.id}>
-              <TransactionTime>{formatKoreanTime(transaction.transactionAt)}</TransactionTime>
+              <TransactionWhen>
+                <TransactionTime>
+                  {formatKoreanTime(transaction.transactionAt)}
+                </TransactionTime>
+                <ActorName>
+                  <strong>행위자</strong> {actor}
+                </ActorName>
+              </TransactionWhen>
               <TransactionBody>
-                <TransactionName>{transaction.merchantName || transaction.memo || "거래"}</TransactionName>
+                <TransactionName>
+                  {transaction.merchantName || transaction.memo || "거래"}
+                </TransactionName>
                 <TransactionMeta>
-                  {category?.name ?? "기타"} · {statusLabels[transaction.status]}
+                  {typeLabels[transaction.type]} · {category?.name ?? "기타"} ·{" "}
+                  {statusLabels[transaction.status]}
                 </TransactionMeta>
+                <RegisteredAt>
+                  등록{" "}
+                  {new Date(transaction.createdAt).toLocaleString("ko-KR", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}
+                </RegisteredAt>
               </TransactionBody>
               <TransactionEnd>
                 <Amount $type={transaction.type}>
-                  {transaction.type === "income" ? "+" : "-"}
+                  {transaction.type === "income"
+                    ? "+"
+                    : transaction.type === "expense"
+                      ? "-"
+                      : ""}
                   {formatKrw(transaction.amount)}
                 </Amount>
+                <RegistrantName>등록자: {registrant}</RegistrantName>
                 <ActionCluster>
-                  <CompactAction title="수정" onClick={() => openEdit(transaction)}>
+                  <CompactAction
+                    title="수정"
+                    onClick={() => openEdit(transaction)}
+                  >
                     <Pencil size={14} />
                   </CompactAction>
                   <CompactAction
                     $variant="danger"
                     title="삭제"
-                    onClick={() => void store.softDeleteTransaction(transaction.id)}
+                    onClick={() =>
+                      void store.softDeleteTransaction(transaction.id)
+                    }
                   >
                     <Trash2 size={14} />
                   </CompactAction>
@@ -218,6 +328,56 @@ export const TransactionPanel = observer(function TransactionPanel() {
           <span>등록된 거래 없음</span>
         </Empty>
       ) : null}
+
+      <DailySummary>
+        <SummaryRow>
+          <span>지출 합계</span>
+          <SummaryAmount $tone="expense">
+            -
+            {formatKrw(
+              store.selectedDateTransactions
+                .filter(
+                  (item) =>
+                    item.type === "expense" && item.status !== "excluded",
+                )
+                .reduce((sum, item) => sum + item.amount, 0),
+            )}
+          </SummaryAmount>
+        </SummaryRow>
+        <SummaryRow>
+          <span>수입 합계</span>
+          <SummaryAmount $tone="income">
+            +
+            {formatKrw(
+              store.selectedDateTransactions
+                .filter(
+                  (item) =>
+                    item.type === "income" && item.status !== "excluded",
+                )
+                .reduce((sum, item) => sum + item.amount, 0),
+            )}
+          </SummaryAmount>
+        </SummaryRow>
+        <SettlementRow>
+          <span>정산 합계</span>
+          <strong>
+            {formatKrw(
+              store.selectedDateTransactions
+                .filter((item) => item.status !== "excluded")
+                .reduce(
+                  (sum, item) =>
+                    sum +
+                    (item.type === "income"
+                      ? item.amount
+                      : item.type === "expense"
+                        ? -item.amount
+                        : 0),
+                  0,
+                ),
+            )}
+          </strong>
+        </SettlementRow>
+      </DailySummary>
     </SidePanel>
   )
 })
@@ -266,7 +426,7 @@ const TransactionList = styled.div`
 
 const TransactionItem = styled.article`
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-columns: 68px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: start;
   border-bottom: 1px solid ${colors.border};
@@ -283,6 +443,23 @@ const TransactionTime = styled.div`
   font-family: var(--font-geist-mono);
   font-size: 12px;
   line-height: 20px;
+`
+
+const TransactionWhen = styled.div`
+  min-width: 0;
+`
+
+const ActorName = styled.div`
+  margin-top: 5px;
+  color: ${colors.ink};
+  font-size: 10px;
+  overflow-wrap: anywhere;
+
+  strong {
+    display: block;
+    color: ${colors.teal};
+    font-weight: 700;
+  }
 `
 
 const TransactionBody = styled.div`
@@ -303,8 +480,27 @@ const TransactionMeta = styled.div`
   font-size: 12px;
 `
 
+const RegisteredAt = styled.div`
+  margin-top: 2px;
+  color: ${colors.subtle};
+  font-size: 10px;
+`
+
+const RegistrantName = styled.div`
+  max-width: 94px;
+  color: ${colors.muted};
+  font-size: 10px;
+  text-align: right;
+  overflow-wrap: anywhere;
+`
+
 const Amount = styled.div<{ $type: Transaction["type"] }>`
-  color: ${({ $type }) => ($type === "income" ? colors.green : $type === "expense" ? colors.coral : colors.blue)};
+  color: ${({ $type }) =>
+    $type === "income"
+      ? colors.green
+      : $type === "expense"
+        ? colors.coral
+        : colors.blue};
   font-family: var(--font-geist-mono);
   font-size: 12px;
   font-weight: 650;
@@ -343,4 +539,42 @@ const Empty = styled.div`
   color: ${colors.muted};
   border-bottom: 1px solid ${colors.border};
   font-size: 12px;
+`
+
+const DailySummary = styled.section`
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+  border: 1px solid ${colors.border};
+  border-radius: ${radii.md};
+  background: ${colors.panel};
+  box-shadow: 0 -10px 20px rgba(24, 24, 27, 0.08);
+  padding: 12px;
+`
+
+const SummaryRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  color: ${colors.muted};
+  font-size: 12px;
+`
+
+const SummaryAmount = styled.strong<{ $tone: "expense" | "income" }>`
+  color: ${({ $tone }) => ($tone === "expense" ? colors.coral : colors.green)};
+  font-family: var(--font-geist-mono);
+`
+
+const SettlementRow = styled(SummaryRow)`
+  margin-top: 3px;
+  border-top: 1px solid ${colors.border};
+  padding-top: 9px;
+  color: ${colors.ink};
+  font-weight: 700;
+
+  strong {
+    font-family: var(--font-geist-mono);
+  }
 `

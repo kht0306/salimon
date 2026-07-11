@@ -21,7 +21,7 @@ import {
   toDateKey,
   toMonthKey,
 } from "@salimon/domain"
-import { makeAutoObservable } from "mobx"
+import { makeAutoObservable, runInAction } from "mobx"
 import type {
   Category,
   Ledger,
@@ -42,6 +42,7 @@ export interface TransactionDraft {
   categoryId?: string
   merchantName?: string
   memo?: string
+  actorUserId?: string
   sourceType?: Transaction["sourceType"]
   sourceHash?: string
   parseConfidence?: number
@@ -53,7 +54,14 @@ export class AppStore {
   selectedLedgerId: string
   selectedMonth: string
   selectedDate: string
-  activeView: "calendar" | "categories" | "shared" | "sms" | "samples" | "connection" = "calendar"
+  activeView:
+    | "calendar"
+    | "transactions"
+    | "categories"
+    | "shared"
+    | "sms"
+    | "samples"
+    | "connection" = "calendar"
   authState: "loading" | "authenticated" | "anonymous" | "error" = "loading"
   authUser: AuthUserInfo | null = null
   authError: string | null = null
@@ -85,21 +93,31 @@ export class AppStore {
   }
 
   get currentLedger(): Ledger | undefined {
-    return this.data.ledgers.find((ledger) => ledger.id === this.selectedLedgerId)
+    return this.data.ledgers.find(
+      (ledger) => ledger.id === this.selectedLedgerId,
+    )
   }
 
   get currentMembers() {
-    return this.data.members.filter((member) => member.ledgerId === this.selectedLedgerId && member.status === "active")
+    return this.data.members.filter(
+      (member) =>
+        member.ledgerId === this.selectedLedgerId && member.status === "active",
+    )
   }
 
   get currentCategories(): Category[] {
     return this.data.categories
-      .filter((category) => category.ledgerId === this.selectedLedgerId && !category.isArchived)
+      .filter(
+        (category) =>
+          category.ledgerId === this.selectedLedgerId && !category.isArchived,
+      )
       .sort((a, b) => a.sortOrder - b.sortOrder)
   }
 
   get expenseCategories(): Category[] {
-    return this.currentCategories.filter((category) => category.type === "expense")
+    return this.currentCategories.filter(
+      (category) => category.type === "expense",
+    )
   }
 
   get monthTransactions(): Transaction[] {
@@ -112,24 +130,35 @@ export class AppStore {
           toMonthKey(date) === this.selectedMonth
         )
       })
-      .sort((a, b) => new Date(b.transactionAt).getTime() - new Date(a.transactionAt).getTime())
+      .sort(
+        (a, b) =>
+          new Date(b.transactionAt).getTime() -
+          new Date(a.transactionAt).getTime(),
+      )
   }
 
   get selectedDateTransactions(): Transaction[] {
     return this.monthTransactions.filter(
-      (transaction) => toDateKey(new Date(transaction.transactionAt)) === this.selectedDate,
+      (transaction) =>
+        toDateKey(new Date(transaction.transactionAt)) === this.selectedDate,
     )
   }
 
   get monthExpenseTotal(): number {
     return this.monthTransactions
-      .filter((transaction) => transaction.type === "expense" && transaction.status !== "excluded")
+      .filter(
+        (transaction) =>
+          transaction.type === "expense" && transaction.status !== "excluded",
+      )
       .reduce((sum, transaction) => sum + transaction.amount, 0)
   }
 
   get monthIncomeTotal(): number {
     return this.monthTransactions
-      .filter((transaction) => transaction.type === "income" && transaction.status !== "excluded")
+      .filter(
+        (transaction) =>
+          transaction.type === "income" && transaction.status !== "excluded",
+      )
       .reduce((sum, transaction) => sum + transaction.amount, 0)
   }
 
@@ -145,7 +174,9 @@ export class AppStore {
 
   hydrate(data: FinanceData): void {
     this.data = data
-    if (!this.data.ledgers.some((ledger) => ledger.id === this.selectedLedgerId)) {
+    if (
+      !this.data.ledgers.some((ledger) => ledger.id === this.selectedLedgerId)
+    ) {
       this.selectedLedgerId = this.data.ledgers[0]?.id ?? ""
     }
   }
@@ -160,11 +191,19 @@ export class AppStore {
     this.dataState = "loading"
     this.dataError = null
     try {
-      this.hydrate(await this.repository.load(this.authUser.id))
-      this.dataState = "ready"
+      const data = await this.repository.load(this.authUser.id)
+      runInAction(() => {
+        this.hydrate(data)
+        this.dataState = "ready"
+      })
     } catch (error) {
-      this.dataState = "error"
-      this.dataError = error instanceof Error ? error.message : "가계부 데이터를 불러오지 못했습니다."
+      runInAction(() => {
+        this.dataState = "error"
+        this.dataError =
+          error instanceof Error
+            ? error.message
+            : "가계부 데이터를 불러오지 못했습니다."
+      })
     }
   }
 
@@ -178,7 +217,10 @@ export class AppStore {
       state: "checking",
       message: "Supabase 연결을 확인하는 중입니다.",
     }
-    this.supabaseConnection = await checkSupabaseConnection()
+    const connection = await checkSupabaseConnection()
+    runInAction(() => {
+      this.supabaseConnection = connection
+    })
   }
 
   async initializeAuth(): Promise<void> {
@@ -214,12 +256,14 @@ export class AppStore {
 
     try {
       await signOutFromSupabase()
-      this.authUser = null
-      this.authState = "anonymous"
-      this.initializedWorkspaceUserId = null
-      this.workspaceInitialization = null
-      this.hydrate(createEmptyFinanceData())
-      this.dataState = "idle"
+      runInAction(() => {
+        this.authUser = null
+        this.authState = "anonymous"
+        this.initializedWorkspaceUserId = null
+        this.workspaceInitialization = null
+        this.hydrate(createEmptyFinanceData())
+        this.dataState = "idle"
+      })
       await this.checkSupabase()
     } catch (error) {
       this.setAuthError(error)
@@ -228,6 +272,7 @@ export class AppStore {
 
   switchLedger(ledgerId: string): void {
     this.selectedLedgerId = ledgerId
+    this.activeView = "calendar"
   }
 
   selectDate(date: string): void {
@@ -239,13 +284,20 @@ export class AppStore {
   }
 
   async saveTransaction(draft: TransactionDraft): Promise<boolean> {
-    if (!this.authUser || !draft.ledgerId) {
+    if (
+      !this.authUser ||
+      !draft.ledgerId ||
+      !Number.isSafeInteger(draft.amount) ||
+      draft.amount <= 0
+    ) {
       return false
     }
 
     const categoryId =
       draft.categoryId ||
-      (draft.type === "expense" ? findOtherCategory(this.data.categories, draft.ledgerId)?.id : undefined)
+      (draft.type === "expense"
+        ? findOtherCategory(this.data.categories, draft.ledgerId)?.id
+        : undefined)
 
     try {
       await this.repository.saveTransaction(this.authUser.id, {
@@ -265,20 +317,29 @@ export class AppStore {
     if (!this.authUser) return
 
     try {
-      await this.repository.softDeleteTransaction(transactionId, this.authUser.id)
+      await this.repository.softDeleteTransaction(
+        transactionId,
+        this.authUser.id,
+      )
       await this.refreshFinanceData()
     } catch (error) {
       this.setDataError(error)
     }
   }
 
-  async createExpenseCategory(name: string, icon: string, color: string): Promise<boolean> {
+  async createExpenseCategory(
+    name: string,
+    icon: string,
+    color: string,
+  ): Promise<boolean> {
     const trimmed = name.trim()
     if (!trimmed || !this.selectedLedgerId || !this.authUser) {
       return false
     }
 
-    const duplicate = this.expenseCategories.some((category) => category.name.toLowerCase() === trimmed.toLowerCase())
+    const duplicate = this.expenseCategories.some(
+      (category) => category.name.toLowerCase() === trimmed.toLowerCase(),
+    )
     if (duplicate) {
       return false
     }
@@ -300,7 +361,10 @@ export class AppStore {
     }
   }
 
-  async updateCategory(categoryId: string, patch: Partial<Pick<Category, "name" | "icon" | "color">>): Promise<void> {
+  async updateCategory(
+    categoryId: string,
+    patch: Partial<Pick<Category, "name" | "icon" | "color">>,
+  ): Promise<void> {
     try {
       await this.repository.updateCategory(categoryId, patch)
       await this.refreshFinanceData()
@@ -330,7 +394,9 @@ export class AppStore {
     try {
       const ledgerId = await this.repository.createSharedLedger(trimmed)
       await this.refreshFinanceData()
-      this.selectedLedgerId = ledgerId
+      runInAction(() => {
+        this.selectedLedgerId = ledgerId
+      })
       return true
     } catch (error) {
       this.setDataError(error)
@@ -339,7 +405,12 @@ export class AppStore {
   }
 
   async createInvite(): Promise<LedgerInvitation | null> {
-    if (!this.authUser || !this.selectedLedgerId) return null
+    if (
+      !this.authUser ||
+      !this.selectedLedgerId ||
+      this.currentLedger?.type !== "shared"
+    )
+      return null
 
     const inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase()
     try {
@@ -350,10 +421,31 @@ export class AppStore {
         inviteTokenHash: createId("invite-token"),
       })
       await this.refreshFinanceData()
-      return this.data.invitations.find((invitation) => invitation.inviteCode === inviteCode) ?? null
+      return (
+        this.data.invitations.find(
+          (invitation) => invitation.inviteCode === inviteCode,
+        ) ?? null
+      )
     } catch (error) {
       this.setDataError(error)
       return null
+    }
+  }
+
+  async acceptInvite(inviteCode: string): Promise<boolean> {
+    const normalizedCode = inviteCode.trim().toUpperCase()
+    if (!this.authUser || !normalizedCode) return false
+
+    try {
+      const ledgerId = await this.repository.acceptInvite(normalizedCode)
+      await this.refreshFinanceData()
+      runInAction(() => {
+        this.selectedLedgerId = ledgerId
+      })
+      return this.dataState === "ready"
+    } catch (error) {
+      this.setDataError(error)
+      return false
     }
   }
 
@@ -372,7 +464,11 @@ export class AppStore {
       targetLedgerId: this.selectedLedgerId,
     })
 
-    if (this.data.smsCandidates.some((candidate) => candidate.sourceHash === parsed.normalizedHash)) {
+    if (
+      this.data.smsCandidates.some(
+        (candidate) => candidate.sourceHash === parsed.normalizedHash,
+      )
+    ) {
       return
     }
 
@@ -390,7 +486,9 @@ export class AppStore {
       promptCount: 1,
       firstDetectedAt: now.toISOString(),
       lastPromptedAt: now.toISOString(),
-      reviewDeadlineAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      reviewDeadlineAt: new Date(
+        now.getTime() + 7 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
     })
   }
 
@@ -409,12 +507,19 @@ export class AppStore {
 
   ignoreSmsCandidate(candidateId: string): void {
     this.data.smsCandidates = this.data.smsCandidates.map((candidate) =>
-      candidate.id === candidateId ? { ...candidate, status: "ignored" } : candidate,
+      candidate.id === candidateId
+        ? { ...candidate, status: "ignored" }
+        : candidate,
     )
   }
 
-  async registerSmsCandidate(candidateId: string, categoryId?: string): Promise<void> {
-    const candidate = this.data.smsCandidates.find((item) => item.id === candidateId)
+  async registerSmsCandidate(
+    candidateId: string,
+    categoryId?: string,
+  ): Promise<void> {
+    const candidate = this.data.smsCandidates.find(
+      (item) => item.id === candidateId,
+    )
     if (!candidate) {
       return
     }
@@ -428,7 +533,10 @@ export class AppStore {
       amount: parsed.amount,
       transactionAt: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
         date.getDate(),
-      ).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`,
+      ).padStart(
+        2,
+        "0",
+      )}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`,
       categoryId,
       merchantName: parsed.merchantName,
       memo: "카드 문자 후보",
@@ -438,14 +546,16 @@ export class AppStore {
     })
 
     if (saved) {
-      this.data.smsCandidates = this.data.smsCandidates.map((item) =>
-        item.id === candidateId
-          ? {
-              ...item,
-              status: categoryId ? "registered" : "auto_registered_other",
-            }
-          : item,
-      )
+      runInAction(() => {
+        this.data.smsCandidates = this.data.smsCandidates.map((item) =>
+          item.id === candidateId
+            ? {
+                ...item,
+                status: categoryId ? "registered" : "auto_registered_other",
+              }
+            : item,
+        )
+      })
     }
   }
 
@@ -476,7 +586,9 @@ export class AppStore {
     }
   }
 
-  private async applyAuthSession(session: AuthSessionInfo | null): Promise<void> {
+  private async applyAuthSession(
+    session: AuthSessionInfo | null,
+  ): Promise<void> {
     if (!session) {
       this.authUser = null
       this.authState = "anonymous"
@@ -503,32 +615,44 @@ export class AppStore {
 
   private setAuthError(error: unknown): void {
     this.authState = "error"
-    this.authError = error instanceof Error ? error.message : "인증 처리 중 알 수 없는 오류가 발생했습니다."
+    this.authError =
+      error instanceof Error
+        ? error.message
+        : "인증 처리 중 알 수 없는 오류가 발생했습니다."
   }
 
   private setDataError(error: unknown): void {
     this.dataState = "error"
-    this.dataError = error instanceof Error ? error.message : "가계부 데이터를 저장하지 못했습니다."
+    this.dataError =
+      error instanceof Error
+        ? error.message
+        : "가계부 데이터를 저장하지 못했습니다."
   }
 
   private async ensureWorkspace(userId: string): Promise<void> {
     if (this.initializedWorkspaceUserId !== userId) {
       this.initializedWorkspaceUserId = userId
-      this.workspaceInitialization = ensureAuthenticatedWorkspace().then(() => undefined)
+      this.workspaceInitialization = ensureAuthenticatedWorkspace().then(
+        () => undefined,
+      )
     }
 
     const initialization = this.workspaceInitialization
     try {
       await initialization
     } catch (error) {
-      if (this.initializedWorkspaceUserId === userId) {
-        this.initializedWorkspaceUserId = null
-      }
+      runInAction(() => {
+        if (this.initializedWorkspaceUserId === userId) {
+          this.initializedWorkspaceUserId = null
+        }
+      })
       throw error
     } finally {
-      if (this.workspaceInitialization === initialization) {
-        this.workspaceInitialization = null
-      }
+      runInAction(() => {
+        if (this.workspaceInitialization === initialization) {
+          this.workspaceInitialization = null
+        }
+      })
     }
   }
 }

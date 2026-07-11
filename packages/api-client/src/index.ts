@@ -1,5 +1,5 @@
 export * from "./authClient"
-export * from "./localRepository"
+export * from "./financeData"
 export * from "./supabaseDiagnostics"
 export * from "./supabaseFinanceRepository"
 export * from "./supabaseClient"
