@@ -72,6 +72,36 @@ export interface Category {
   isArchived: boolean
 }
 
+export interface CategoryBudget {
+  id: string
+  ledgerId: string
+  categoryId: string
+  effectiveMonth: string
+  amount: number
+  createdAt: string
+}
+
+export type RecurringRuleType = "fixed" | "installment"
+
+export interface RecurringRule {
+  id: string
+  ledgerId: string
+  createdBy: string
+  type: RecurringRuleType
+  amount: number
+  dayOfMonth: number
+  timeOfDay: string
+  startMonth: string
+  endMonth?: string
+  inactiveFromMonth?: string
+  installmentMonths?: number
+  categoryId?: string
+  merchantName?: string
+  memo?: string
+  isActive: boolean
+  createdAt: string
+}
+
 export interface PaymentMethod {
   id: string
   ledgerId: string
@@ -90,6 +120,10 @@ export interface Transaction {
   createdBy: string
   updatedBy?: string
   actorUserId?: string
+  recurringRuleId?: string
+  recurringType?: RecurringRuleType
+  installmentNumber?: number
+  installmentTotal?: number
   type: TransactionType
   status: TransactionStatus
   amount: number

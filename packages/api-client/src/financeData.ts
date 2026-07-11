@@ -1,12 +1,14 @@
 import type {
   CardMessageSample,
   Category,
+  CategoryBudget,
   Ledger,
   LedgerInvitation,
   LedgerMember,
   LocalSmsCandidate,
   PaymentMethod,
   Profile,
+  RecurringRule,
   Transaction,
 } from "@salimon/types"
 
@@ -16,6 +18,8 @@ export interface FinanceData {
   members: LedgerMember[]
   invitations: LedgerInvitation[]
   categories: Category[]
+  categoryBudgets: CategoryBudget[]
+  recurringRules: RecurringRule[]
   paymentMethods: PaymentMethod[]
   transactions: Transaction[]
   smsCandidates: LocalSmsCandidate[]
@@ -34,6 +38,8 @@ export function createEmptyFinanceData(): FinanceData {
     members: [],
     invitations: [],
     categories: [],
+    categoryBudgets: [],
+    recurringRules: [],
     paymentMethods: [],
     transactions: [],
     smsCandidates: [],

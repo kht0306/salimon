@@ -3,25 +3,23 @@
 import { observer } from "mobx-react-lite"
 import {
   CalendarDays,
-  ClipboardCheck,
   Database,
-  MessageSquareText,
   ListFilter,
   RefreshCw,
   Tags,
   Users,
   WalletCards,
+  ChartNoAxesCombined,
 } from "lucide-react"
 import { StoreProvider, useAppStore } from "./StoreProvider"
 import { CalendarGrid } from "./components/CalendarGrid"
 import { AuthControls } from "./components/AuthControls"
 import { CategoryManager } from "./components/CategoryManager"
 import { ConnectionPanel } from "./components/ConnectionPanel"
-import { SampleSubmissionPanel } from "./components/SampleSubmissionPanel"
 import { SharedLedgerPanel } from "./components/SharedLedgerPanel"
-import { SmsCandidatePanel } from "./components/SmsCandidatePanel"
 import { TransactionPanel } from "./components/TransactionPanel"
 import { TransactionListPanel } from "./components/TransactionListPanel"
+import { SettlementPanel } from "./components/SettlementPanel"
 import {
   Button,
   Metric,
@@ -71,7 +69,11 @@ const DashboardContent = observer(function DashboardContent() {
   return (
     <Shell>
       <Sidebar>
-        <Brand>
+        <Brand
+          type="button"
+          onClick={() => store.setView("calendar")}
+          aria-label="기본 대시보드로 이동"
+        >
           <BrandMark aria-hidden="true">S</BrandMark>
           <BrandName>Salimon</BrandName>
         </Brand>
@@ -114,20 +116,29 @@ const DashboardContent = observer(function DashboardContent() {
 
         <Nav>
           <NavButton
+            $active={store.activeView === "calendar"}
+            aria-current={store.activeView === "calendar" ? "page" : undefined}
+            onClick={() => store.setView("calendar")}
+          >
+            <CalendarDays size={17} /> 캘린더
+          </NavButton>
+          <NavButton
             $active={store.activeView === "transactions"}
             aria-current={
               store.activeView === "transactions" ? "page" : undefined
             }
             onClick={() => store.setView("transactions")}
           >
-            <ListFilter size={17} /> 거래 목록
+            <ListFilter size={17} /> 내역 검색
           </NavButton>
           <NavButton
-            $active={store.activeView === "calendar"}
-            aria-current={store.activeView === "calendar" ? "page" : undefined}
-            onClick={() => store.setView("calendar")}
+            $active={store.activeView === "settlement"}
+            aria-current={
+              store.activeView === "settlement" ? "page" : undefined
+            }
+            onClick={() => store.setView("settlement")}
           >
-            <CalendarDays size={17} /> 캘린더
+            <ChartNoAxesCombined size={17} /> 정산
           </NavButton>
           <NavButton
             $active={store.activeView === "categories"}
@@ -143,24 +154,7 @@ const DashboardContent = observer(function DashboardContent() {
             aria-current={store.activeView === "shared" ? "page" : undefined}
             onClick={() => store.setView("shared")}
           >
-            <Users size={17} /> 공동
-          </NavButton>
-          <NavButton
-            $active={store.activeView === "sms"}
-            aria-current={store.activeView === "sms" ? "page" : undefined}
-            onClick={() => store.setView("sms")}
-          >
-            <MessageSquareText size={17} /> 문자 후보
-            {store.deferredSmsCandidates.length > 0 ? (
-              <Pill>{store.deferredSmsCandidates.length}</Pill>
-            ) : null}
-          </NavButton>
-          <NavButton
-            $active={store.activeView === "samples"}
-            aria-current={store.activeView === "samples" ? "page" : undefined}
-            onClick={() => store.setView("samples")}
-          >
-            <ClipboardCheck size={17} /> 샘플
+            <Users size={17} /> 공유
           </NavButton>
           {isLocalDevelopment ? (
             <NavButton
@@ -178,7 +172,11 @@ const DashboardContent = observer(function DashboardContent() {
         <SidebarFooter>
           <Button
             $variant="ghost"
-            onClick={() => void store.refreshFinanceData()}
+            onClick={async () => {
+              await store.refreshFinanceData()
+              if (store.dataState === "ready")
+                store.notify("최신 데이터로 새로고침했습니다.")
+            }}
             disabled={!store.authUser || store.dataState === "loading"}
             title="Supabase 데이터 새로고침"
           >
@@ -207,9 +205,8 @@ const DashboardContent = observer(function DashboardContent() {
         {store.activeView === "calendar" ? <CalendarGrid /> : null}
         {store.activeView === "transactions" ? <TransactionListPanel /> : null}
         {store.activeView === "categories" ? <CategoryManager /> : null}
+        {store.activeView === "settlement" ? <SettlementPanel /> : null}
         {store.activeView === "shared" ? <SharedLedgerPanel /> : null}
-        {store.activeView === "sms" ? <SmsCandidatePanel /> : null}
-        {store.activeView === "samples" ? <SampleSubmissionPanel /> : null}
         {isLocalDevelopment && store.activeView === "connection" ? (
           <ConnectionPanel />
         ) : null}
@@ -219,6 +216,15 @@ const DashboardContent = observer(function DashboardContent() {
       </Workspace>
 
       <TransactionPanel key={store.selectedLedgerId} />
+      {store.toast ? (
+        <Toast
+          $tone={store.toast.tone}
+          role="status"
+          onClick={store.dismissToast}
+        >
+          {store.toast.message}
+        </Toast>
+      ) : null}
     </Shell>
   )
 })
@@ -231,11 +237,16 @@ const AuthLoading = styled.main`
   color: ${colors.muted};
 `
 
-const Brand = styled.div`
+const Brand = styled.button`
   display: flex;
   align-items: center;
   gap: ${spacing[3]};
   padding: 0 ${spacing[1]} ${spacing[2]};
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 `
 
 const BrandMark = styled.div`
@@ -318,19 +329,6 @@ const NavButton = styled.button<{ $active: boolean }>`
   }
 `
 
-const Pill = styled.span`
-  margin-left: auto;
-  min-width: 18px;
-  height: 18px;
-  display: grid;
-  place-items: center;
-  border-radius: ${radii.round};
-  background: ${colors.coral};
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-`
-
 const SidebarFooter = styled.div`
   display: grid;
   gap: ${spacing[2]};
@@ -394,4 +392,34 @@ const DataError = styled.p`
   margin: 14px 0 0;
   color: ${colors.coral};
   font-size: 13px;
+`
+
+const Toast = styled.button<{ $tone: "success" | "error" | "info" }>`
+  position: fixed;
+  z-index: 1000;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  min-width: 220px;
+  max-width: min(440px, calc(100vw - 32px));
+  border: 1px solid
+    ${({ $tone }) =>
+      $tone === "error"
+        ? "#fecaca"
+        : $tone === "success"
+          ? "#bbf7d0"
+          : colors.border};
+  border-radius: ${radii.sm};
+  background: ${({ $tone }) =>
+    $tone === "error" ? "#fff1f2" : $tone === "success" ? "#f0fdf4" : "#fff"};
+  color: ${({ $tone }) =>
+    $tone === "error"
+      ? colors.coral
+      : $tone === "success"
+        ? colors.green
+        : colors.ink};
+  padding: 11px 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+  font-size: 13px;
+  font-weight: 650;
 `

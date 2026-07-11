@@ -67,7 +67,13 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
       .filter((item) => !type || item.type === type)
       .filter((item) => !status || item.status === status)
       .filter((item) => !categoryId || item.categoryId === categoryId)
-      .filter((item) => !actorUserId || item.actorUserId === actorUserId)
+      .filter(
+        (item) =>
+          !actorUserId ||
+          (actorUserId === "common"
+            ? !item.actorUserId
+            : item.actorUserId === actorUserId),
+      )
       .filter(
         (item) =>
           !query ||
@@ -157,6 +163,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
             onChange={(event) => setType(event.target.value)}
           >
             <option value="">전체</option>
+            <option value="common">공통</option>
             <option value="expense">지출</option>
             <option value="income">수입</option>
             <option value="transfer">이체</option>
@@ -228,10 +235,11 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
             store.data.categories.find(
               (item) => item.id === transaction.categoryId,
             )?.name ?? "기타"
-          const actor =
-            store.currentMembers.find(
-              (member) => member.userId === transaction.actorUserId,
-            )?.nickname ?? "알 수 없음"
+          const actor = transaction.actorUserId
+            ? (store.currentMembers.find(
+                (member) => member.userId === transaction.actorUserId,
+              )?.nickname ?? "알 수 없음")
+            : "공통"
           const registrant =
             store.currentMembers.find(
               (member) => member.userId === transaction.createdBy,
@@ -251,6 +259,10 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
                 <span>
                   {typeLabels[transaction.type]} · {category} ·{" "}
                   {statusLabels[transaction.status]}
+                  {transaction.recurringType === "fixed" ? " · 고정비" : ""}
+                  {transaction.recurringType === "installment"
+                    ? ` · ${transaction.installmentNumber}/${transaction.installmentTotal}회`
+                    : ""}
                 </span>
                 <small>
                   행위자 {actor} · 등록자 {registrant}

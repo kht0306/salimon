@@ -11,3 +11,8 @@ export function parseMoneyInput(value: string): number {
   const parsed = Number(normalized)
   return Number.isFinite(parsed) ? parsed : 0
 }
+
+export function formatMoneyInput(value: string | number): string {
+  const digits = String(value).replace(/\D/g, "")
+  return digits ? Number(digits).toLocaleString("ko-KR") : ""
+}

@@ -1,14 +1,31 @@
 "use client"
 
 import styled from "@emotion/styled"
+import { formatMoneyInput } from "@salimon/domain"
 import { colors, radii } from "@salimon/ui-tokens"
-import { Archive, Plus, Save } from "lucide-react"
+import { Archive, Plus } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useState } from "react"
 import { useAppStore } from "../StoreProvider"
-import { Button, Field, IconButton, Input, Panel, PanelHeader, PanelTitle, Select } from "../styles"
+import {
+  Button,
+  Field,
+  IconButton,
+  Input,
+  Panel,
+  PanelHeader,
+  PanelTitle,
+  Select,
+} from "../styles"
 
-const colorOptions = ["#2d6a4f", "#e4572e", "#277da1", "#f4a261", "#7b2cbf", "#6c757d"]
+const colorOptions = [
+  "#2d6a4f",
+  "#e4572e",
+  "#277da1",
+  "#f4a261",
+  "#7b2cbf",
+  "#6c757d",
+]
 const iconOptions = [
   { value: "utensils", label: "식비" },
   { value: "coffee", label: "카페" },
@@ -17,13 +34,16 @@ const iconOptions = [
   { value: "home", label: "주거" },
   { value: "more-horizontal", label: "기타" },
 ]
-const iconLabels = Object.fromEntries(iconOptions.map((option) => [option.value, option.label]))
+const iconLabels = Object.fromEntries(
+  iconOptions.map((option) => [option.value, option.label]),
+)
 
 export const CategoryManager = observer(function CategoryManager() {
   const store = useAppStore()
   const [name, setName] = useState("")
   const [icon, setIcon] = useState(iconOptions[0].value)
   const [color, setColor] = useState(colorOptions[0])
+  const [budgets, setBudgets] = useState<Record<string, string>>({})
 
   async function create() {
     if (await store.createExpenseCategory(name, icon, color)) {
@@ -35,7 +55,11 @@ export const CategoryManager = observer(function CategoryManager() {
     <Panel>
       <PanelHeader>
         <PanelTitle>지출 카테고리</PanelTitle>
-        <Button $variant="primary" onClick={() => void create()} disabled={!name.trim() || !store.authUser}>
+        <Button
+          $variant="primary"
+          onClick={() => void create()}
+          disabled={!name.trim() || !store.authUser}
+        >
           <Plus size={16} /> 추가
         </Button>
       </PanelHeader>
@@ -43,11 +67,17 @@ export const CategoryManager = observer(function CategoryManager() {
       <CategoryComposer>
         <Field>
           이름
-          <Input value={name} onChange={(event) => setName(event.target.value)} />
+          <Input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
         </Field>
         <Field>
           아이콘
-          <Select value={icon} onChange={(event) => setIcon(event.target.value)}>
+          <Select
+            value={icon}
+            onChange={(event) => setIcon(event.target.value)}
+          >
             {iconOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -75,15 +105,48 @@ export const CategoryManager = observer(function CategoryManager() {
             <ColorDot $color={category.color} />
             <CategoryInfo>
               <strong>{category.name}</strong>
-              <span>{category.isDefault ? "기본" : "사용자"} · {iconLabels[category.icon] ?? category.icon}</span>
+              <span>
+                {category.isDefault ? "기본" : "사용자"} ·{" "}
+                {iconLabels[category.icon] ?? category.icon}
+              </span>
             </CategoryInfo>
-            <IconButton
-              title="색상 저장"
-              aria-label={`${category.name} 색상 저장`}
-              onClick={() => void store.updateCategory(category.id, { color: category.color })}
-            >
-              <Save size={15} />
-            </IconButton>
+            <BudgetField>
+              <Input
+                aria-label={`${category.name} ${store.selectedMonth} 예산`}
+                inputMode="numeric"
+                placeholder="월 예산"
+                value={formatMoneyInput(
+                  budgets[category.id] ??
+                    store.selectedMonthBudgets.find(
+                      (item) => item.category.id === category.id,
+                    )?.amount ??
+                    "",
+                )}
+                onChange={(event) =>
+                  setBudgets({
+                    ...budgets,
+                    [category.id]: event.target.value.replace(/\D/g, ""),
+                  })
+                }
+              />
+              <Button
+                $variant="soft"
+                onClick={() =>
+                  void store.setCategoryBudget(
+                    category.id,
+                    Number(
+                      budgets[category.id] ??
+                        store.selectedMonthBudgets.find(
+                          (item) => item.category.id === category.id,
+                        )?.amount ??
+                        0,
+                    ),
+                  )
+                }
+              >
+                예산 저장
+              </Button>
+            </BudgetField>
             <IconButton
               $variant="danger"
               title="카테고리 비활성화"
@@ -96,6 +159,33 @@ export const CategoryManager = observer(function CategoryManager() {
           </CategoryRow>
         ))}
       </CategoryList>
+
+      <RecurringSection>
+        <strong>고정비 관리 ({store.selectedMonth})</strong>
+        {store.data.recurringRules
+          .filter(
+            (rule) =>
+              rule.ledgerId === store.selectedLedgerId &&
+              rule.type === "fixed" &&
+              (!rule.inactiveFromMonth ||
+                rule.inactiveFromMonth > store.selectedMonth),
+          )
+          .map((rule) => (
+            <RecurringRow key={rule.id}>
+              <span>
+                {rule.merchantName || rule.memo || "고정비"} ·{" "}
+                {rule.amount.toLocaleString("ko-KR")}원 · 매월 {rule.dayOfMonth}
+                일
+              </span>
+              <Button
+                $variant="danger"
+                onClick={() => void store.deactivateFixedRule(rule.id)}
+              >
+                이번 달부터 해제
+              </Button>
+            </RecurringRow>
+          ))}
+      </RecurringSection>
     </Panel>
   )
 })
@@ -137,11 +227,35 @@ const CategoryList = styled.div`
 
 const CategoryRow = styled.div`
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(220px, auto) auto;
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid ${colors.border};
   padding: 10px 0;
+`
+
+const BudgetField = styled.div`
+  display: flex;
+  gap: 6px;
+  input {
+    width: 110px;
+  }
+`
+
+const RecurringSection = styled.div`
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-top: 1px solid ${colors.border};
+`
+
+const RecurringRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: ${colors.muted};
+  font-size: 13px;
 `
 
 const ColorDot = styled.span<{ $color: string }>`

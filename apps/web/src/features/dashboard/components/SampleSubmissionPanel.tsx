@@ -1,13 +1,21 @@
 "use client"
 
 import styled from "@emotion/styled"
-import { maskSensitiveText } from "@salimon/domain"
+import { formatMoneyInput, maskSensitiveText } from "@salimon/domain"
 import { colors, radii } from "@salimon/ui-tokens"
 import { Send } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useMemo, useState } from "react"
 import { useAppStore } from "../StoreProvider"
-import { Button, Field, Input, Panel, PanelHeader, PanelTitle, Textarea } from "../styles"
+import {
+  Button,
+  Field,
+  Input,
+  Panel,
+  PanelHeader,
+  PanelTitle,
+  Textarea,
+} from "../styles"
 
 export const SampleSubmissionPanel = observer(function SampleSubmissionPanel() {
   const store = useAppStore()
@@ -38,7 +46,11 @@ export const SampleSubmissionPanel = observer(function SampleSubmissionPanel() {
     <Panel>
       <PanelHeader>
         <PanelTitle>카드 문자 샘플</PanelTitle>
-        <Button $variant="primary" disabled={!message.trim() || !consent || !store.authUser} onClick={() => void submit()}>
+        <Button
+          $variant="primary"
+          disabled={!message.trim() || !consent || !store.authUser}
+          onClick={() => void submit()}
+        >
           <Send size={16} /> 제출
         </Button>
       </PanelHeader>
@@ -46,19 +58,34 @@ export const SampleSubmissionPanel = observer(function SampleSubmissionPanel() {
       <FormGrid>
         <Field>
           카드사
-          <Input value={company} onChange={(event) => setCompany(event.target.value)} />
+          <Input
+            value={company}
+            onChange={(event) => setCompany(event.target.value)}
+          />
         </Field>
         <Field>
           예상 금액
-          <Input inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} />
+          <Input
+            inputMode="numeric"
+            value={formatMoneyInput(amount)}
+            onChange={(event) =>
+              setAmount(event.target.value.replace(/\D/g, ""))
+            }
+          />
         </Field>
         <Field>
           예상 가맹점
-          <Input value={merchant} onChange={(event) => setMerchant(event.target.value)} />
+          <Input
+            value={merchant}
+            onChange={(event) => setMerchant(event.target.value)}
+          />
         </Field>
         <Field>
           문자 예시
-          <Textarea value={message} onChange={(event) => setMessage(event.target.value)} />
+          <Textarea
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+          />
         </Field>
       </FormGrid>
 
@@ -66,7 +93,11 @@ export const SampleSubmissionPanel = observer(function SampleSubmissionPanel() {
         <strong>마스킹 미리보기</strong>
         <Masked>{masked || " "}</Masked>
         <Consent>
-          <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+          <input
+            type="checkbox"
+            checked={consent}
+            onChange={(event) => setConsent(event.target.checked)}
+          />
           익명화된 샘플 저장 동의
         </Consent>
       </Preview>

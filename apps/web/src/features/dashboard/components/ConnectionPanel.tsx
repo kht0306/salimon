@@ -2,7 +2,14 @@
 
 import styled from "@emotion/styled"
 import { colors, radii } from "@salimon/ui-tokens"
-import { CheckCircle2, Database, RefreshCw, ShieldCheck, TriangleAlert, Wifi } from "lucide-react"
+import {
+  CheckCircle2,
+  Database,
+  RefreshCw,
+  ShieldCheck,
+  TriangleAlert,
+  Wifi,
+} from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useEffect } from "react"
 import { useAppStore } from "../StoreProvider"
@@ -20,16 +27,26 @@ export const ConnectionPanel = observer(function ConnectionPanel() {
     <Panel>
       <PanelHeader>
         <PanelTitle>Supabase 연결</PanelTitle>
-        <Button $variant="primary" onClick={store.checkSupabase} disabled={status.state === "checking"}>
+        <Button
+          $variant="primary"
+          onClick={() => void store.checkSupabase(true)}
+          disabled={status.state === "checking"}
+        >
           <RefreshCw size={16} /> 다시 확인
         </Button>
       </PanelHeader>
 
       <Content>
         <StatusCard $state={status.state}>
-          {status.state === "configured" ? <CheckCircle2 size={24} /> : <TriangleAlert size={24} />}
+          {status.state === "configured" ? (
+            <CheckCircle2 size={24} />
+          ) : (
+            <TriangleAlert size={24} />
+          )}
           <div>
-            <strong>{status.state === "configured" ? "연결 준비 완료" : "확인 필요"}</strong>
+            <strong>
+              {status.state === "configured" ? "연결 준비 완료" : "확인 필요"}
+            </strong>
             <p>{status.message}</p>
           </div>
         </StatusCard>
@@ -77,8 +94,10 @@ const StatusCard = styled.div<{ $state: string }>`
   gap: 12px;
   align-items: start;
   border-bottom: 1px solid ${colors.border};
-  background: ${({ $state }) => ($state === "configured" ? colors.greenSoft : "#fffbeb")};
-  color: ${({ $state }) => ($state === "configured" ? colors.green : colors.ink)};
+  background: ${({ $state }) =>
+    $state === "configured" ? colors.greenSoft : "#fffbeb"};
+  color: ${({ $state }) =>
+    $state === "configured" ? colors.green : colors.ink};
   padding: 16px 18px;
 
   p {

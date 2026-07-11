@@ -4,6 +4,7 @@ import styled from "@emotion/styled"
 import {
   formatKoreanDate,
   formatKoreanTime,
+  formatMoneyInput,
   formatKrw,
   getDateTimeLocalValue,
 } from "@salimon/domain"
@@ -50,6 +51,8 @@ export const TransactionPanel = observer(function TransactionPanel() {
       status: "confirmed",
       categoryId: store.expenseCategories[0]?.id ?? "",
       actorUserId: store.authUser?.id ?? "",
+      recurringType: "none",
+      installmentMonths: "2",
       transactionAt: `${selectedDate}T12:00`,
     }),
     [selectedDate, store.expenseCategories, store.authUser?.id],
@@ -72,7 +75,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
       type: transaction.type,
       status: transaction.status,
       categoryId: transaction.categoryId ?? "",
-      actorUserId: transaction.actorUserId ?? transaction.createdBy,
+      actorUserId: transaction.actorUserId ?? "",
+      recurringType: "none",
+      installmentMonths: "2",
       transactionAt: getDateTimeLocalValue(transaction.transactionAt),
     })
     setAdding(true)
@@ -100,6 +105,14 @@ export const TransactionPanel = observer(function TransactionPanel() {
       merchantName: draft.merchantName || undefined,
       memo: draft.memo || undefined,
       actorUserId: draft.actorUserId || undefined,
+      recurringType:
+        editing || draft.recurringType === "none"
+          ? undefined
+          : (draft.recurringType as "fixed" | "installment"),
+      installmentMonths:
+        draft.recurringType === "installment"
+          ? Number(draft.installmentMonths)
+          : undefined,
     })
     if (saved) {
       closeForm()
@@ -161,14 +174,52 @@ export const TransactionPanel = observer(function TransactionPanel() {
             </Field>
           </TwoColumns>
 
+          {!editing ? (
+            <TwoColumns>
+              <Field>
+                반복 유형
+                <Select
+                  value={draft.recurringType}
+                  onChange={(event) =>
+                    setDraft({ ...draft, recurringType: event.target.value })
+                  }
+                >
+                  <option value="none">일반 거래</option>
+                  <option value="fixed">고정비</option>
+                  <option value="installment">카드 할부</option>
+                </Select>
+              </Field>
+              {draft.recurringType === "installment" ? (
+                <Field>
+                  전체 할부 개월
+                  <Input
+                    type="number"
+                    min="2"
+                    max="120"
+                    value={draft.installmentMonths}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        installmentMonths: event.target.value,
+                      })
+                    }
+                  />
+                </Field>
+              ) : (
+                <div />
+              )}
+            </TwoColumns>
+          ) : null}
+
           <Field>
             금액
+            {draft.recurringType === "installment" ? " (월별 할부액)" : ""}
             <Input
               type="text"
               inputMode="numeric"
-              pattern="[0-9]*"
+              pattern="[0-9,]*"
               autoComplete="off"
-              value={draft.amount}
+              value={formatMoneyInput(draft.amount)}
               onChange={(event) =>
                 setDraft({
                   ...draft,
@@ -197,6 +248,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 setDraft({ ...draft, actorUserId: event.target.value })
               }
             >
+              <option value="">공통</option>
               {store.currentMembers.map((member) => (
                 <option key={member.userId} value={member.userId}>
                   {member.nickname}
@@ -259,10 +311,11 @@ export const TransactionPanel = observer(function TransactionPanel() {
             store.currentMembers.find(
               (member) => member.userId === transaction.createdBy,
             )?.nickname ?? "알 수 없음"
-          const actor =
-            store.currentMembers.find(
-              (member) => member.userId === transaction.actorUserId,
-            )?.nickname ?? registrant
+          const actor = transaction.actorUserId
+            ? (store.currentMembers.find(
+                (member) => member.userId === transaction.actorUserId,
+              )?.nickname ?? registrant)
+            : "공통"
           return (
             <TransactionItem key={transaction.id}>
               <TransactionWhen>
@@ -280,6 +333,10 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 <TransactionMeta>
                   {typeLabels[transaction.type]} · {category?.name ?? "기타"} ·{" "}
                   {statusLabels[transaction.status]}
+                  {transaction.recurringType === "fixed" ? " · 고정비" : ""}
+                  {transaction.recurringType === "installment"
+                    ? ` · ${transaction.installmentNumber}/${transaction.installmentTotal}회`
+                    : ""}
                 </TransactionMeta>
                 <RegisteredAt>
                   등록{" "}

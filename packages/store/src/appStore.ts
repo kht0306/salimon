@@ -46,10 +46,18 @@ export interface TransactionDraft {
   sourceType?: Transaction["sourceType"]
   sourceHash?: string
   parseConfidence?: number
+  recurringType?: "fixed" | "installment"
+  installmentMonths?: number
 }
 
 export class AppStore {
   private repository: SupabaseFinanceRepository
+  private toastTimer?: ReturnType<typeof setTimeout>
+  toast: {
+    id: number
+    tone: "success" | "error" | "info"
+    message: string
+  } | null = null
   data: FinanceData
   selectedLedgerId: string
   selectedMonth: string
@@ -58,6 +66,7 @@ export class AppStore {
     | "calendar"
     | "transactions"
     | "categories"
+    | "settlement"
     | "shared"
     | "sms"
     | "samples"
@@ -118,6 +127,28 @@ export class AppStore {
     return this.currentCategories.filter(
       (category) => category.type === "expense",
     )
+  }
+
+  get selectedMonthBudgets() {
+    return this.expenseCategories.flatMap((category) => {
+      const budget = this.data.categoryBudgets
+        .filter(
+          (item) =>
+            item.categoryId === category.id &&
+            item.effectiveMonth <= this.selectedMonth,
+        )
+        .sort((a, b) => b.effectiveMonth.localeCompare(a.effectiveMonth))[0]
+      if (!budget || budget.amount <= 0) return []
+      const spent = this.monthTransactions
+        .filter(
+          (item) =>
+            item.type === "expense" &&
+            item.status !== "excluded" &&
+            item.categoryId === category.id,
+        )
+        .reduce((sum, item) => sum + item.amount, 0)
+      return [{ category, amount: budget.amount, spent }]
+    })
   }
 
   get monthTransactions(): Transaction[] {
@@ -191,6 +222,7 @@ export class AppStore {
     this.dataState = "loading"
     this.dataError = null
     try {
+      await this.repository.materializeMonth(this.selectedMonth)
       const data = await this.repository.load(this.authUser.id)
       runInAction(() => {
         this.hydrate(data)
@@ -211,7 +243,26 @@ export class AppStore {
     this.activeView = view
   }
 
-  async checkSupabase(): Promise<void> {
+  notify(
+    message: string,
+    tone: "success" | "error" | "info" = "success",
+  ): void {
+    if (this.toastTimer) clearTimeout(this.toastTimer)
+    this.toast = { id: Date.now(), tone, message }
+    this.toastTimer = setTimeout(
+      () =>
+        runInAction(() => {
+          this.toast = null
+        }),
+      2800,
+    )
+  }
+
+  dismissToast(): void {
+    this.toast = null
+  }
+
+  async checkSupabase(showToast = false): Promise<void> {
     this.supabaseConnection = {
       ...this.supabaseConnection,
       state: "checking",
@@ -221,6 +272,13 @@ export class AppStore {
     runInAction(() => {
       this.supabaseConnection = connection
     })
+    if (showToast)
+      this.notify(
+        connection.state === "configured"
+          ? "Supabase 연결을 확인했습니다."
+          : connection.message,
+        connection.state === "configured" ? "success" : "error",
+      )
   }
 
   async initializeAuth(): Promise<void> {
@@ -281,6 +339,7 @@ export class AppStore {
 
   moveSelectedMonth(amount: number): void {
     this.selectedMonth = moveMonth(this.selectedMonth, amount)
+    void this.refreshFinanceData()
   }
 
   async saveTransaction(draft: TransactionDraft): Promise<boolean> {
@@ -290,6 +349,7 @@ export class AppStore {
       !Number.isSafeInteger(draft.amount) ||
       draft.amount <= 0
     ) {
+      this.notify("금액과 필수 항목을 확인해 주세요.", "error")
       return false
     }
 
@@ -306,6 +366,7 @@ export class AppStore {
         transactionAt: fromDateTimeLocalValue(draft.transactionAt),
       })
       await this.refreshFinanceData()
+      this.notify(draft.id ? "거래를 수정했습니다." : "거래를 저장했습니다.")
       return this.dataState === "ready"
     } catch (error) {
       this.setDataError(error)
@@ -322,6 +383,7 @@ export class AppStore {
         this.authUser.id,
       )
       await this.refreshFinanceData()
+      this.notify("거래를 삭제했습니다.")
     } catch (error) {
       this.setDataError(error)
     }
@@ -334,6 +396,7 @@ export class AppStore {
   ): Promise<boolean> {
     const trimmed = name.trim()
     if (!trimmed || !this.selectedLedgerId || !this.authUser) {
+      this.notify("카테고리 이름을 입력해 주세요.", "error")
       return false
     }
 
@@ -341,6 +404,7 @@ export class AppStore {
       (category) => category.name.toLowerCase() === trimmed.toLowerCase(),
     )
     if (duplicate) {
+      this.notify("이미 같은 이름의 카테고리가 있습니다.", "error")
       return false
     }
 
@@ -354,6 +418,7 @@ export class AppStore {
         sortOrder: this.expenseCategories.length,
       })
       await this.refreshFinanceData()
+      this.notify("카테고리를 추가했습니다.")
       return this.dataState === "ready"
     } catch (error) {
       this.setDataError(error)
@@ -368,6 +433,7 @@ export class AppStore {
     try {
       await this.repository.updateCategory(categoryId, patch)
       await this.refreshFinanceData()
+      this.notify("카테고리를 수정했습니다.")
     } catch (error) {
       this.setDataError(error)
     }
@@ -380,6 +446,42 @@ export class AppStore {
     try {
       await this.repository.updateCategory(categoryId, { isArchived: true })
       await this.refreshFinanceData()
+      this.notify("카테고리를 비활성화했습니다.")
+    } catch (error) {
+      this.setDataError(error)
+    }
+  }
+
+  async setCategoryBudget(
+    categoryId: string,
+    amount: number,
+  ): Promise<boolean> {
+    if (!this.authUser || !Number.isSafeInteger(amount) || amount < 0) {
+      this.notify("올바른 예산 금액을 입력해 주세요.", "error")
+      return false
+    }
+    try {
+      await this.repository.setCategoryBudget({
+        ledgerId: this.selectedLedgerId,
+        categoryId,
+        month: this.selectedMonth,
+        amount,
+        userId: this.authUser.id,
+      })
+      await this.refreshFinanceData()
+      this.notify(`${this.selectedMonth} 예산을 저장했습니다.`)
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async deactivateFixedRule(ruleId: string): Promise<void> {
+    try {
+      await this.repository.deactivateFixedRule(ruleId, this.selectedMonth)
+      await this.refreshFinanceData()
+      this.notify("이번 달부터 고정비를 해제했습니다.")
     } catch (error) {
       this.setDataError(error)
     }
@@ -397,6 +499,7 @@ export class AppStore {
       runInAction(() => {
         this.selectedLedgerId = ledgerId
       })
+      this.notify("공동 가계부를 만들었습니다.")
       return true
     } catch (error) {
       this.setDataError(error)
@@ -421,6 +524,7 @@ export class AppStore {
         inviteTokenHash: createId("invite-token"),
       })
       await this.refreshFinanceData()
+      this.notify("초대 코드를 만들었습니다.")
       return (
         this.data.invitations.find(
           (invitation) => invitation.inviteCode === inviteCode,
@@ -442,6 +546,7 @@ export class AppStore {
       runInAction(() => {
         this.selectedLedgerId = ledgerId
       })
+      this.notify("공동 가계부에 참여했습니다.")
       return this.dataState === "ready"
     } catch (error) {
       this.setDataError(error)
@@ -453,6 +558,7 @@ export class AppStore {
     try {
       await this.repository.revokeInvite(invitationId)
       await this.refreshFinanceData()
+      this.notify("초대를 취소했습니다.")
     } catch (error) {
       this.setDataError(error)
     }
@@ -627,6 +733,7 @@ export class AppStore {
       error instanceof Error
         ? error.message
         : "가계부 데이터를 저장하지 못했습니다."
+    this.notify(this.dataError, "error")
   }
 
   private async ensureWorkspace(userId: string): Promise<void> {

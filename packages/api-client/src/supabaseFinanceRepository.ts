@@ -1,11 +1,13 @@
 import type {
   CardMessageSample,
   Category,
+  CategoryBudget,
   Ledger,
   LedgerInvitation,
   LedgerMember,
   PaymentMethod,
   Profile,
+  RecurringRule,
   Transaction,
   TransactionSourceType,
   TransactionStatus,
@@ -30,6 +32,8 @@ export interface RemoteTransactionInput {
   sourceType?: TransactionSourceType
   sourceHash?: string
   parseConfidence?: number
+  recurringType?: "fixed" | "installment"
+  installmentMonths?: number
 }
 
 export interface RemoteSampleInput {
@@ -49,6 +53,8 @@ export class SupabaseFinanceRepository {
       ledgersResult,
       membersResult,
       categoriesResult,
+      budgetsResult,
+      rulesResult,
       transactionsResult,
       invitationsResult,
       samplesResult,
@@ -75,9 +81,21 @@ export class SupabaseFinanceRepository {
         )
         .order("sort_order"),
       client
+        .from("category_budgets")
+        .select(
+          "id, ledger_id, category_id, effective_month, amount, created_at",
+        )
+        .order("effective_month"),
+      client
+        .from("recurring_rules")
+        .select(
+          "id, ledger_id, created_by, rule_type, amount, day_of_month, time_of_day, start_month, end_month, inactive_from_month, installment_months, category_id, merchant_name, memo, is_active, created_at",
+        )
+        .order("created_at"),
+      client
         .from("transactions")
         .select(
-          "id, ledger_id, created_by, updated_by, actor_user_id, type, status, amount, currency, transaction_at, category_id, payment_method_id, merchant_name, memo, source_type, source_app, source_sender, source_hash, parse_confidence, created_at, updated_at, deleted_at",
+          "id, ledger_id, created_by, updated_by, actor_user_id, type, status, amount, currency, transaction_at, category_id, payment_method_id, merchant_name, memo, source_type, source_app, source_sender, source_hash, parse_confidence, recurring_rule_id, recurring_type, installment_number, installment_total, created_at, updated_at, deleted_at",
         )
         .order("transaction_at", { ascending: false }),
       client
@@ -99,6 +117,8 @@ export class SupabaseFinanceRepository {
       ledgersResult,
       membersResult,
       categoriesResult,
+      budgetsResult,
+      rulesResult,
       transactionsResult,
       invitationsResult,
       samplesResult,
@@ -121,6 +141,10 @@ export class SupabaseFinanceRepository {
       members,
       invitations: ((invitationsResult.data ?? []) as Row[]).map(mapInvitation),
       categories: ((categoriesResult.data ?? []) as Row[]).map(mapCategory),
+      categoryBudgets: ((budgetsResult.data ?? []) as Row[]).map(
+        mapCategoryBudget,
+      ),
+      recurringRules: ((rulesResult.data ?? []) as Row[]).map(mapRecurringRule),
       paymentMethods: [],
       transactions: ((transactionsResult.data ?? []) as Row[]).map(
         mapTransaction,
@@ -144,12 +168,40 @@ export class SupabaseFinanceRepository {
       category_id: input.categoryId ?? null,
       merchant_name: input.merchantName ?? null,
       memo: input.memo ?? null,
-      actor_user_id: input.actorUserId ?? userId,
+      actor_user_id: input.actorUserId || null,
       source_type: input.sourceType ?? "manual",
       source_hash: input.sourceHash ?? null,
       parse_confidence: input.parseConfidence ?? null,
       updated_by: userId,
       updated_at: new Date().toISOString(),
+    }
+
+    if (!input.id && input.recurringType) {
+      const date = new Date(input.transactionAt)
+      const startMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`
+      const { error: ruleError } = await client.from("recurring_rules").insert({
+        ledger_id: input.ledgerId,
+        created_by: userId,
+        rule_type: input.recurringType,
+        amount: input.amount,
+        day_of_month: date.getDate(),
+        time_of_day: `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`,
+        start_month: startMonth,
+        end_month:
+          input.recurringType === "installment"
+            ? addMonths(startMonth, (input.installmentMonths ?? 2) - 1)
+            : null,
+        installment_months:
+          input.recurringType === "installment"
+            ? (input.installmentMonths ?? 2)
+            : null,
+        category_id: input.categoryId ?? null,
+        merchant_name: input.merchantName ?? null,
+        memo: input.memo ?? null,
+      })
+      throwIfError(ruleError)
+      await this.materializeMonth(startMonth.slice(0, 7))
+      return
     }
 
     const result = input.id
@@ -158,6 +210,61 @@ export class SupabaseFinanceRepository {
           .from("transactions")
           .insert({ ...payload, created_by: userId })
     throwIfError(result.error)
+  }
+
+  async materializeMonth(month: string): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("materialize_finance_month", {
+      target_month: `${month}-01`,
+    })
+    throwIfError(error)
+  }
+
+  async setCategoryBudget(input: {
+    ledgerId: string
+    categoryId: string
+    month: string
+    amount: number
+    userId: string
+  }): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.from("category_budgets").upsert(
+      {
+        ledger_id: input.ledgerId,
+        category_id: input.categoryId,
+        effective_month: `${input.month}-01`,
+        amount: input.amount,
+        created_by: input.userId,
+      },
+      { onConflict: "category_id,effective_month" },
+    )
+    throwIfError(error)
+  }
+
+  async deactivateFixedRule(ruleId: string, month: string): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error: ruleError } = await client
+      .from("recurring_rules")
+      .update({
+        inactive_from_month: `${month}-01`,
+        is_active: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", ruleId)
+    throwIfError(ruleError)
+    const start = new Date(`${month}-01T00:00:00`)
+    const end = new Date(
+      start.getFullYear(),
+      start.getMonth() + 1,
+      1,
+    ).toISOString()
+    const { error } = await client
+      .from("transactions")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("recurring_rule_id", ruleId)
+      .gte("transaction_at", start.toISOString())
+      .lt("transaction_at", end)
+    throwIfError(error)
   }
 
   async softDeleteTransaction(
@@ -377,14 +484,48 @@ function mapCategory(row: Row): Category {
   }
 }
 
+function mapCategoryBudget(row: Row): CategoryBudget {
+  return {
+    id: stringValue(row.id),
+    ledgerId: stringValue(row.ledger_id),
+    categoryId: stringValue(row.category_id),
+    effectiveMonth: stringValue(row.effective_month).slice(0, 7),
+    amount: numberValue(row.amount),
+    createdAt: stringValue(row.created_at),
+  }
+}
+
+function mapRecurringRule(row: Row): RecurringRule {
+  return {
+    id: stringValue(row.id),
+    ledgerId: stringValue(row.ledger_id),
+    createdBy: stringValue(row.created_by),
+    type: row.rule_type === "installment" ? "installment" : "fixed",
+    amount: numberValue(row.amount),
+    dayOfMonth: numberValue(row.day_of_month),
+    timeOfDay: stringValue(row.time_of_day),
+    startMonth: stringValue(row.start_month).slice(0, 7),
+    endMonth: optionalString(row.end_month)?.slice(0, 7),
+    inactiveFromMonth: optionalString(row.inactive_from_month)?.slice(0, 7),
+    installmentMonths:
+      row.installment_months == null
+        ? undefined
+        : numberValue(row.installment_months),
+    categoryId: optionalString(row.category_id),
+    merchantName: optionalString(row.merchant_name),
+    memo: optionalString(row.memo),
+    isActive: Boolean(row.is_active),
+    createdAt: stringValue(row.created_at),
+  }
+}
+
 function mapTransaction(row: Row): Transaction {
   return {
     id: stringValue(row.id),
     ledgerId: stringValue(row.ledger_id),
     createdBy: stringValue(row.created_by),
     updatedBy: optionalString(row.updated_by),
-    actorUserId:
-      optionalString(row.actor_user_id) ?? stringValue(row.created_by),
+    actorUserId: optionalString(row.actor_user_id),
     type: mapTransactionType(row.type),
     status: mapTransactionStatus(row.status),
     amount: numberValue(row.amount),
@@ -402,10 +543,29 @@ function mapTransaction(row: Row): Transaction {
       row.parse_confidence === null
         ? undefined
         : numberValue(row.parse_confidence),
+    recurringRuleId: optionalString(row.recurring_rule_id),
+    recurringType:
+      row.recurring_type === "fixed" || row.recurring_type === "installment"
+        ? row.recurring_type
+        : undefined,
+    installmentNumber:
+      row.installment_number == null
+        ? undefined
+        : numberValue(row.installment_number),
+    installmentTotal:
+      row.installment_total == null
+        ? undefined
+        : numberValue(row.installment_total),
     createdAt: stringValue(row.created_at),
     updatedAt: stringValue(row.updated_at),
     deletedAt: optionalString(row.deleted_at),
   }
+}
+
+function addMonths(date: string, amount: number): string {
+  const [year, month] = date.split("-").map(Number)
+  const next = new Date(year, month - 1 + amount, 1)
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-01`
 }
 
 function mapSample(row: Row): CardMessageSample {
