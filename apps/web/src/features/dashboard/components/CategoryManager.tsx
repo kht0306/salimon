@@ -300,9 +300,13 @@ export const CategoryManager = observer(function CategoryManager() {
               )}
               <IconButton
                 $variant="danger"
-                title="카테고리 비활성화"
-                aria-label={`${category.name} 비활성화`}
-                disabled={category.isDefault || category.name === "기타"}
+                title={
+                  category.name === "기타"
+                    ? "기타 카테고리는 제거할 수 없습니다"
+                    : "카테고리 제거"
+                }
+                aria-label={`${category.name} 제거`}
+                disabled={category.name === "기타"}
                 onClick={() => void store.archiveCategory(category.id)}
               >
                 <Archive size={15} />

@@ -541,12 +541,12 @@ export class AppStore {
 
   async archiveCategory(categoryId: string): Promise<void> {
     const category = this.data.categories.find((item) => item.id === categoryId)
-    if (!category || category.isDefault || category.name === "기타") return
+    if (!category || category.name === "기타") return
 
     try {
       await this.repository.updateCategory(categoryId, { isArchived: true })
       await this.refreshFinanceData()
-      this.notify("카테고리를 비활성화했습니다.")
+      this.notify("카테고리를 제거했습니다.")
     } catch (error) {
       this.setDataError(error)
     }
