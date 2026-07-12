@@ -15,6 +15,7 @@ import { StoreProvider, useAppStore } from "./StoreProvider"
 import { CalendarGrid } from "./components/CalendarGrid"
 import { AuthControls } from "./components/AuthControls"
 import { CategoryManager } from "./components/CategoryManager"
+import { CardManager } from "./components/CardManager"
 import { ConnectionPanel } from "./components/ConnectionPanel"
 import { SharedLedgerPanel } from "./components/SharedLedgerPanel"
 import { TransactionPanel } from "./components/TransactionPanel"
@@ -150,6 +151,13 @@ const DashboardContent = observer(function DashboardContent() {
             <Tags size={17} /> 카테고리
           </NavButton>
           <NavButton
+            $active={store.activeView === "cards"}
+            aria-current={store.activeView === "cards" ? "page" : undefined}
+            onClick={() => store.setView("cards")}
+          >
+            <WalletCards size={17} /> 카드 관리
+          </NavButton>
+          <NavButton
             $active={store.activeView === "shared"}
             aria-current={store.activeView === "shared" ? "page" : undefined}
             onClick={() => store.setView("shared")}
@@ -205,6 +213,7 @@ const DashboardContent = observer(function DashboardContent() {
         {store.activeView === "calendar" ? <CalendarGrid /> : null}
         {store.activeView === "transactions" ? <TransactionListPanel /> : null}
         {store.activeView === "categories" ? <CategoryManager /> : null}
+        {store.activeView === "cards" ? <CardManager /> : null}
         {store.activeView === "settlement" ? <SettlementPanel /> : null}
         {store.activeView === "shared" ? <SharedLedgerPanel /> : null}
         {isLocalDevelopment && store.activeView === "connection" ? (
@@ -216,7 +225,9 @@ const DashboardContent = observer(function DashboardContent() {
       </Workspace>
 
       {store.activeView === "calendar" ? (
-        <TransactionPanel key={store.selectedLedgerId} />
+        <TransactionPanel
+          key={`${store.selectedLedgerId}-${store.selectedDate}`}
+        />
       ) : null}
       {store.toast ? (
         <Toast
@@ -399,9 +410,8 @@ const DataError = styled.p`
 const Toast = styled.button<{ $tone: "success" | "error" | "info" }>`
   position: fixed;
   z-index: 1000;
-  left: 50%;
-  bottom: 28px;
-  transform: translateX(-50%);
+  top: 20px;
+  right: 20px;
   min-width: 220px;
   max-width: min(440px, calc(100vw - 32px));
   border: 1px solid

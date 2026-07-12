@@ -95,6 +95,8 @@ export interface RecurringRule {
   endMonth?: string
   inactiveFromMonth?: string
   installmentMonths?: number
+  purchaseAt?: string
+  paymentMethodId?: string
   categoryId?: string
   merchantName?: string
   memo?: string
@@ -110,8 +112,13 @@ export interface PaymentMethod {
   type: "cash" | "card" | "bank" | "pay" | "etc"
   last4?: string
   issuer?: string
+  paymentDay?: number
+  billingPeriodEndDay?: number
+  billingPeriodEndMonthOffset?: -1 | 0
   visibility: "ledger" | "private"
   isActive: boolean
+  isDeleted?: boolean
+  isPrimary?: boolean
 }
 
 export interface Transaction {

@@ -35,6 +35,7 @@ export interface RemoteTransactionInput {
   recurringType?: "fixed" | "installment"
   recurringRuleId?: string
   installmentMonths?: number
+  paymentMethodId?: string
 }
 
 export interface RemoteSampleInput {
@@ -56,6 +57,7 @@ export class SupabaseFinanceRepository {
       categoriesResult,
       budgetsResult,
       rulesResult,
+      paymentMethodsResult,
       transactionsResult,
       invitationsResult,
       samplesResult,
@@ -90,8 +92,15 @@ export class SupabaseFinanceRepository {
       client
         .from("recurring_rules")
         .select(
-          "id, ledger_id, created_by, rule_type, amount, day_of_month, time_of_day, start_month, end_month, inactive_from_month, installment_months, category_id, merchant_name, memo, is_active, created_at",
+          "id, ledger_id, created_by, rule_type, amount, day_of_month, time_of_day, start_month, end_month, inactive_from_month, installment_months, purchase_at, payment_method_id, category_id, merchant_name, memo, is_active, created_at",
         )
+        .order("created_at"),
+      client
+        .from("payment_methods")
+        .select(
+          "id, ledger_id, owner_user_id, name, type, last4, issuer, visibility, is_active, is_primary, deleted_at, payment_day, billing_period_end_day, billing_period_end_month_offset",
+        )
+        .eq("type", "card")
         .order("created_at"),
       client
         .from("transactions")
@@ -120,6 +129,7 @@ export class SupabaseFinanceRepository {
       categoriesResult,
       budgetsResult,
       rulesResult,
+      paymentMethodsResult,
       transactionsResult,
       invitationsResult,
       samplesResult,
@@ -146,7 +156,9 @@ export class SupabaseFinanceRepository {
         mapCategoryBudget,
       ),
       recurringRules: ((rulesResult.data ?? []) as Row[]).map(mapRecurringRule),
-      paymentMethods: [],
+      paymentMethods: ((paymentMethodsResult.data ?? []) as Row[]).map(
+        mapPaymentMethod,
+      ),
       transactions: ((transactionsResult.data ?? []) as Row[]).map(
         mapTransaction,
       ),
@@ -170,6 +182,7 @@ export class SupabaseFinanceRepository {
       merchant_name: input.merchantName ?? null,
       memo: input.memo ?? null,
       actor_user_id: input.actorUserId || null,
+      payment_method_id: input.paymentMethodId ?? null,
       source_type: input.sourceType ?? "manual",
       source_hash: input.sourceHash ?? null,
       parse_confidence: input.parseConfidence ?? null,
@@ -178,7 +191,7 @@ export class SupabaseFinanceRepository {
     }
 
     if (input.recurringType === "installment") {
-      const { error } = await client.rpc("save_installment_series", {
+      const { error } = await client.rpc("save_card_installment_series", {
         p_rule_id: input.recurringRuleId ?? null,
         p_ledger_id: input.ledgerId,
         p_amount: input.amount,
@@ -190,6 +203,7 @@ export class SupabaseFinanceRepository {
         p_actor_user_id: input.actorUserId ?? null,
         p_status: input.status,
         p_type: input.type,
+        p_payment_method_id: input.paymentMethodId,
       })
       throwIfError(error)
       return
@@ -254,6 +268,100 @@ export class SupabaseFinanceRepository {
       },
       { onConflict: "category_id,effective_month" },
     )
+    throwIfError(error)
+  }
+
+  async createCard(input: {
+    ledgerId: string
+    ownerUserId: string
+    name: string
+    issuer: string
+    last4?: string
+    paymentDay: number
+    billingPeriodEndDay: number
+    billingPeriodEndMonthOffset: -1 | 0
+    isPrimary: boolean
+  }): Promise<void> {
+    const client = requireSupabaseClient()
+    const { data, error } = await client
+      .from("payment_methods")
+      .insert({
+        ledger_id: input.ledgerId,
+        owner_user_id: input.ownerUserId,
+        name: input.name,
+        type: "card",
+        last4: input.last4 || null,
+        issuer: input.issuer,
+        visibility: "ledger",
+        payment_day: input.paymentDay,
+        billing_period_end_day: input.billingPeriodEndDay,
+        billing_period_end_month_offset: input.billingPeriodEndMonthOffset,
+        is_primary: false,
+      })
+      .select("id")
+      .single()
+    throwIfError(error)
+    if (input.isPrimary && data?.id) await this.setCardPrimary(data.id)
+  }
+
+  async setCardActive(cardId: string, isActive: boolean): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client
+      .from("payment_methods")
+      .update({
+        is_active: isActive,
+        ...(!isActive ? { is_primary: false } : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", cardId)
+    throwIfError(error)
+  }
+
+  async deleteCard(cardId: string): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client
+      .from("payment_methods")
+      .update({
+        is_active: false,
+        is_primary: false,
+        deleted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", cardId)
+    throwIfError(error)
+  }
+
+  async setCardPrimary(cardId: string): Promise<void> {
+    const client = requireSupabaseClient()
+    const { data: card, error: readError } = await client
+      .from("payment_methods")
+      .select("ledger_id, owner_user_id")
+      .eq("id", cardId)
+      .single()
+    throwIfError(readError)
+    if (!card) throw new Error("카드를 찾을 수 없습니다.")
+
+    const { error: clearError } = await client
+      .from("payment_methods")
+      .update({ is_primary: false, updated_at: new Date().toISOString() })
+      .eq("ledger_id", card.ledger_id)
+      .eq("owner_user_id", card.owner_user_id)
+    throwIfError(clearError)
+
+    const { error } = await client
+      .from("payment_methods")
+      .update({
+        is_primary: true,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", cardId)
+    throwIfError(error)
+  }
+
+  async resetMyFinanceData(): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("reset_my_finance_data")
     throwIfError(error)
   }
 
@@ -535,11 +643,37 @@ function mapRecurringRule(row: Row): RecurringRule {
       row.installment_months == null
         ? undefined
         : numberValue(row.installment_months),
+    purchaseAt: optionalString(row.purchase_at),
+    paymentMethodId: optionalString(row.payment_method_id),
     categoryId: optionalString(row.category_id),
     merchantName: optionalString(row.merchant_name),
     memo: optionalString(row.memo),
     isActive: Boolean(row.is_active),
     createdAt: stringValue(row.created_at),
+  }
+}
+
+function mapPaymentMethod(row: Row): PaymentMethod {
+  const offset = numberValue(row.billing_period_end_month_offset)
+  return {
+    id: stringValue(row.id),
+    ledgerId: stringValue(row.ledger_id),
+    ownerUserId: optionalString(row.owner_user_id),
+    name: stringValue(row.name),
+    type: "card",
+    last4: optionalString(row.last4),
+    issuer: optionalString(row.issuer),
+    visibility: row.visibility === "private" ? "private" : "ledger",
+    isActive: Boolean(row.is_active),
+    isDeleted: Boolean(row.deleted_at),
+    isPrimary: Boolean(row.is_primary),
+    paymentDay:
+      row.payment_day == null ? undefined : numberValue(row.payment_day),
+    billingPeriodEndDay:
+      row.billing_period_end_day == null
+        ? undefined
+        : numberValue(row.billing_period_end_day),
+    billingPeriodEndMonthOffset: offset === 0 ? 0 : -1,
   }
 }
 

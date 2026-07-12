@@ -4,11 +4,25 @@ import styled from "@emotion/styled"
 import { formatKrw } from "@salimon/domain"
 import type { SmsCandidateStatus } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
-import { Archive, Bell, CheckCircle2, Clock3, SearchCheck, XCircle } from "lucide-react"
+import {
+  Archive,
+  Bell,
+  CheckCircle2,
+  Clock3,
+  SearchCheck,
+  XCircle,
+} from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useState } from "react"
 import { useAppStore } from "../StoreProvider"
-import { Button, Field, Panel, PanelHeader, PanelTitle, Textarea } from "../styles"
+import {
+  Button,
+  Field,
+  Panel,
+  PanelHeader,
+  PanelTitle,
+  Textarea,
+} from "../styles"
 
 const example = "[카드사] 06/28 12:34 스타벅스 5,800원 승인"
 const examples = [
@@ -35,7 +49,11 @@ export const SmsCandidatePanel = observer(function SmsCandidatePanel() {
     <Panel>
       <PanelHeader>
         <PanelTitle>미등록 카드 문자</PanelTitle>
-        <Button $variant="primary" onClick={() => store.detectSmsCandidate(rawText)}>
+        <Button
+          $variant="primary"
+          disabled={!rawText.trim()}
+          onClick={() => store.detectSmsCandidate(rawText)}
+        >
           <Bell size={16} /> 감지
         </Button>
       </PanelHeader>
@@ -43,7 +61,10 @@ export const SmsCandidatePanel = observer(function SmsCandidatePanel() {
       <Composer>
         <Field>
           테스트 문자
-          <Textarea value={rawText} onChange={(event) => setRawText(event.target.value)} />
+          <Textarea
+            value={rawText}
+            onChange={(event) => setRawText(event.target.value)}
+          />
         </Field>
       </Composer>
 
@@ -53,22 +74,31 @@ export const SmsCandidatePanel = observer(function SmsCandidatePanel() {
             <CandidateTop>
               <SearchCheck size={18} />
               <div>
-                <strong>{candidate.parsed.merchantName || "카드 사용 후보"}</strong>
+                <strong>
+                  {candidate.parsed.merchantName || "카드 사용 후보"}
+                </strong>
                 <Meta>
-                  {formatKrw(candidate.parsed.amount)} · 신뢰도 {Math.round(candidate.parsed.confidence * 100)}%
+                  {formatKrw(candidate.parsed.amount)} · 신뢰도{" "}
+                  {Math.round(candidate.parsed.confidence * 100)}%
                 </Meta>
               </div>
               <Status>{statusLabels[candidate.status]}</Status>
             </CandidateTop>
             <Masked>{candidate.maskedMessage}</Masked>
             <Actions>
-              <Button $variant="primary" onClick={() => void store.registerSmsCandidate(candidate.id)}>
+              <Button
+                $variant="primary"
+                onClick={() => void store.registerSmsCandidate(candidate.id)}
+              >
                 <CheckCircle2 size={15} /> 기타 등록
               </Button>
               <Button onClick={() => store.markSmsCandidateLater(candidate.id)}>
                 <Clock3 size={15} /> 나중에
               </Button>
-              <Button $variant="danger" onClick={() => store.ignoreSmsCandidate(candidate.id)}>
+              <Button
+                $variant="danger"
+                onClick={() => store.ignoreSmsCandidate(candidate.id)}
+              >
                 <XCircle size={15} /> 제외
               </Button>
             </Actions>

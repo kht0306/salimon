@@ -49,6 +49,7 @@ export interface TransactionDraft {
   recurringType?: "fixed" | "installment"
   recurringRuleId?: string
   installmentMonths?: number
+  paymentMethodId?: string
 }
 
 export class AppStore {
@@ -63,10 +64,12 @@ export class AppStore {
   selectedLedgerId: string
   selectedMonth: string
   selectedDate: string
+  transactionEditorOpen = false
   activeView:
     | "calendar"
     | "transactions"
     | "categories"
+    | "cards"
     | "settlement"
     | "shared"
     | "sms"
@@ -127,6 +130,33 @@ export class AppStore {
   get expenseCategories(): Category[] {
     return this.currentCategories.filter(
       (category) => category.type === "expense",
+    )
+  }
+
+  get currentCards() {
+    return this.currentLedgerCards.filter((method) => method.isActive)
+  }
+
+  get currentLedgerCards() {
+    return this.data.paymentMethods.filter(
+      (method) =>
+        method.ledgerId === this.selectedLedgerId &&
+        method.type === "card" &&
+        !method.isDeleted,
+    )
+  }
+
+  get defaultInstallmentCard() {
+    const userPrimary = this.currentCards.find(
+      (card) =>
+        card.ownerUserId === this.authUser?.id && Boolean(card.isPrimary),
+    )
+    if (userPrimary) return userPrimary
+
+    return this.currentCards.find(
+      (card) =>
+        card.ownerUserId === this.currentLedger?.ownerId &&
+        Boolean(card.isPrimary),
     )
   }
 
@@ -338,6 +368,10 @@ export class AppStore {
     this.selectedDate = date
   }
 
+  setTransactionEditorOpen(open: boolean): void {
+    this.transactionEditorOpen = open
+  }
+
   moveSelectedMonth(amount: number): void {
     this.selectedMonth = moveMonth(this.selectedMonth, amount)
     void this.refreshFinanceData()
@@ -359,7 +393,14 @@ export class AppStore {
         (draft.installmentMonths ?? 0) < 2 ||
         (draft.installmentMonths ?? 0) > 120)
     ) {
-      this.notify("할부 개월은 2개월에서 120개월 사이로 입력해 주세요.", "error")
+      this.notify(
+        "할부 개월은 2개월에서 120개월 사이로 입력해 주세요.",
+        "error",
+      )
+      return false
+    }
+    if (draft.recurringType === "installment" && !draft.paymentMethodId) {
+      this.notify("할부 거래에 사용할 카드를 선택해 주세요.", "error")
       return false
     }
 
@@ -529,6 +570,97 @@ export class AppStore {
       })
       await this.refreshFinanceData()
       this.notify(`${this.selectedMonth} 예산을 저장했습니다.`)
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async createCard(input: {
+    ownerUserId: string
+    name: string
+    issuer: string
+    last4?: string
+    paymentDay: number
+    billingPeriodEndDay: number
+    billingPeriodEndMonthOffset: -1 | 0
+    isPrimary: boolean
+  }): Promise<boolean> {
+    if (!this.selectedLedgerId || !input.name.trim() || !input.issuer.trim()) {
+      this.notify("카드사와 카드 별칭을 입력해 주세요.", "error")
+      return false
+    }
+    if (
+      !Number.isSafeInteger(input.paymentDay) ||
+      input.paymentDay < 1 ||
+      input.paymentDay > 31 ||
+      !Number.isSafeInteger(input.billingPeriodEndDay) ||
+      input.billingPeriodEndDay < 1 ||
+      input.billingPeriodEndDay > 31
+    ) {
+      this.notify("결제일과 이용기간 종료일을 확인해 주세요.", "error")
+      return false
+    }
+    try {
+      const isFirstCard = !this.currentLedgerCards.some(
+        (card) => card.ownerUserId === input.ownerUserId,
+      )
+      await this.repository.createCard({
+        ...input,
+        ledgerId: this.selectedLedgerId,
+        name: input.name.trim(),
+        issuer: input.issuer.trim(),
+        isPrimary: isFirstCard || input.isPrimary,
+      })
+      await this.refreshFinanceData()
+      this.notify("카드를 등록했습니다.")
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async setCardActive(cardId: string, isActive: boolean): Promise<void> {
+    try {
+      await this.repository.setCardActive(cardId, isActive)
+      await this.refreshFinanceData()
+      this.notify(
+        isActive ? "카드를 다시 활성화했습니다." : "카드를 비활성화했습니다.",
+      )
+    } catch (error) {
+      this.setDataError(error)
+    }
+  }
+
+  async deleteCard(cardId: string): Promise<void> {
+    try {
+      await this.repository.deleteCard(cardId)
+      await this.refreshFinanceData()
+      this.notify("카드를 삭제했습니다.")
+    } catch (error) {
+      this.setDataError(error)
+    }
+  }
+
+  async setCardPrimary(cardId: string): Promise<void> {
+    try {
+      await this.repository.setCardPrimary(cardId)
+      await this.refreshFinanceData()
+      this.notify("주 카드를 변경했습니다.")
+    } catch (error) {
+      this.setDataError(error)
+    }
+  }
+
+  async resetMyFinanceData(): Promise<boolean> {
+    try {
+      await this.repository.resetMyFinanceData()
+      this.initializedWorkspaceUserId = null
+      await this.ensureWorkspace(this.authUser?.id ?? "")
+      await this.refreshFinanceData()
+      this.notify("회원정보를 제외한 데이터를 초기화했습니다.")
       return true
     } catch (error) {
       this.setDataError(error)

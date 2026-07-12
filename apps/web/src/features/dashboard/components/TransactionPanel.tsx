@@ -54,20 +54,40 @@ export const TransactionPanel = observer(function TransactionPanel() {
       recurringType: "none",
       recurringRuleId: undefined as string | undefined,
       installmentMonths: "2",
+      paymentMethodId: "",
       transactionAt: `${selectedDate}T12:00`,
     }),
     [selectedDate, store.expenseCategories, store.authUser?.id],
   )
 
   const [draft, setDraft] = useState(initialDraft)
+  const amount = Number(draft.amount)
+  const installmentMonths = Number(draft.installmentMonths)
+  const canSave =
+    Number.isSafeInteger(amount) &&
+    amount > 0 &&
+    Boolean(draft.transactionAt) &&
+    Boolean(store.selectedLedgerId) &&
+    (draft.recurringType !== "installment" ||
+      (Number.isSafeInteger(installmentMonths) &&
+        installmentMonths >= 2 &&
+        installmentMonths <= 120 &&
+        Boolean(draft.paymentMethodId) &&
+        store.currentCards.length > 0))
 
   function openNew() {
     setEditing(null)
     setDraft(initialDraft)
     setAdding(true)
+    store.setTransactionEditorOpen(true)
   }
 
   function openEdit(transaction: Transaction) {
+    const recurringRule = transaction.recurringRuleId
+      ? store.data.recurringRules.find(
+          (rule) => rule.id === transaction.recurringRuleId,
+        )
+      : undefined
     const firstInstallment = transaction.recurringRuleId
       ? store.data.transactions.find(
           (item) =>
@@ -88,16 +108,22 @@ export const TransactionPanel = observer(function TransactionPanel() {
       recurringType: transaction.recurringType ?? "none",
       recurringRuleId: transaction.recurringRuleId,
       installmentMonths: String(transaction.installmentTotal ?? 2),
+      paymentMethodId:
+        transaction.paymentMethodId ?? recurringRule?.paymentMethodId ?? "",
       transactionAt: getDateTimeLocalValue(
-        firstInstallment?.transactionAt ?? transaction.transactionAt,
+        recurringRule?.purchaseAt ??
+          firstInstallment?.transactionAt ??
+          transaction.transactionAt,
       ),
     })
     setAdding(true)
+    store.setTransactionEditorOpen(true)
   }
 
   function closeForm() {
     setAdding(false)
     setEditing(null)
+    store.setTransactionEditorOpen(false)
   }
 
   async function save() {
@@ -122,6 +148,10 @@ export const TransactionPanel = observer(function TransactionPanel() {
           ? undefined
           : (draft.recurringType as "fixed" | "installment"),
       recurringRuleId: draft.recurringRuleId,
+      paymentMethodId:
+        draft.type === "expense"
+          ? draft.paymentMethodId || undefined
+          : undefined,
       installmentMonths:
         draft.recurringType === "installment"
           ? Number(draft.installmentMonths)
@@ -163,9 +193,15 @@ export const TransactionPanel = observer(function TransactionPanel() {
               유형
               <Select
                 value={draft.type}
-                onChange={(event) =>
-                  setDraft({ ...draft, type: event.target.value })
-                }
+                onChange={(event) => {
+                  const type = event.target.value
+                  setDraft({
+                    ...draft,
+                    type,
+                    paymentMethodId:
+                      type === "expense" ? draft.paymentMethodId : "",
+                  })
+                }}
               >
                 <option value="expense">지출</option>
                 <option value="income">수입</option>
@@ -193,9 +229,17 @@ export const TransactionPanel = observer(function TransactionPanel() {
               <Select
                 value={draft.recurringType}
                 disabled={Boolean(editing)}
-                onChange={(event) =>
-                  setDraft({ ...draft, recurringType: event.target.value })
-                }
+                onChange={(event) => {
+                  const recurringType = event.target.value
+                  setDraft({
+                    ...draft,
+                    recurringType,
+                    paymentMethodId:
+                      recurringType === "installment"
+                        ? (store.defaultInstallmentCard?.id ?? "")
+                        : draft.paymentMethodId,
+                  })
+                }}
               >
                 <option value="none">일반 거래</option>
                 <option value="fixed">고정비</option>
@@ -225,6 +269,51 @@ export const TransactionPanel = observer(function TransactionPanel() {
               <div />
             )}
           </TwoColumns>
+
+          {draft.type === "expense" ? (
+            <Field>
+              결제 수단
+              <Select
+                value={draft.paymentMethodId}
+                onChange={(event) =>
+                  setDraft({ ...draft, paymentMethodId: event.target.value })
+                }
+              >
+                <option value="">
+                  {draft.recurringType === "installment"
+                    ? "카드를 선택해 주세요"
+                    : "현금"}
+                </option>
+                {store.currentMembers.map((member) => {
+                  const memberCards = store.currentCards
+                    .filter((card) => card.ownerUserId === member.userId)
+                    .sort(
+                      (a, b) =>
+                        Number(Boolean(b.isPrimary)) -
+                          Number(Boolean(a.isPrimary)) ||
+                        a.name.localeCompare(b.name, "ko"),
+                    )
+                  return memberCards.length > 0 ? (
+                    <optgroup key={member.userId} label={member.nickname}>
+                      {memberCards.map((card) => (
+                        <option key={card.id} value={card.id}>
+                          {card.isPrimary ? "[주 카드] " : ""}
+                          {card.issuer} · {card.name}
+                          {card.last4 ? ` (${card.last4})` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null
+                })}
+              </Select>
+              {draft.recurringType === "installment" &&
+              store.currentCards.length === 0 ? (
+                <CardRequired role="alert">
+                  카드 관리 메뉴에서 카드를 먼저 등록해 주세요.
+                </CardRequired>
+              ) : null}
+            </Field>
+          ) : null}
 
           <Field>
             금액
@@ -311,7 +400,11 @@ export const TransactionPanel = observer(function TransactionPanel() {
             />
           </Field>
 
-          <Button $variant="primary" onClick={() => void save()}>
+          <Button
+            $variant="primary"
+            disabled={!canSave}
+            onClick={() => void save()}
+          >
             <Save size={16} /> 저장
           </Button>
         </Editor>
@@ -321,6 +414,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
         {store.selectedDateTransactions.map((transaction) => {
           const category = store.data.categories.find(
             (item) => item.id === transaction.categoryId,
+          )
+          const card = store.data.paymentMethods.find(
+            (item) => item.id === transaction.paymentMethodId,
           )
           const registrant =
             store.currentMembers.find(
@@ -352,6 +448,11 @@ export const TransactionPanel = observer(function TransactionPanel() {
                   {transaction.recurringType === "installment"
                     ? ` · (${transaction.installmentNumber}/${transaction.installmentTotal}개월)`
                     : ""}
+                  {card
+                    ? ` · ${card.name}${card.isDeleted ? " (삭제)" : ""}`
+                    : transaction.type === "expense"
+                      ? " · 현금"
+                      : ""}
                 </TransactionMeta>
                 <RegisteredAt>
                   등록{" "}
@@ -478,6 +579,12 @@ const Editor = styled.div`
   background: ${colors.panelSubtle};
   padding: 14px;
   margin-bottom: 16px;
+`
+
+const CardRequired = styled.span`
+  color: ${colors.coral};
+  font-size: 12px;
+  font-weight: 600;
 `
 
 const EditorHeader = styled.div`

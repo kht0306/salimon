@@ -244,6 +244,9 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
             store.currentMembers.find(
               (member) => member.userId === transaction.createdBy,
             )?.nickname ?? "알 수 없음"
+          const card = store.data.paymentMethods.find(
+            (item) => item.id === transaction.paymentMethodId,
+          )
           return (
             <Row key={transaction.id}>
               <DateCell>
@@ -263,6 +266,11 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
                   {transaction.recurringType === "installment"
                     ? ` · (${transaction.installmentNumber}/${transaction.installmentTotal}개월)`
                     : ""}
+                  {card
+                    ? ` · ${card.name}${card.isDeleted ? " (삭제)" : ""}`
+                    : transaction.type === "expense"
+                      ? " · 현금"
+                      : ""}
                 </span>
                 <small>
                   행위자 {actor} · 등록자 {registrant}

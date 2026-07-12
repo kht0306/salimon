@@ -23,6 +23,18 @@ export const CalendarGrid = observer(function CalendarGrid() {
   const baseMonth = fromMonthKey(store.selectedMonth)
   const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"]
 
+  function selectDate(date: string) {
+    if (date === store.selectedDate) return
+    if (
+      store.transactionEditorOpen &&
+      !window.confirm("작성 중인 거래 등록 또는 수정을 취소하시겠습니까?")
+    ) {
+      return
+    }
+    store.setTransactionEditorOpen(false)
+    store.selectDate(date)
+  }
+
   return (
     <CalendarStack>
       {store.selectedMonthBudgets.length > 0 ? (
@@ -70,7 +82,7 @@ export const CalendarGrid = observer(function CalendarGrid() {
           <Button
             $variant="primary"
             onClick={() => {
-              store.selectDate(toDateKey(new Date()))
+              selectDate(toDateKey(new Date()))
             }}
           >
             <CalendarCheck2 size={15} /> 오늘
@@ -113,7 +125,7 @@ export const CalendarGrid = observer(function CalendarGrid() {
                     aria-pressed={store.selectedDate === day.date}
                     $selected={store.selectedDate === day.date}
                     $muted={!day.isCurrentMonth}
-                    onClick={() => store.selectDate(day.date)}
+                    onClick={() => selectDate(day.date)}
                   >
                     <DayTop>
                       <DayNumber $today={day.isToday}>
