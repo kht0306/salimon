@@ -2,7 +2,7 @@
 
 import styled from "@emotion/styled"
 import { colors, radii } from "@salimon/ui-tokens"
-import { Copy, Link, Plus, UserMinus } from "lucide-react"
+import { Copy, Link, Plus, Share2, UserMinus } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useState } from "react"
 import { useAppStore } from "../StoreProvider"
@@ -54,6 +54,33 @@ export const SharedLedgerPanel = observer(function SharedLedgerPanel() {
           <Link size={16} /> 초대 생성
         </Button>
       </PanelHeader>
+
+      {store.currentLedger?.type === "personal" ? (
+        <ConversionNotice>
+          <div>
+            <strong>현재 개인 가계부를 함께 사용하기</strong>
+            <p>
+              거래, 카테고리와 카드를 그대로 유지한 채 공동 가계부로
+              전환합니다. 전환 후 초대 코드를 생성할 수 있습니다.
+            </p>
+          </div>
+          <Button
+            $variant="primary"
+            disabled={store.currentLedger.ownerId !== store.authUser?.id}
+            onClick={() => {
+              if (
+                window.confirm(
+                  "현재 개인 가계부를 공동 가계부로 전환하시겠습니까? 기존 데이터는 모두 유지됩니다.",
+                )
+              ) {
+                void store.convertCurrentLedgerToShared()
+              }
+            }}
+          >
+            <Share2 size={15} /> 공동 가계부로 전환
+          </Button>
+        </ConversionNotice>
+      ) : null}
 
       <Composer>
         <Field>
@@ -159,6 +186,26 @@ const Composer = styled.div`
   padding: 16px 18px;
   border-bottom: 1px solid ${colors.border};
   background: ${colors.panelSubtle};
+`
+
+const ConversionNotice = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 18px;
+  border-bottom: 1px solid ${colors.border};
+  background: ${colors.tealSoft};
+
+  p {
+    margin: 4px 0 0;
+    color: ${colors.muted};
+    font-size: 12px;
+  }
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
 `
 
 const Section = styled.section`

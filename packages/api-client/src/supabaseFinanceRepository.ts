@@ -35,6 +35,7 @@ export interface RemoteTransactionInput {
   recurringType?: "fixed" | "installment"
   recurringRuleId?: string
   installmentMonths?: number
+  installmentAmountType?: "monthly" | "principal"
   paymentMethodId?: string
 }
 
@@ -74,7 +75,9 @@ export class SupabaseFinanceRepository {
         .order("created_at"),
       client
         .from("ledger_members")
-        .select("id, ledger_id, user_id, nickname, role, status, joined_at")
+        .select(
+          "id, ledger_id, user_id, nickname, role, status, is_default, joined_at",
+        )
         .eq("status", "active")
         .order("joined_at"),
       client
@@ -92,13 +95,13 @@ export class SupabaseFinanceRepository {
       client
         .from("recurring_rules")
         .select(
-          "id, ledger_id, created_by, rule_type, amount, day_of_month, time_of_day, start_month, end_month, inactive_from_month, installment_months, purchase_at, payment_method_id, category_id, merchant_name, memo, is_active, created_at",
+          "id, ledger_id, created_by, rule_type, amount, day_of_month, time_of_day, start_month, end_month, inactive_from_month, installment_months, installment_amount_type, installment_principal, purchase_at, payment_method_id, category_id, merchant_name, memo, is_active, created_at",
         )
         .order("created_at"),
       client
         .from("payment_methods")
         .select(
-          "id, ledger_id, owner_user_id, name, type, last4, issuer, visibility, is_active, is_primary, deleted_at, payment_day, billing_period_end_day, billing_period_end_month_offset",
+          "id, ledger_id, owner_user_id, name, type, last4, issuer, visibility, is_active, is_primary, is_debit, deleted_at, payment_day, billing_period_end_day, billing_period_end_month_offset",
         )
         .eq("type", "card")
         .order("created_at"),
@@ -192,10 +195,11 @@ export class SupabaseFinanceRepository {
     }
 
     if (input.recurringType === "installment") {
-      const { error } = await client.rpc("save_card_installment_series", {
+      const { error } = await client.rpc("save_card_installment_series_v2", {
         p_rule_id: input.recurringRuleId ?? null,
         p_ledger_id: input.ledgerId,
         p_amount: input.amount,
+        p_amount_type: input.installmentAmountType ?? "monthly",
         p_transaction_at: input.transactionAt,
         p_installment_months: input.installmentMonths ?? 2,
         p_category_id: input.categoryId ?? null,
@@ -282,6 +286,7 @@ export class SupabaseFinanceRepository {
     billingPeriodEndDay: number
     billingPeriodEndMonthOffset: -1 | 0
     isPrimary: boolean
+    isDebit: boolean
   }): Promise<void> {
     const client = requireSupabaseClient()
     const { data, error } = await client
@@ -294,9 +299,14 @@ export class SupabaseFinanceRepository {
         last4: input.last4 || null,
         issuer: input.issuer,
         visibility: "ledger",
-        payment_day: input.paymentDay,
-        billing_period_end_day: input.billingPeriodEndDay,
-        billing_period_end_month_offset: input.billingPeriodEndMonthOffset,
+        payment_day: input.isDebit ? 31 : input.paymentDay,
+        billing_period_end_day: input.isDebit
+          ? 31
+          : input.billingPeriodEndDay,
+        billing_period_end_month_offset: input.isDebit
+          ? -1
+          : input.billingPeriodEndMonthOffset,
+        is_debit: input.isDebit,
         is_primary: false,
       })
       .select("id")
@@ -316,6 +326,7 @@ export class SupabaseFinanceRepository {
       billingPeriodEndDay: number
       billingPeriodEndMonthOffset: -1 | 0
       isPrimary: boolean
+      isDebit: boolean
     },
   ): Promise<void> {
     const client = requireSupabaseClient()
@@ -326,9 +337,14 @@ export class SupabaseFinanceRepository {
         name: input.name,
         issuer: input.issuer,
         last4: input.last4 || null,
-        payment_day: input.paymentDay,
-        billing_period_end_day: input.billingPeriodEndDay,
-        billing_period_end_month_offset: input.billingPeriodEndMonthOffset,
+        payment_day: input.isDebit ? 31 : input.paymentDay,
+        billing_period_end_day: input.isDebit
+          ? 31
+          : input.billingPeriodEndDay,
+        billing_period_end_month_offset: input.isDebit
+          ? -1
+          : input.billingPeriodEndMonthOffset,
+        is_debit: input.isDebit,
         is_primary: false,
         updated_at: new Date().toISOString(),
       })
@@ -513,6 +529,23 @@ export class SupabaseFinanceRepository {
     return data
   }
 
+  async setDefaultLedger(ledgerId: string): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("set_default_ledger", {
+      p_ledger_id: ledgerId,
+    })
+    throwIfError(error)
+  }
+
+  async convertPersonalLedgerToShared(ledgerId: string): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc(
+      "convert_personal_ledger_to_shared",
+      { p_ledger_id: ledgerId },
+    )
+    throwIfError(error)
+  }
+
   async createInvite(input: {
     ledgerId: string
     userId: string
@@ -627,6 +660,7 @@ function mapMember(row: Row, profile: Profile, userId: string): LedgerMember {
       (stringValue(row.user_id) === userId ? profile.nickname : "공동 멤버"),
     role: mapRole(row.role),
     status: row.status === "removed" ? "removed" : "active",
+    isDefault: Boolean(row.is_default),
     joinedAt: stringValue(row.joined_at),
   }
 }
@@ -686,6 +720,12 @@ function mapRecurringRule(row: Row): RecurringRule {
       row.installment_months == null
         ? undefined
         : numberValue(row.installment_months),
+    installmentAmountType:
+      row.installment_amount_type === "principal" ? "principal" : "monthly",
+    installmentPrincipal:
+      row.installment_principal == null
+        ? undefined
+        : numberValue(row.installment_principal),
     purchaseAt: optionalString(row.purchase_at),
     paymentMethodId: optionalString(row.payment_method_id),
     categoryId: optionalString(row.category_id),
@@ -710,6 +750,7 @@ function mapPaymentMethod(row: Row): PaymentMethod {
     isActive: Boolean(row.is_active),
     isDeleted: Boolean(row.deleted_at),
     isPrimary: Boolean(row.is_primary),
+    isDebit: Boolean(row.is_debit),
     paymentDay:
       row.payment_day == null ? undefined : numberValue(row.payment_day),
     billingPeriodEndDay:

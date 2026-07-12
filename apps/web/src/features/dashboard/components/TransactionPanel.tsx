@@ -7,6 +7,7 @@ import {
   formatMoneyInput,
   formatKrw,
   getDateTimeLocalValue,
+  splitInstallmentPrincipal,
 } from "@salimon/domain"
 import type { Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
@@ -55,6 +56,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
       recurringType: "none",
       recurringRuleId: undefined as string | undefined,
       installmentMonths: "2",
+      installmentAmountType: "monthly" as "monthly" | "principal",
       paymentMethodId: "",
       transactionAt: `${selectedDate}T12:00`,
     }),
@@ -72,6 +74,15 @@ export const TransactionPanel = observer(function TransactionPanel() {
 
   const amount = Number(draft.amount)
   const installmentMonths = Number(draft.installmentMonths)
+  const installmentAmounts =
+    draft.recurringType === "installment" &&
+    draft.installmentAmountType === "principal" &&
+    Number.isSafeInteger(amount) &&
+    Number.isSafeInteger(installmentMonths) &&
+    installmentMonths > 0
+      ? splitInstallmentPrincipal(amount, installmentMonths)
+      : []
+  const installmentMonthlyAmount = installmentAmounts[0] ?? amount
   const canSave =
     Number.isSafeInteger(amount) &&
     amount > 0 &&
@@ -82,7 +93,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
         installmentMonths >= 2 &&
         installmentMonths <= 120 &&
         Boolean(draft.paymentMethodId) &&
-        store.currentCards.length > 0))
+        store.currentCards.length > 0 &&
+        (draft.installmentAmountType !== "principal" ||
+          amount >= installmentMonths)))
 
   function openNew() {
     setEditing(null)
@@ -107,7 +120,11 @@ export const TransactionPanel = observer(function TransactionPanel() {
       : undefined
     setEditing(transaction)
     setDraft({
-      amount: String(transaction.amount),
+      amount: String(
+        recurringRule?.installmentAmountType === "principal"
+          ? (recurringRule.installmentPrincipal ?? transaction.amount)
+          : transaction.amount,
+      ),
       merchantName: transaction.merchantName ?? "",
       memo: transaction.memo ?? "",
       type: transaction.type,
@@ -117,6 +134,8 @@ export const TransactionPanel = observer(function TransactionPanel() {
       recurringType: transaction.recurringType ?? "none",
       recurringRuleId: transaction.recurringRuleId,
       installmentMonths: String(transaction.installmentTotal ?? 2),
+      installmentAmountType:
+        recurringRule?.installmentAmountType ?? "monthly",
       paymentMethodId:
         transaction.paymentMethodId ?? recurringRule?.paymentMethodId ?? "",
       transactionAt: getDateTimeLocalValue(
@@ -164,6 +183,10 @@ export const TransactionPanel = observer(function TransactionPanel() {
       installmentMonths:
         draft.recurringType === "installment"
           ? Number(draft.installmentMonths)
+          : undefined,
+      installmentAmountType:
+        draft.recurringType === "installment"
+          ? draft.installmentAmountType
           : undefined,
     })
     if (saved) {
@@ -333,23 +356,49 @@ export const TransactionPanel = observer(function TransactionPanel() {
 
           <Field>
             <span>
-              금액{draft.recurringType === "installment" ? " (월별 납부액)" : ""}
+              금액
               <RequiredMark>*</RequiredMark>
             </span>
-            <Input
-              required
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9,]*"
-              autoComplete="off"
-              value={formatMoneyInput(draft.amount)}
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  amount: event.target.value.replace(/\D/g, ""),
-                })
-              }
-            />
+            <AmountControl $withType={draft.recurringType === "installment"}>
+              {draft.recurringType === "installment" ? (
+                <Select
+                  aria-label="할부 금액 입력 방식"
+                  value={draft.installmentAmountType}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      installmentAmountType: event.target.value as
+                        | "monthly"
+                        | "principal",
+                    })
+                  }
+                >
+                  <option value="monthly">월별 납입액</option>
+                  <option value="principal">할부 원금</option>
+                </Select>
+              ) : null}
+              <Input
+                required
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9,]*"
+                autoComplete="off"
+                value={formatMoneyInput(draft.amount)}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    amount: event.target.value.replace(/\D/g, ""),
+                  })
+                }
+              />
+            </AmountControl>
+            {draft.recurringType === "installment" &&
+            draft.installmentAmountType === "principal" &&
+            installmentMonthlyAmount > 0 ? (
+              <InstallmentPreview>
+                월 {formatKrw(installmentMonthlyAmount)} · 마지막 회차에 잔액 반영
+              </InstallmentPreview>
+            ) : null}
           </Field>
 
           <Field>
@@ -617,6 +666,19 @@ const TwoColumns = styled.div`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+`
+
+const AmountControl = styled.div<{ $withType: boolean }>`
+  display: grid;
+  grid-template-columns: ${({ $withType }) =>
+    $withType ? "130px minmax(0, 1fr)" : "minmax(0, 1fr)"};
+  gap: 8px;
+`
+
+const InstallmentPreview = styled.small`
+  color: ${colors.muted};
+  font-size: 11px;
+  font-weight: 400;
 `
 
 const TransactionList = styled.div`

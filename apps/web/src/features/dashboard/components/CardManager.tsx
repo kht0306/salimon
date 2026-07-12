@@ -34,6 +34,7 @@ const issuers = [
   "하나카드",
   "우리카드",
   "NH농협카드",
+  "카카오뱅크",
   "BC카드",
   "기타",
 ]
@@ -48,6 +49,7 @@ export const CardManager = observer(function CardManager() {
   const [endDay, setEndDay] = useState("")
   const [endOffset, setEndOffset] = useState<"-1" | "0">("-1")
   const [isPrimary, setPrimary] = useState(false)
+  const [isDebit, setDebit] = useState(false)
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const isFirstCard = !store.currentLedgerCards.some(
     (card) =>
@@ -58,12 +60,13 @@ export const CardManager = observer(function CardManager() {
   const canSave =
     Boolean(ownerUserId && issuer.trim() && name.trim()) &&
     (!last4 || last4.length === 4) &&
-    Number.isSafeInteger(paymentDayNumber) &&
-    paymentDayNumber >= 1 &&
-    paymentDayNumber <= 31 &&
-    Number.isSafeInteger(endDayNumber) &&
-    endDayNumber >= 1 &&
-    endDayNumber <= 31
+    (isDebit ||
+      (Number.isSafeInteger(paymentDayNumber) &&
+        paymentDayNumber >= 1 &&
+        paymentDayNumber <= 31 &&
+        Number.isSafeInteger(endDayNumber) &&
+        endDayNumber >= 1 &&
+        endDayNumber <= 31))
 
   async function create() {
     if (
@@ -72,10 +75,11 @@ export const CardManager = observer(function CardManager() {
         name,
         issuer,
         last4: last4 || undefined,
-        paymentDay: Number(paymentDay),
-        billingPeriodEndDay: Number(endDay),
-        billingPeriodEndMonthOffset: Number(endOffset) as -1 | 0,
+        paymentDay: isDebit ? 31 : Number(paymentDay),
+        billingPeriodEndDay: isDebit ? 31 : Number(endDay),
+        billingPeriodEndMonthOffset: isDebit ? -1 : Number(endOffset) as -1 | 0,
         isPrimary: isFirstCard || isPrimary,
+        isDebit,
       })
     ) {
       resetForm()
@@ -92,6 +96,7 @@ export const CardManager = observer(function CardManager() {
     setEndDay("")
     setEndOffset("-1")
     setPrimary(false)
+    setDebit(false)
   }
 
   function selectCard(card: (typeof store.currentLedgerCards)[number]) {
@@ -108,6 +113,7 @@ export const CardManager = observer(function CardManager() {
     setEndDay(String(card.billingPeriodEndDay ?? 31))
     setEndOffset(String(card.billingPeriodEndMonthOffset ?? -1) as "-1" | "0")
     setPrimary(Boolean(card.isPrimary))
+    setDebit(Boolean(card.isDebit))
   }
 
   async function save() {
@@ -121,10 +127,11 @@ export const CardManager = observer(function CardManager() {
         name,
         issuer,
         last4: last4 || undefined,
-        paymentDay: Number(paymentDay),
-        billingPeriodEndDay: Number(endDay),
-        billingPeriodEndMonthOffset: Number(endOffset) as -1 | 0,
+        paymentDay: isDebit ? 31 : Number(paymentDay),
+        billingPeriodEndDay: isDebit ? 31 : Number(endDay),
+        billingPeriodEndMonthOffset: isDebit ? -1 : Number(endOffset) as -1 | 0,
         isPrimary: isFirstCard || isPrimary,
+        isDebit,
       })
     ) {
       resetForm()
@@ -191,7 +198,16 @@ export const CardManager = observer(function CardManager() {
             }
           />
         </Field>
-        <Field>
+        <PrimaryField>
+          <input
+            type="checkbox"
+            checked={isDebit}
+            onChange={(event) => setDebit(event.target.checked)}
+          />
+          체크카드
+          <small>결제일과 이용기간은 자동 설정됩니다.</small>
+        </PrimaryField>
+        {!isDebit ? <Field>
           <span>매월 결제일<RequiredMark>*</RequiredMark></span>
           <Input
             required
@@ -201,8 +217,8 @@ export const CardManager = observer(function CardManager() {
             value={paymentDay}
             onChange={(event) => setPaymentDay(event.target.value)}
           />
-        </Field>
-        <Field>
+        </Field> : null}
+        {!isDebit ? <Field>
           <span>이용기간 종료월<RequiredMark>*</RequiredMark></span>
           <Select
             required
@@ -212,8 +228,8 @@ export const CardManager = observer(function CardManager() {
             <option value="-1">결제일의 전월</option>
             <option value="0">결제일의 당월</option>
           </Select>
-        </Field>
-        <Field>
+        </Field> : null}
+        {!isDebit ? <Field>
           <span>이용기간 종료일<RequiredMark>*</RequiredMark></span>
           <Input
             required
@@ -223,7 +239,7 @@ export const CardManager = observer(function CardManager() {
             value={endDay}
             onChange={(event) => setEndDay(event.target.value)}
           />
-        </Field>
+        </Field> : null}
         <PrimaryField>
           <input
             type="checkbox"
@@ -236,8 +252,9 @@ export const CardManager = observer(function CardManager() {
         </PrimaryField>
       </Composer>
       <Hint>
-        카드사 앱의 결제일별 이용기간에서 종료일을 입력하세요. 예: 매월 14일
-        결제·전월 말일까지 이용한 금액이면 ‘전월 / 31일’입니다.
+        {isDebit
+          ? "체크카드는 결제일 말일, 이용기간은 전월 말일까지로 자동 저장됩니다."
+          : "카드사 앱의 결제일별 이용기간에서 종료일을 입력하세요. 예: 매월 14일 결제·전월 말일까지 이용한 금액이면 ‘전월 / 31일’입니다."}
       </Hint>
       <MemberGroups>
         {store.currentMembers.map((member) => {
@@ -282,8 +299,9 @@ export const CardManager = observer(function CardManager() {
                       <strong>{card.name}</strong>
                       <Meta>
                         {card.issuer}
-                        {card.last4 ? ` · •••• ${card.last4}` : ""} · 매월{" "}
-                        {card.paymentDay}일{!card.isActive ? " · 비활성" : ""}
+                        {card.last4 ? ` · •••• ${card.last4}` : ""}
+                        {card.isDebit ? " · 체크카드" : ` · 매월 ${card.paymentDay}일`}
+                        {!card.isActive ? " · 비활성" : ""}
                         {card.isPrimary ? " · 주 카드" : ""}
                       </Meta>
                     </div>
