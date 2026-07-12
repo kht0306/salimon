@@ -15,6 +15,7 @@ import {
   Panel,
   PanelHeader,
   PanelTitle,
+  RequiredMark,
   Select,
 } from "../styles"
 
@@ -47,47 +48,53 @@ function ColorPicker({
   value,
   onChange,
   label,
+  required = false,
 }: {
   value: string
   onChange: (value: string) => void
   label: string
+  required?: boolean
 }) {
   const validColor = hexColorPattern.test(value) ? value : "#000000"
 
   return (
-    <ColorControls>
-      <Swatches aria-label={`${label} 빠른 색상 선택`}>
-        {colorOptions.map((option) => (
-          <Swatch
-            key={option}
-            type="button"
-            title={option}
-            aria-label={option}
-            $color={option}
-            $selected={value.toLowerCase() === option}
-            onClick={() => onChange(option)}
+    <ColorPickerField>
+      <span>색상{required ? <RequiredMark>*</RequiredMark> : null}</span>
+      <ColorControls>
+        <Swatches aria-label={`${label} 빠른 색상 선택`}>
+          {colorOptions.map((option) => (
+            <Swatch
+              key={option}
+              type="button"
+              title={option}
+              aria-label={option}
+              $color={option}
+              $selected={value.toLowerCase() === option}
+              onClick={() => onChange(option)}
+            />
+          ))}
+        </Swatches>
+        <CustomColor>
+          <NativeColorInput
+            type="color"
+            title="전체 색상에서 선택"
+            aria-label={`${label} 전체 색상에서 선택`}
+            value={validColor}
+            onChange={(event) => onChange(event.target.value)}
           />
-        ))}
-      </Swatches>
-      <CustomColor>
-        <NativeColorInput
-          type="color"
-          title="전체 색상에서 선택"
-          aria-label={`${label} 전체 색상에서 선택`}
-          value={validColor}
-          onChange={(event) => onChange(event.target.value)}
-        />
-        <HexInput
-          aria-label={`${label} HEX 색상 코드`}
-          aria-invalid={!hexColorPattern.test(value)}
-          maxLength={7}
-          spellCheck={false}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="#2d6a4f"
-        />
-      </CustomColor>
-    </ColorControls>
+          <HexInput
+            required={required}
+            aria-label={`${label} HEX 색상 코드`}
+            aria-invalid={!hexColorPattern.test(value)}
+            maxLength={7}
+            spellCheck={false}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="#2d6a4f"
+          />
+        </CustomColor>
+      </ColorControls>
+    </ColorPickerField>
   )
 }
 
@@ -154,15 +161,17 @@ export const CategoryManager = observer(function CategoryManager() {
 
       <CategoryComposer>
         <Field>
-          이름
+          <span>이름<RequiredMark>*</RequiredMark></span>
           <Input
+            required
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
         </Field>
         <Field>
-          아이콘
+          <span>아이콘<RequiredMark>*</RequiredMark></span>
           <Select
+            required
             value={icon}
             onChange={(event) => setIcon(event.target.value)}
           >
@@ -184,7 +193,12 @@ export const CategoryManager = observer(function CategoryManager() {
             }
           />
         </Field>
-        <ColorPicker value={color} onChange={setColor} label="새 카테고리" />
+        <ColorPicker
+          value={color}
+          onChange={setColor}
+          label="새 카테고리"
+          required
+        />
       </CategoryComposer>
 
       <CategoryList>
@@ -365,6 +379,14 @@ const Swatches = styled.div`
   gap: 6px;
   min-height: 38px;
   align-items: center;
+`
+
+const ColorPickerField = styled.div`
+  display: grid;
+  gap: 8px;
+  color: ${colors.muted};
+  font-size: 12px;
+  font-weight: 600;
 `
 
 const ColorControls = styled.div`

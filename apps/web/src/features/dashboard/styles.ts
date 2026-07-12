@@ -147,6 +147,12 @@ export const Field = styled.label`
   font-weight: 600;
 `
 
+export const RequiredMark = styled.span`
+  margin-left: 3px;
+  color: ${colors.coral};
+  font-weight: 800;
+`
+
 export const Input = styled.input`
   min-width: 0;
   width: 100%;

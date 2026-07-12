@@ -6,7 +6,15 @@ import { Copy, Link, Plus, UserMinus } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useState } from "react"
 import { useAppStore } from "../StoreProvider"
-import { Button, Field, Input, Panel, PanelHeader, PanelTitle } from "../styles"
+import {
+  Button,
+  Field,
+  Input,
+  Panel,
+  PanelHeader,
+  PanelTitle,
+  RequiredMark,
+} from "../styles"
 
 const roleLabels = {
   owner: "소유자",
@@ -49,8 +57,9 @@ export const SharedLedgerPanel = observer(function SharedLedgerPanel() {
 
       <Composer>
         <Field>
-          새 공동 가계부
+          <span>새 공동 가계부<RequiredMark>*</RequiredMark></span>
           <Input
+            required
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -70,8 +79,9 @@ export const SharedLedgerPanel = observer(function SharedLedgerPanel() {
 
       <Composer>
         <Field>
-          받은 초대코드
+          <span>받은 초대코드<RequiredMark>*</RequiredMark></span>
           <Input
+            required
             value={inviteCode}
             maxLength={6}
             autoCapitalize="characters"

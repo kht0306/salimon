@@ -12,7 +12,7 @@ import type { Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import { Check, Pencil, Plus, Save, Trash2, X } from "lucide-react"
 import { observer } from "mobx-react-lite"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useAppStore } from "../StoreProvider"
 import {
   Button,
@@ -20,6 +20,7 @@ import {
   IconButton,
   Input,
   PanelTitle,
+  RequiredMark,
   Select,
   SidePanel,
   Textarea,
@@ -61,6 +62,14 @@ export const TransactionPanel = observer(function TransactionPanel() {
   )
 
   const [draft, setDraft] = useState(initialDraft)
+
+  useEffect(
+    () => () => {
+      store.setTransactionEditorOpen(false)
+    },
+    [store],
+  )
+
   const amount = Number(draft.amount)
   const installmentMonths = Number(draft.installmentMonths)
   const canSave =
@@ -190,8 +199,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
 
           <TwoColumns>
             <Field>
-              유형
+              <span>유형<RequiredMark>*</RequiredMark></span>
               <Select
+                required
                 value={draft.type}
                 onChange={(event) => {
                   const type = event.target.value
@@ -209,8 +219,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
               </Select>
             </Field>
             <Field>
-              상태
+              <span>상태<RequiredMark>*</RequiredMark></span>
               <Select
+                required
                 value={draft.status}
                 onChange={(event) =>
                   setDraft({ ...draft, status: event.target.value })
@@ -248,11 +259,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
             </Field>
             {draft.recurringType === "installment" ? (
               <Field>
-                할부 개월
+                <span>할부 개월<RequiredMark>*</RequiredMark></span>
                 {editing?.recurringType === "installment"
                   ? ` (${editing.installmentNumber ?? 1}/${draft.installmentMonths})`
                   : ""}
                 <Input
+                  required
                   type="number"
                   min="2"
                   max="120"
@@ -272,8 +284,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
 
           {draft.type === "expense" ? (
             <Field>
-              결제 수단
+              <span>
+                결제 수단
+                {draft.recurringType === "installment" ? <RequiredMark>*</RequiredMark> : null}
+              </span>
               <Select
+                required={draft.recurringType === "installment"}
                 value={draft.paymentMethodId}
                 onChange={(event) =>
                   setDraft({ ...draft, paymentMethodId: event.target.value })
@@ -316,9 +332,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
           ) : null}
 
           <Field>
-            금액
-            {draft.recurringType === "installment" ? " (월별 납부액)" : ""}
+            <span>
+              금액{draft.recurringType === "installment" ? " (월별 납부액)" : ""}
+              <RequiredMark>*</RequiredMark>
+            </span>
             <Input
+              required
               type="text"
               inputMode="numeric"
               pattern="[0-9,]*"
@@ -334,8 +353,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
           </Field>
 
           <Field>
-            거래일시
+            <span>거래일시<RequiredMark>*</RequiredMark></span>
             <Input
+              required
               type="datetime-local"
               value={draft.transactionAt}
               onChange={(event) =>

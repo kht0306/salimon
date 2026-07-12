@@ -304,6 +304,38 @@ export class SupabaseFinanceRepository {
     if (input.isPrimary && data?.id) await this.setCardPrimary(data.id)
   }
 
+  async updateCard(
+    cardId: string,
+    input: {
+      ownerUserId: string
+      name: string
+      issuer: string
+      last4?: string
+      paymentDay: number
+      billingPeriodEndDay: number
+      billingPeriodEndMonthOffset: -1 | 0
+      isPrimary: boolean
+    },
+  ): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client
+      .from("payment_methods")
+      .update({
+        owner_user_id: input.ownerUserId,
+        name: input.name,
+        issuer: input.issuer,
+        last4: input.last4 || null,
+        payment_day: input.paymentDay,
+        billing_period_end_day: input.billingPeriodEndDay,
+        billing_period_end_month_offset: input.billingPeriodEndMonthOffset,
+        is_primary: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", cardId)
+    throwIfError(error)
+    if (input.isPrimary) await this.setCardPrimary(cardId)
+  }
+
   async setCardActive(cardId: string, isActive: boolean): Promise<void> {
     const client = requireSupabaseClient()
     const { error } = await client

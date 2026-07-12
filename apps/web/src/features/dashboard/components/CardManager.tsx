@@ -2,7 +2,15 @@
 
 import styled from "@emotion/styled"
 import { colors } from "@salimon/ui-tokens"
-import { CreditCard, Power, PowerOff, Plus, Star, Trash2 } from "lucide-react"
+import {
+  Check,
+  CreditCard,
+  Power,
+  PowerOff,
+  Plus,
+  Star,
+  Trash2,
+} from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useState } from "react"
 import { useAppStore } from "../StoreProvider"
@@ -13,6 +21,7 @@ import {
   Panel,
   PanelHeader,
   PanelTitle,
+  RequiredMark,
   Select,
 } from "../styles"
 
@@ -35,16 +44,18 @@ export const CardManager = observer(function CardManager() {
   const [name, setName] = useState("")
   const [last4, setLast4] = useState("")
   const [ownerUserId, setOwnerUserId] = useState(store.authUser?.id ?? "")
-  const [paymentDay, setPaymentDay] = useState("14")
-  const [endDay, setEndDay] = useState("31")
+  const [paymentDay, setPaymentDay] = useState("")
+  const [endDay, setEndDay] = useState("")
   const [endOffset, setEndOffset] = useState<"-1" | "0">("-1")
   const [isPrimary, setPrimary] = useState(false)
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const isFirstCard = !store.currentLedgerCards.some(
-    (card) => card.ownerUserId === ownerUserId,
+    (card) =>
+      card.id !== selectedCardId && card.ownerUserId === ownerUserId,
   )
   const paymentDayNumber = Number(paymentDay)
   const endDayNumber = Number(endDay)
-  const canCreate =
+  const canSave =
     Boolean(ownerUserId && issuer.trim() && name.trim()) &&
     (!last4 || last4.length === 4) &&
     Number.isSafeInteger(paymentDayNumber) &&
@@ -67,8 +78,56 @@ export const CardManager = observer(function CardManager() {
         isPrimary: isFirstCard || isPrimary,
       })
     ) {
-      setName("")
-      setLast4("")
+      resetForm()
+    }
+  }
+
+  function resetForm() {
+    setSelectedCardId(null)
+    setOwnerUserId(store.authUser?.id ?? "")
+    setIssuer(issuers[0])
+    setName("")
+    setLast4("")
+    setPaymentDay("")
+    setEndDay("")
+    setEndOffset("-1")
+    setPrimary(false)
+  }
+
+  function selectCard(card: (typeof store.currentLedgerCards)[number]) {
+    if (selectedCardId === card.id) {
+      resetForm()
+      return
+    }
+    setSelectedCardId(card.id)
+    setOwnerUserId(card.ownerUserId ?? store.authUser?.id ?? "")
+    setIssuer(card.issuer ?? issuers[0])
+    setName(card.name)
+    setLast4(card.last4 ?? "")
+    setPaymentDay(String(card.paymentDay ?? 14))
+    setEndDay(String(card.billingPeriodEndDay ?? 31))
+    setEndOffset(String(card.billingPeriodEndMonthOffset ?? -1) as "-1" | "0")
+    setPrimary(Boolean(card.isPrimary))
+  }
+
+  async function save() {
+    if (!selectedCardId) {
+      await create()
+      return
+    }
+    if (
+      await store.updateCard(selectedCardId, {
+        ownerUserId,
+        name,
+        issuer,
+        last4: last4 || undefined,
+        paymentDay: Number(paymentDay),
+        billingPeriodEndDay: Number(endDay),
+        billingPeriodEndMonthOffset: Number(endOffset) as -1 | 0,
+        isPrimary: isFirstCard || isPrimary,
+      })
+    ) {
+      resetForm()
     }
   }
 
@@ -78,16 +137,18 @@ export const CardManager = observer(function CardManager() {
         <PanelTitle>카드 관리</PanelTitle>
         <Button
           $variant="primary"
-          disabled={!canCreate}
-          onClick={() => void create()}
+          disabled={!canSave}
+          onClick={() => void save()}
         >
-          <Plus size={16} /> 카드 등록
+          {selectedCardId ? <Check size={16} /> : <Plus size={16} />}
+          {selectedCardId ? "카드 수정" : "카드 등록"}
         </Button>
       </PanelHeader>
       <Composer>
         <Field>
-          카드 소유자
+          <span>카드 소유자<RequiredMark>*</RequiredMark></span>
           <Select
+            required
             value={ownerUserId}
             onChange={(event) => setOwnerUserId(event.target.value)}
           >
@@ -99,8 +160,9 @@ export const CardManager = observer(function CardManager() {
           </Select>
         </Field>
         <Field>
-          카드사
+          <span>카드사<RequiredMark>*</RequiredMark></span>
           <Select
+            required
             value={issuer}
             onChange={(event) => setIssuer(event.target.value)}
           >
@@ -110,8 +172,9 @@ export const CardManager = observer(function CardManager() {
           </Select>
         </Field>
         <Field>
-          카드 별칭
+          <span>카드 별칭<RequiredMark>*</RequiredMark></span>
           <Input
+            required
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="생활비 카드"
@@ -129,8 +192,9 @@ export const CardManager = observer(function CardManager() {
           />
         </Field>
         <Field>
-          매월 결제일
+          <span>매월 결제일<RequiredMark>*</RequiredMark></span>
           <Input
+            required
             type="number"
             min="1"
             max="31"
@@ -139,8 +203,9 @@ export const CardManager = observer(function CardManager() {
           />
         </Field>
         <Field>
-          이용기간 종료월
+          <span>이용기간 종료월<RequiredMark>*</RequiredMark></span>
           <Select
+            required
             value={endOffset}
             onChange={(event) => setEndOffset(event.target.value as "-1" | "0")}
           >
@@ -149,8 +214,9 @@ export const CardManager = observer(function CardManager() {
           </Select>
         </Field>
         <Field>
-          이용기간 종료일
+          <span>이용기간 종료일<RequiredMark>*</RequiredMark></span>
           <Input
+            required
             type="number"
             min="1"
             max="31"
@@ -196,7 +262,21 @@ export const CardManager = observer(function CardManager() {
               </MemberHeader>
               <Rows>
                 {memberCards.map((card) => (
-                  <Row key={card.id}>
+                  <Row
+                    key={card.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedCardId === card.id}
+                    $selected={selectedCardId === card.id}
+                    onClick={() => selectCard(card)}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault()
+                        selectCard(card)
+                      }
+                    }}
+                  >
                     <CreditCard size={18} />
                     <div>
                       <strong>{card.name}</strong>
@@ -207,7 +287,7 @@ export const CardManager = observer(function CardManager() {
                         {card.isPrimary ? " · 주 카드" : ""}
                       </Meta>
                     </div>
-                    <Actions>
+                    <Actions onClick={(event) => event.stopPropagation()}>
                       {card.isPrimary ? (
                         <PrimaryBadge>
                           <Star size={13} fill="currentColor" /> 주 카드
@@ -334,13 +414,29 @@ const Rows = styled.div`
   display: grid;
   padding: 4px 18px 12px;
 `
-const Row = styled.div`
+const Row = styled.div<{ $selected: boolean }>`
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 12px 0;
-  border-bottom: 1px solid ${colors.border};
+  margin: 2px 0;
+  padding: 12px 10px;
+  border: 1px solid
+    ${({ $selected }) => ($selected ? colors.teal : "transparent")};
+  border-bottom-color: ${({ $selected }) =>
+    $selected ? colors.teal : colors.border};
+  border-radius: 8px;
+  background: ${({ $selected }) =>
+    $selected ? colors.tealSoft : "transparent"};
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+
+  &:focus-visible {
+    outline: 2px solid ${colors.teal};
+    outline-offset: 2px;
+  }
 `
 const Meta = styled.div`
   margin-top: 3px;
