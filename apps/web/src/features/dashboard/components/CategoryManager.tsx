@@ -41,6 +41,55 @@ const iconOptions = [
 const iconLabels = Object.fromEntries(
   iconOptions.map((option) => [option.value, option.label]),
 )
+const hexColorPattern = /^#[0-9a-f]{6}$/i
+
+function ColorPicker({
+  value,
+  onChange,
+  label,
+}: {
+  value: string
+  onChange: (value: string) => void
+  label: string
+}) {
+  const validColor = hexColorPattern.test(value) ? value : "#000000"
+
+  return (
+    <ColorControls>
+      <Swatches aria-label={`${label} 빠른 색상 선택`}>
+        {colorOptions.map((option) => (
+          <Swatch
+            key={option}
+            type="button"
+            title={option}
+            aria-label={option}
+            $color={option}
+            $selected={value.toLowerCase() === option}
+            onClick={() => onChange(option)}
+          />
+        ))}
+      </Swatches>
+      <CustomColor>
+        <NativeColorInput
+          type="color"
+          title="전체 색상에서 선택"
+          aria-label={`${label} 전체 색상에서 선택`}
+          value={validColor}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <HexInput
+          aria-label={`${label} HEX 색상 코드`}
+          aria-invalid={!hexColorPattern.test(value)}
+          maxLength={7}
+          spellCheck={false}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="#2d6a4f"
+        />
+      </CustomColor>
+    </ColorControls>
+  )
+}
 
 export const CategoryManager = observer(function CategoryManager() {
   const store = useAppStore()
@@ -86,7 +135,9 @@ export const CategoryManager = observer(function CategoryManager() {
         <Button
           $variant="primary"
           onClick={() => void create()}
-          disabled={!name.trim() || !store.authUser}
+          disabled={
+            !name.trim() || !store.authUser || !hexColorPattern.test(color)
+          }
         >
           <Plus size={16} /> 추가
         </Button>
@@ -113,18 +164,7 @@ export const CategoryManager = observer(function CategoryManager() {
             ))}
           </Select>
         </Field>
-        <Swatches>
-          {colorOptions.map((option) => (
-            <Swatch
-              key={option}
-              type="button"
-              title={option}
-              $color={option}
-              $selected={color === option}
-              onClick={() => setColor(option)}
-            />
-          ))}
-        </Swatches>
+        <ColorPicker value={color} onChange={setColor} label="새 카테고리" />
       </CategoryComposer>
 
       <CategoryList>
@@ -152,19 +192,11 @@ export const CategoryManager = observer(function CategoryManager() {
                     </option>
                   ))}
                 </Select>
-                <Swatches aria-label={`${category.name} 카테고리 색상`}>
-                  {colorOptions.map((option) => (
-                    <Swatch
-                      key={option}
-                      type="button"
-                      title={option}
-                      aria-label={option}
-                      $color={option}
-                      $selected={editColor.toLowerCase() === option}
-                      onClick={() => setEditColor(option)}
-                    />
-                  ))}
-                </Swatches>
+                <ColorPicker
+                  value={editColor}
+                  onChange={setEditColor}
+                  label={`${category.name} 카테고리`}
+                />
               </CategoryEditor>
             ) : (
               <CategorySummary>
@@ -222,7 +254,9 @@ export const CategoryManager = observer(function CategoryManager() {
                     $variant="primary"
                     title="카테고리 수정 저장"
                     aria-label={`${category.name} 수정 저장`}
-                    disabled={!editName.trim()}
+                    disabled={
+                      !editName.trim() || !hexColorPattern.test(editColor)
+                    }
                     onClick={() => void saveEditing()}
                   >
                     <Check size={15} />
@@ -309,6 +343,43 @@ const Swatches = styled.div`
   align-items: center;
 `
 
+const ColorControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+
+  @media (max-width: 720px) {
+    flex-wrap: wrap;
+  }
+`
+
+const CustomColor = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+`
+
+const NativeColorInput = styled.input`
+  width: 38px;
+  height: 38px;
+  padding: 3px;
+  border: 1px solid ${colors.borderStrong};
+  border-radius: ${radii.sm};
+  background: #fff;
+  cursor: pointer;
+`
+
+const HexInput = styled(Input)`
+  width: 90px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-transform: lowercase;
+
+  &[aria-invalid="true"] {
+    border-color: ${colors.coral};
+  }
+`
+
 const Swatch = styled.button<{ $color: string; $selected: boolean }>`
   width: 24px;
   height: 24px;
@@ -341,7 +412,7 @@ const CategorySummary = styled.div`
 
 const CategoryEditor = styled.div`
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) 110px auto;
+  grid-template-columns: minmax(120px, 1fr) 110px minmax(300px, auto);
   align-items: center;
   gap: 8px;
 

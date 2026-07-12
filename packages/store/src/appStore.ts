@@ -399,6 +399,10 @@ export class AppStore {
       this.notify("카테고리 이름을 입력해 주세요.", "error")
       return false
     }
+    if (!isHexColor(color)) {
+      this.notify("색상은 # 뒤에 6자리 HEX 코드로 입력해 주세요.", "error")
+      return false
+    }
 
     const duplicate = this.expenseCategories.some(
       (category) => category.name.toLowerCase() === trimmed.toLowerCase(),
@@ -434,6 +438,10 @@ export class AppStore {
     const name = patch.name?.trim()
     if (!category || (patch.name !== undefined && !name)) {
       this.notify("카테고리 이름을 입력해 주세요.", "error")
+      return false
+    }
+    if (patch.color !== undefined && !isHexColor(patch.color)) {
+      this.notify("색상은 # 뒤에 6자리 HEX 코드로 입력해 주세요.", "error")
       return false
     }
 
@@ -797,4 +805,8 @@ function createId(prefix: string): string {
   }
 
   return `${prefix}-${Math.random().toString(36).slice(2)}`
+}
+
+function isHexColor(value: string): boolean {
+  return /^#[0-9a-f]{6}$/i.test(value)
 }
