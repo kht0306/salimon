@@ -6,6 +6,7 @@ import {
   Database,
   ListFilter,
   RefreshCw,
+  Star,
   Tags,
   Users,
   WalletCards,
@@ -50,6 +51,11 @@ export function SalimonDashboard() {
 const DashboardContent = observer(function DashboardContent() {
   const store = useAppStore()
   const router = useRouter()
+  const currentMembership = store.data.members.find(
+    (member) =>
+      member.ledgerId === store.selectedLedgerId &&
+      member.userId === store.authUser?.id,
+  )
 
   useEffect(() => {
     if (store.authState !== "loading" && !store.authUser) {
@@ -83,21 +89,43 @@ const DashboardContent = observer(function DashboardContent() {
           <LedgerLabel>
             <WalletCards size={14} /> 가계부
           </LedgerLabel>
-          <LedgerSelect
-            value={store.selectedLedgerId}
-            onChange={(event) => store.switchLedger(event.target.value)}
-            aria-label="가계부 선택"
-            disabled={store.data.ledgers.length === 0}
-          >
-            {store.data.ledgers.length === 0 ? (
-              <option value="">로그인 후 불러오기</option>
-            ) : null}
-            {store.data.ledgers.map((ledger) => (
-              <option key={ledger.id} value={ledger.id}>
-                {ledger.name}
-              </option>
-            ))}
-          </LedgerSelect>
+          <LedgerControl>
+            <LedgerSelect
+              value={store.selectedLedgerId}
+              onChange={(event) => store.switchLedger(event.target.value)}
+              aria-label="가계부 선택"
+              disabled={store.data.ledgers.length === 0}
+            >
+              {store.data.ledgers.length === 0 ? (
+                <option value="">로그인 후 불러오기</option>
+              ) : null}
+              {store.data.ledgers.map((ledger) => (
+                <option key={ledger.id} value={ledger.id}>
+                  {ledger.name}
+                </option>
+              ))}
+            </LedgerSelect>
+            <DefaultLedgerButton
+              type="button"
+              $active={Boolean(currentMembership?.isDefault)}
+              disabled={
+                !store.selectedLedgerId || Boolean(currentMembership?.isDefault)
+              }
+              title={
+                currentMembership?.isDefault
+                  ? "현재 기본 가계부입니다"
+                  : "기본 가계부로 설정"
+              }
+              aria-label={
+                currentMembership?.isDefault
+                  ? "현재 기본 가계부"
+                  : "기본 가계부로 설정"
+              }
+              onClick={() => void store.setDefaultLedger(store.selectedLedgerId)}
+            >
+              <Star size={15} fill={currentMembership?.isDefault ? "currentColor" : "none"} />
+            </DefaultLedgerButton>
+          </LedgerControl>
         </LedgerField>
 
         <MetricRow>
@@ -280,9 +308,30 @@ const BrandName = styled.div`
   line-height: 1.2;
 `
 
-const LedgerField = styled.label`
+const LedgerField = styled.div`
   display: grid;
   gap: ${spacing[2]};
+`
+
+const LedgerControl = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  gap: 6px;
+`
+
+const DefaultLedgerButton = styled.button<{ $active: boolean }>`
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid ${colors.borderStrong};
+  border-radius: ${radii.sm};
+  background: ${({ $active }) => ($active ? "#fff7d6" : "#fff")};
+  color: ${({ $active }) => ($active ? "#b7791f" : colors.muted)};
+
+  &:disabled {
+    cursor: default;
+  }
 `
 
 const LedgerLabel = styled.span`

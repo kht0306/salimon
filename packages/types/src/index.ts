@@ -45,6 +45,7 @@ export interface LedgerMember {
   nickname: string
   role: LedgerRole
   status: "active" | "removed"
+  isDefault: boolean
   joinedAt: string
 }
 
@@ -95,6 +96,8 @@ export interface RecurringRule {
   endMonth?: string
   inactiveFromMonth?: string
   installmentMonths?: number
+  installmentAmountType?: "monthly" | "principal"
+  installmentPrincipal?: number
   purchaseAt?: string
   paymentMethodId?: string
   categoryId?: string
@@ -119,6 +122,7 @@ export interface PaymentMethod {
   isActive: boolean
   isDeleted?: boolean
   isPrimary?: boolean
+  isDebit?: boolean
 }
 
 export interface Transaction {

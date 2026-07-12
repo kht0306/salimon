@@ -49,6 +49,7 @@ export interface TransactionDraft {
   recurringType?: "fixed" | "installment"
   recurringRuleId?: string
   installmentMonths?: number
+  installmentAmountType?: "monthly" | "principal"
   paymentMethodId?: string
 }
 
@@ -239,7 +240,12 @@ export class AppStore {
     if (
       !this.data.ledgers.some((ledger) => ledger.id === this.selectedLedgerId)
     ) {
-      this.selectedLedgerId = this.data.ledgers[0]?.id ?? ""
+      const defaultLedgerId = this.data.members.find(
+        (member) =>
+          member.userId === this.authUser?.id && member.isDefault,
+      )?.ledgerId
+      this.selectedLedgerId =
+        defaultLedgerId ?? this.data.ledgers[0]?.id ?? ""
     }
   }
 
@@ -364,6 +370,20 @@ export class AppStore {
     this.activeView = "calendar"
   }
 
+  async setDefaultLedger(ledgerId: string): Promise<boolean> {
+    if (!this.authUser || !ledgerId) return false
+
+    try {
+      await this.repository.setDefaultLedger(ledgerId)
+      await this.refreshFinanceData()
+      this.notify("기본 가계부를 변경했습니다.")
+      return this.dataState === "ready"
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
   selectDate(date: string): void {
     this.selectedDate = date
   }
@@ -397,6 +417,14 @@ export class AppStore {
         "할부 개월은 2개월에서 120개월 사이로 입력해 주세요.",
         "error",
       )
+      return false
+    }
+    if (
+      draft.recurringType === "installment" &&
+      draft.installmentAmountType === "principal" &&
+      draft.amount < (draft.installmentMonths ?? 0)
+    ) {
+      this.notify("할부 원금은 할부 개월 수 이상이어야 합니다.", "error")
       return false
     }
     if (draft.recurringType === "installment" && !draft.paymentMethodId) {
@@ -656,6 +684,7 @@ export class AppStore {
     billingPeriodEndDay: number
     billingPeriodEndMonthOffset: -1 | 0
     isPrimary: boolean
+    isDebit: boolean
   }): Promise<boolean> {
     if (!this.selectedLedgerId || !input.name.trim() || !input.issuer.trim()) {
       this.notify("카드사와 카드 별칭을 입력해 주세요.", "error")
@@ -703,6 +732,7 @@ export class AppStore {
       billingPeriodEndDay: number
       billingPeriodEndMonthOffset: -1 | 0
       isPrimary: boolean
+      isDebit: boolean
     },
   ): Promise<boolean> {
     const card = this.currentLedgerCards.find((item) => item.id === cardId)
@@ -811,6 +841,29 @@ export class AppStore {
       })
       this.notify("공동 가계부를 만들었습니다.")
       return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async convertCurrentLedgerToShared(): Promise<boolean> {
+    if (
+      !this.authUser ||
+      !this.currentLedger ||
+      this.currentLedger.type !== "personal" ||
+      this.currentLedger.ownerId !== this.authUser.id
+    ) {
+      return false
+    }
+
+    try {
+      await this.repository.convertPersonalLedgerToShared(
+        this.currentLedger.id,
+      )
+      await this.refreshFinanceData()
+      this.notify("개인 가계부를 공동 가계부로 전환했습니다.")
+      return this.dataState === "ready"
     } catch (error) {
       this.setDataError(error)
       return false
