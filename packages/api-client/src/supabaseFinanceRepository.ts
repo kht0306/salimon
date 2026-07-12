@@ -107,6 +107,7 @@ export class SupabaseFinanceRepository {
         .select(
           "id, ledger_id, created_by, updated_by, actor_user_id, type, status, amount, currency, transaction_at, category_id, payment_method_id, merchant_name, memo, source_type, source_app, source_sender, source_hash, parse_confidence, recurring_rule_id, recurring_type, installment_number, installment_total, created_at, updated_at, deleted_at",
         )
+        .is("deleted_at", null)
         .order("transaction_at", { ascending: false }),
       client
         .from("ledger_invitations")

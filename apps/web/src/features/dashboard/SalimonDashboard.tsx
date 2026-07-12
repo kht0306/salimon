@@ -172,7 +172,7 @@ const DashboardContent = observer(function DashboardContent() {
               }
               onClick={() => store.setView("connection")}
             >
-              <Database size={17} /> 연결
+              <Database size={17} /> 앱 관리
             </NavButton>
           ) : null}
         </Nav>
