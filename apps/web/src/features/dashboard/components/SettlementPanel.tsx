@@ -30,6 +30,7 @@ export const SettlementPanel = observer(function SettlementPanel() {
     })
     .filter((item) => item.spent > 0 || item.budget > 0)
   const max = Math.max(1, ...rows.map((item) => item.spent))
+  const pieRows = rows.filter((item) => item.spent > 0)
 
   function exportExcel() {
     const transactions = store.monthTransactions.map((item) => {
@@ -123,11 +124,26 @@ export const SettlementPanel = observer(function SettlementPanel() {
               ))}
             </Bars>
           ) : (
-            <Pie style={{ background: pieGradient(rows) }}>
-              <span>
-                {formatKrw(rows.reduce((sum, row) => sum + row.spent, 0))}
-              </span>
-            </Pie>
+            <PieChartLayout>
+              <Pie style={{ background: pieGradient(pieRows) }}>
+                <span>
+                  {formatKrw(
+                    pieRows.reduce((sum, row) => sum + row.spent, 0),
+                  )}
+                </span>
+              </Pie>
+              <PieLegend aria-label="카테고리별 지출 범례">
+                {pieRows.map(({ category, spent }) => (
+                  <PieLegendItem key={category.id}>
+                    <LegendLabel>
+                      <LegendDot $color={category.color} />
+                      {category.name}
+                    </LegendLabel>
+                    <strong>{formatKrw(spent)}</strong>
+                  </PieLegendItem>
+                ))}
+              </PieLegend>
+            </PieChartLayout>
           )}
         </Section>
         <Section>
@@ -269,10 +285,21 @@ const Bar = styled.div`
     height: 100%;
   }
 `
+const PieChartLayout = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+
+  @media (max-width: 640px) {
+    flex-direction: column;
+    gap: 20px;
+  }
+`
 const Pie = styled.div`
   width: 220px;
   height: 220px;
-  margin: auto;
+  flex: 0 0 auto;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -285,6 +312,36 @@ const Pie = styled.div`
     background: white;
     font-weight: 700;
   }
+`
+const PieLegend = styled.div`
+  display: grid;
+  gap: 10px;
+  min-width: 190px;
+`
+const PieLegendItem = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  font-size: 12px;
+
+  strong {
+    font-size: 12px;
+    white-space: nowrap;
+  }
+`
+const LegendLabel = styled.span`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+`
+const LegendDot = styled.i<{ $color: string }>`
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: ${radii.round};
+  background: ${({ $color }) => $color};
 `
 const DataTable = styled.table`
   width: 100%;
