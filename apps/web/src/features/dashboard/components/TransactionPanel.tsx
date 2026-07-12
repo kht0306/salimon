@@ -52,6 +52,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
       categoryId: store.expenseCategories[0]?.id ?? "",
       actorUserId: store.authUser?.id ?? "",
       recurringType: "none",
+      recurringRuleId: undefined as string | undefined,
       installmentMonths: "2",
       transactionAt: `${selectedDate}T12:00`,
     }),
@@ -67,6 +68,14 @@ export const TransactionPanel = observer(function TransactionPanel() {
   }
 
   function openEdit(transaction: Transaction) {
+    const firstInstallment = transaction.recurringRuleId
+      ? store.data.transactions.find(
+          (item) =>
+            item.recurringRuleId === transaction.recurringRuleId &&
+            item.installmentNumber === 1 &&
+            !item.deletedAt,
+        )
+      : undefined
     setEditing(transaction)
     setDraft({
       amount: String(transaction.amount),
@@ -76,9 +85,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
       status: transaction.status,
       categoryId: transaction.categoryId ?? "",
       actorUserId: transaction.actorUserId ?? "",
-      recurringType: "none",
-      installmentMonths: "2",
-      transactionAt: getDateTimeLocalValue(transaction.transactionAt),
+      recurringType: transaction.recurringType ?? "none",
+      recurringRuleId: transaction.recurringRuleId,
+      installmentMonths: String(transaction.installmentTotal ?? 2),
+      transactionAt: getDateTimeLocalValue(
+        firstInstallment?.transactionAt ?? transaction.transactionAt,
+      ),
     })
     setAdding(true)
   }
@@ -106,9 +118,10 @@ export const TransactionPanel = observer(function TransactionPanel() {
       memo: draft.memo || undefined,
       actorUserId: draft.actorUserId || undefined,
       recurringType:
-        editing || draft.recurringType === "none"
+        draft.recurringType === "none"
           ? undefined
           : (draft.recurringType as "fixed" | "installment"),
+      recurringRuleId: draft.recurringRuleId,
       installmentMonths:
         draft.recurringType === "installment"
           ? Number(draft.installmentMonths)
@@ -174,46 +187,48 @@ export const TransactionPanel = observer(function TransactionPanel() {
             </Field>
           </TwoColumns>
 
-          {!editing ? (
-            <TwoColumns>
+          <TwoColumns>
+            <Field>
+              반복 유형
+              <Select
+                value={draft.recurringType}
+                disabled={Boolean(editing)}
+                onChange={(event) =>
+                  setDraft({ ...draft, recurringType: event.target.value })
+                }
+              >
+                <option value="none">일반 거래</option>
+                <option value="fixed">고정비</option>
+                <option value="installment">카드 할부</option>
+              </Select>
+            </Field>
+            {draft.recurringType === "installment" ? (
               <Field>
-                반복 유형
-                <Select
-                  value={draft.recurringType}
+                할부 개월
+                {editing?.recurringType === "installment"
+                  ? ` (${editing.installmentNumber ?? 1}/${draft.installmentMonths})`
+                  : ""}
+                <Input
+                  type="number"
+                  min="2"
+                  max="120"
+                  value={draft.installmentMonths}
                   onChange={(event) =>
-                    setDraft({ ...draft, recurringType: event.target.value })
+                    setDraft({
+                      ...draft,
+                      installmentMonths: event.target.value,
+                    })
                   }
-                >
-                  <option value="none">일반 거래</option>
-                  <option value="fixed">고정비</option>
-                  <option value="installment">카드 할부</option>
-                </Select>
+                />
               </Field>
-              {draft.recurringType === "installment" ? (
-                <Field>
-                  전체 할부 개월
-                  <Input
-                    type="number"
-                    min="2"
-                    max="120"
-                    value={draft.installmentMonths}
-                    onChange={(event) =>
-                      setDraft({
-                        ...draft,
-                        installmentMonths: event.target.value,
-                      })
-                    }
-                  />
-                </Field>
-              ) : (
-                <div />
-              )}
-            </TwoColumns>
-          ) : null}
+            ) : (
+              <div />
+            )}
+          </TwoColumns>
 
           <Field>
             금액
-            {draft.recurringType === "installment" ? " (월별 할부액)" : ""}
+            {draft.recurringType === "installment" ? " (월별 납부액)" : ""}
             <Input
               type="text"
               inputMode="numeric"
@@ -335,7 +350,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                   {statusLabels[transaction.status]}
                   {transaction.recurringType === "fixed" ? " · 고정비" : ""}
                   {transaction.recurringType === "installment"
-                    ? ` · ${transaction.installmentNumber}/${transaction.installmentTotal}회`
+                    ? ` · (${transaction.installmentNumber}/${transaction.installmentTotal}개월)`
                     : ""}
                 </TransactionMeta>
                 <RegisteredAt>

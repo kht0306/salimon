@@ -261,7 +261,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
                   {statusLabels[transaction.status]}
                   {transaction.recurringType === "fixed" ? " · 고정비" : ""}
                   {transaction.recurringType === "installment"
-                    ? ` · ${transaction.installmentNumber}/${transaction.installmentTotal}회`
+                    ? ` · (${transaction.installmentNumber}/${transaction.installmentTotal}개월)`
                     : ""}
                 </span>
                 <small>

@@ -33,6 +33,7 @@ export interface RemoteTransactionInput {
   sourceHash?: string
   parseConfidence?: number
   recurringType?: "fixed" | "installment"
+  recurringRuleId?: string
   installmentMonths?: number
 }
 
@@ -176,7 +177,25 @@ export class SupabaseFinanceRepository {
       updated_at: new Date().toISOString(),
     }
 
-    if (!input.id && input.recurringType) {
+    if (input.recurringType === "installment") {
+      const { error } = await client.rpc("save_installment_series", {
+        p_rule_id: input.recurringRuleId ?? null,
+        p_ledger_id: input.ledgerId,
+        p_amount: input.amount,
+        p_transaction_at: input.transactionAt,
+        p_installment_months: input.installmentMonths ?? 2,
+        p_category_id: input.categoryId ?? null,
+        p_merchant_name: input.merchantName ?? null,
+        p_memo: input.memo ?? null,
+        p_actor_user_id: input.actorUserId ?? null,
+        p_status: input.status,
+        p_type: input.type,
+      })
+      throwIfError(error)
+      return
+    }
+
+    if (!input.id && input.recurringType === "fixed") {
       const date = new Date(input.transactionAt)
       const startMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`
       const { error: ruleError } = await client.from("recurring_rules").insert({
@@ -187,17 +206,14 @@ export class SupabaseFinanceRepository {
         day_of_month: date.getDate(),
         time_of_day: `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`,
         start_month: startMonth,
-        end_month:
-          input.recurringType === "installment"
-            ? addMonths(startMonth, (input.installmentMonths ?? 2) - 1)
-            : null,
-        installment_months:
-          input.recurringType === "installment"
-            ? (input.installmentMonths ?? 2)
-            : null,
+        end_month: null,
+        installment_months: null,
         category_id: input.categoryId ?? null,
         merchant_name: input.merchantName ?? null,
         memo: input.memo ?? null,
+        transaction_type: input.type,
+        transaction_status: input.status,
+        actor_user_id: input.actorUserId ?? null,
       })
       throwIfError(ruleError)
       await this.materializeMonth(startMonth.slice(0, 7))
@@ -290,19 +306,27 @@ export class SupabaseFinanceRepository {
     icon: string
     color: string
     sortOrder: number
-  }): Promise<void> {
+  }): Promise<string> {
     const client = requireSupabaseClient()
-    const { error } = await client.from("categories").insert({
-      ledger_id: input.ledgerId,
-      created_by: input.userId,
-      type: "expense",
-      name: input.name,
-      icon: input.icon,
-      color: input.color,
-      sort_order: input.sortOrder,
-      is_default: false,
-    })
+    const { data, error } = await client
+      .from("categories")
+      .insert({
+        ledger_id: input.ledgerId,
+        created_by: input.userId,
+        type: "expense",
+        name: input.name,
+        icon: input.icon,
+        color: input.color,
+        sort_order: input.sortOrder,
+        is_default: false,
+      })
+      .select("id")
+      .single()
     throwIfError(error)
+    if (!data || typeof data.id !== "string") {
+      throw new Error("생성한 카테고리를 확인할 수 없습니다.")
+    }
+    return data.id
   }
 
   async updateCategory(
@@ -560,12 +584,6 @@ function mapTransaction(row: Row): Transaction {
     updatedAt: stringValue(row.updated_at),
     deletedAt: optionalString(row.deleted_at),
   }
-}
-
-function addMonths(date: string, amount: number): string {
-  const [year, month] = date.split("-").map(Number)
-  const next = new Date(year, month - 1 + amount, 1)
-  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-01`
 }
 
 function mapSample(row: Row): CardMessageSample {

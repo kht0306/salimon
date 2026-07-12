@@ -67,7 +67,7 @@ const DashboardContent = observer(function DashboardContent() {
   }
 
   return (
-    <Shell>
+    <Shell $showTransactionPanel={store.activeView === "calendar"}>
       <Sidebar>
         <Brand
           type="button"
@@ -215,7 +215,9 @@ const DashboardContent = observer(function DashboardContent() {
         ) : null}
       </Workspace>
 
-      <TransactionPanel key={store.selectedLedgerId} />
+      {store.activeView === "calendar" ? (
+        <TransactionPanel key={store.selectedLedgerId} />
+      ) : null}
       {store.toast ? (
         <Toast
           $tone={store.toast.tone}

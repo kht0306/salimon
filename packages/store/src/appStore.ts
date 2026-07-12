@@ -47,6 +47,7 @@ export interface TransactionDraft {
   sourceHash?: string
   parseConfidence?: number
   recurringType?: "fixed" | "installment"
+  recurringRuleId?: string
   installmentMonths?: number
 }
 
@@ -352,6 +353,15 @@ export class AppStore {
       this.notify("금액과 필수 항목을 확인해 주세요.", "error")
       return false
     }
+    if (
+      draft.recurringType === "installment" &&
+      (!Number.isSafeInteger(draft.installmentMonths) ||
+        (draft.installmentMonths ?? 0) < 2 ||
+        (draft.installmentMonths ?? 0) > 120)
+    ) {
+      this.notify("할부 개월은 2개월에서 120개월 사이로 입력해 주세요.", "error")
+      return false
+    }
 
     const categoryId =
       draft.categoryId ||
@@ -393,6 +403,7 @@ export class AppStore {
     name: string,
     icon: string,
     color: string,
+    budget = 0,
   ): Promise<boolean> {
     const trimmed = name.trim()
     if (!trimmed || !this.selectedLedgerId || !this.authUser) {
@@ -401,6 +412,10 @@ export class AppStore {
     }
     if (!isHexColor(color)) {
       this.notify("색상은 # 뒤에 6자리 HEX 코드로 입력해 주세요.", "error")
+      return false
+    }
+    if (!Number.isSafeInteger(budget) || budget < 0) {
+      this.notify("올바른 예산 금액을 입력해 주세요.", "error")
       return false
     }
 
@@ -413,7 +428,7 @@ export class AppStore {
     }
 
     try {
-      await this.repository.createExpenseCategory({
+      const categoryId = await this.repository.createExpenseCategory({
         ledgerId: this.selectedLedgerId,
         userId: this.authUser.id,
         name: trimmed,
@@ -421,6 +436,15 @@ export class AppStore {
         color,
         sortOrder: this.expenseCategories.length,
       })
+      if (budget > 0) {
+        await this.repository.setCategoryBudget({
+          ledgerId: this.selectedLedgerId,
+          categoryId,
+          month: this.selectedMonth,
+          amount: budget,
+          userId: this.authUser.id,
+        })
+      }
       await this.refreshFinanceData()
       this.notify("카테고리를 추가했습니다.")
       return this.dataState === "ready"

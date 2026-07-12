@@ -1,10 +1,13 @@
 import styled from "@emotion/styled"
 import { colors, controls, radii, shadows, spacing } from "@salimon/ui-tokens"
 
-export const Shell = styled.main`
+export const Shell = styled.main<{ $showTransactionPanel?: boolean }>`
   min-height: 100dvh;
   display: grid;
-  grid-template-columns: 224px minmax(520px, 1fr) 328px;
+  grid-template-columns: ${({ $showTransactionPanel }) =>
+    $showTransactionPanel
+      ? "224px minmax(520px, 1fr) 328px"
+      : "224px minmax(520px, 1fr)"};
   background: ${colors.panel};
 
   @media (max-width: 1160px) {

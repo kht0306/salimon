@@ -96,6 +96,7 @@ export const CategoryManager = observer(function CategoryManager() {
   const [name, setName] = useState("")
   const [icon, setIcon] = useState(iconOptions[0].value)
   const [color, setColor] = useState(colorOptions[0])
+  const [budget, setBudget] = useState("")
   const [budgets, setBudgets] = useState<Record<string, string>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState("")
@@ -103,8 +104,16 @@ export const CategoryManager = observer(function CategoryManager() {
   const [editColor, setEditColor] = useState(colorOptions[0])
 
   async function create() {
-    if (await store.createExpenseCategory(name, icon, color)) {
+    if (
+      await store.createExpenseCategory(
+        name,
+        icon,
+        color,
+        Number(budget || 0),
+      )
+    ) {
       setName("")
+      setBudget("")
     }
   }
 
@@ -163,6 +172,17 @@ export const CategoryManager = observer(function CategoryManager() {
               </option>
             ))}
           </Select>
+        </Field>
+        <Field>
+          {store.selectedMonth} 예산
+          <Input
+            inputMode="numeric"
+            placeholder="선택 입력"
+            value={formatMoneyInput(budget)}
+            onChange={(event) =>
+              setBudget(event.target.value.replace(/\D/g, ""))
+            }
+          />
         </Field>
         <ColorPicker value={color} onChange={setColor} label="새 카테고리" />
       </CategoryComposer>
@@ -324,7 +344,7 @@ export const CategoryManager = observer(function CategoryManager() {
 
 const CategoryComposer = styled.div`
   display: grid;
-  grid-template-columns: 1fr 180px auto;
+  grid-template-columns: minmax(140px, 1fr) 150px 150px auto;
   gap: 12px;
   padding: 16px 18px;
   align-items: end;

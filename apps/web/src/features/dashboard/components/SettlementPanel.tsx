@@ -179,7 +179,7 @@ export const SettlementPanel = observer(function SettlementPanel() {
                   <td>
                     {item.merchantName || item.memo || "거래"}
                     {item.recurringType === "installment"
-                      ? ` (${item.installmentNumber}/${item.installmentTotal})`
+                      ? ` (${item.installmentNumber}/${item.installmentTotal}개월)`
                       : ""}
                   </td>
                   <td>
