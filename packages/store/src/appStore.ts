@@ -779,7 +779,7 @@ export class AppStore {
       this.initializedWorkspaceUserId = null
       await this.ensureWorkspace(this.authUser?.id ?? "")
       await this.refreshFinanceData()
-      this.notify("회원정보를 제외한 데이터를 초기화했습니다.")
+      this.notify("카테고리와 카드는 유지하고 테스트 데이터를 초기화했습니다.")
       return true
     } catch (error) {
       this.setDataError(error)
