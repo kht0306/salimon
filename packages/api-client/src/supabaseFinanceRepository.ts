@@ -174,7 +174,7 @@ export class SupabaseFinanceRepository {
   async saveTransaction(
     userId: string,
     input: RemoteTransactionInput,
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     const client = requireSupabaseClient()
     const payload = {
       ledger_id: input.ledgerId,
@@ -195,23 +195,26 @@ export class SupabaseFinanceRepository {
     }
 
     if (input.recurringType === "installment") {
-      const { error } = await client.rpc("save_card_installment_series_v2", {
-        p_rule_id: input.recurringRuleId ?? null,
-        p_ledger_id: input.ledgerId,
-        p_amount: input.amount,
-        p_amount_type: input.installmentAmountType ?? "monthly",
-        p_transaction_at: input.transactionAt,
-        p_installment_months: input.installmentMonths ?? 2,
-        p_category_id: input.categoryId ?? null,
-        p_merchant_name: input.merchantName ?? null,
-        p_memo: input.memo ?? null,
-        p_actor_user_id: input.actorUserId ?? null,
-        p_status: input.status,
-        p_type: input.type,
-        p_payment_method_id: input.paymentMethodId,
-      })
+      const { data, error } = await client.rpc(
+        "save_purchase_day_installment_series",
+        {
+          p_rule_id: input.recurringRuleId ?? null,
+          p_ledger_id: input.ledgerId,
+          p_amount: input.amount,
+          p_amount_type: input.installmentAmountType ?? "monthly",
+          p_transaction_at: input.transactionAt,
+          p_installment_months: input.installmentMonths ?? 2,
+          p_category_id: input.categoryId ?? null,
+          p_merchant_name: input.merchantName ?? null,
+          p_memo: input.memo ?? null,
+          p_actor_user_id: input.actorUserId ?? null,
+          p_status: input.status,
+          p_type: input.type,
+          p_payment_method_id: input.paymentMethodId,
+        },
+      )
       throwIfError(error)
-      return
+      return typeof data === "string" ? data : undefined
     }
 
     if (!input.id && input.recurringType === "fixed") {
@@ -236,7 +239,7 @@ export class SupabaseFinanceRepository {
       })
       throwIfError(ruleError)
       await this.materializeMonth(startMonth.slice(0, 7))
-      return
+      return undefined
     }
 
     const result = input.id
@@ -245,6 +248,7 @@ export class SupabaseFinanceRepository {
           .from("transactions")
           .insert({ ...payload, created_by: userId })
     throwIfError(result.error)
+    return undefined
   }
 
   async materializeMonth(month: string): Promise<void> {

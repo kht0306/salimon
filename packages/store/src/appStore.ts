@@ -439,12 +439,35 @@ export class AppStore {
         : undefined)
 
     try {
-      await this.repository.saveTransaction(this.authUser.id, {
-        ...draft,
-        categoryId,
-        transactionAt: fromDateTimeLocalValue(draft.transactionAt),
-      })
+      const savedRecurringRuleId = await this.repository.saveTransaction(
+        this.authUser.id,
+        {
+          ...draft,
+          categoryId,
+          transactionAt: fromDateTimeLocalValue(draft.transactionAt),
+        },
+      )
       await this.refreshFinanceData()
+      if (draft.recurringType === "installment" && savedRecurringRuleId) {
+        const firstInstallment = this.data.transactions
+          .filter(
+            (transaction) =>
+              transaction.recurringRuleId === savedRecurringRuleId &&
+              !transaction.deletedAt,
+          )
+          .sort(
+            (first, second) =>
+              new Date(first.transactionAt).getTime() -
+              new Date(second.transactionAt).getTime(),
+          )[0]
+        if (firstInstallment) {
+          runInAction(() => {
+            const paymentDate = new Date(firstInstallment.transactionAt)
+            this.selectedMonth = toMonthKey(paymentDate)
+            this.selectedDate = toDateKey(paymentDate)
+          })
+        }
+      }
       this.notify(draft.id ? "거래를 수정했습니다." : "거래를 저장했습니다.")
       return this.dataState === "ready"
     } catch (error) {
