@@ -489,6 +489,16 @@ export class SupabaseFinanceRepository {
     throwIfError(error)
   }
 
+  async updateCategoryOrder(categoryIds: string[]): Promise<void> {
+    if (categoryIds.length === 0) return
+
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("reorder_categories", {
+      p_category_ids: categoryIds,
+    })
+    throwIfError(error)
+  }
+
   async createSharedLedger(name: string): Promise<string> {
     const client = requireSupabaseClient()
     const { data, error } = await client.rpc("create_shared_ledger", {

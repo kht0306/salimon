@@ -552,6 +552,76 @@ export class AppStore {
     }
   }
 
+  async reorderExpenseCategories(
+    sourceCategoryId: string,
+    targetCategoryId: string,
+  ): Promise<boolean> {
+    if (sourceCategoryId === targetCategoryId) return true
+
+    const visibleCategories = this.expenseCategories
+    const sourceIndex = visibleCategories.findIndex(
+      (category) => category.id === sourceCategoryId,
+    )
+    const targetIndex = visibleCategories.findIndex(
+      (category) => category.id === targetCategoryId,
+    )
+    if (sourceIndex < 0 || targetIndex < 0) return false
+
+    const reorderedVisibleCategories = [...visibleCategories]
+    const [movedCategory] = reorderedVisibleCategories.splice(sourceIndex, 1)
+    if (!movedCategory) return false
+    reorderedVisibleCategories.splice(targetIndex, 0, movedCategory)
+
+    const archivedCategories = this.data.categories
+      .filter(
+        (category) =>
+          category.ledgerId === this.selectedLedgerId &&
+          category.type === "expense" &&
+          category.isArchived,
+      )
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+    const orderedCategories = [
+      ...reorderedVisibleCategories,
+      ...archivedCategories,
+    ]
+
+    const previousOrders = new Map(
+      orderedCategories.map((category) => [category.id, category.sortOrder]),
+    )
+    const updates = orderedCategories.map((category, index) => ({
+      categoryId: category.id,
+      sortOrder: index,
+    }))
+
+    try {
+      runInAction(() => {
+        updates.forEach((update) => {
+          const category = this.data.categories.find(
+            (item) => item.id === update.categoryId,
+          )
+          if (category) category.sortOrder = update.sortOrder
+        })
+      })
+      await this.repository.updateCategoryOrder(
+        updates.map((update) => update.categoryId),
+      )
+      await this.refreshFinanceData()
+      this.notify("카테고리 순서를 변경했습니다.")
+      return this.dataState === "ready"
+    } catch (error) {
+      runInAction(() => {
+        previousOrders.forEach((sortOrder, categoryId) => {
+          const category = this.data.categories.find(
+            (item) => item.id === categoryId,
+          )
+          if (category) category.sortOrder = sortOrder
+        })
+      })
+      this.setDataError(error)
+      return false
+    }
+  }
+
   async setCategoryBudget(
     categoryId: string,
     amount: number,

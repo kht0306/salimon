@@ -3,9 +3,9 @@
 import styled from "@emotion/styled"
 import { formatMoneyInput } from "@salimon/domain"
 import { colors, radii } from "@salimon/ui-tokens"
-import { Archive, Check, Pencil, Plus, X } from "lucide-react"
+import { Archive, Check, GripVertical, Pencil, Plus, X } from "lucide-react"
 import { observer } from "mobx-react-lite"
-import { useState } from "react"
+import { type DragEvent, useState } from "react"
 import { useAppStore } from "../StoreProvider"
 import {
   Button,
@@ -109,6 +109,9 @@ export const CategoryManager = observer(function CategoryManager() {
   const [editName, setEditName] = useState("")
   const [editIcon, setEditIcon] = useState(iconOptions[0].value)
   const [editColor, setEditColor] = useState(colorOptions[0])
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [savingOrder, setSavingOrder] = useState(false)
 
   async function create() {
     if (
@@ -141,6 +144,60 @@ export const CategoryManager = observer(function CategoryManager() {
       })
     ) {
       setEditingId(null)
+    }
+  }
+
+  function handleDragStart(
+    event: DragEvent<HTMLButtonElement>,
+    categoryId: string,
+  ) {
+    if (savingOrder) return
+
+    event.dataTransfer.effectAllowed = "move"
+    event.dataTransfer.setData("text/plain", categoryId)
+    setDraggingId(categoryId)
+  }
+
+  function handleDragOver(
+    event: DragEvent<HTMLDivElement>,
+    categoryId: string,
+  ) {
+    if (!draggingId || draggingId === categoryId) return
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "move"
+    setDragOverId(categoryId)
+  }
+
+  function handleDragLeave(
+    event: DragEvent<HTMLDivElement>,
+    categoryId: string,
+  ) {
+    const nextTarget = event.relatedTarget
+    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+      return
+    }
+
+    setDragOverId((current) => (current === categoryId ? null : current))
+  }
+
+  async function handleDrop(
+    event: DragEvent<HTMLDivElement>,
+    categoryId: string,
+  ) {
+    event.preventDefault()
+    const sourceCategoryId =
+      draggingId || event.dataTransfer.getData("text/plain")
+
+    setDraggingId(null)
+    setDragOverId(null)
+    if (!sourceCategoryId || sourceCategoryId === categoryId) return
+
+    setSavingOrder(true)
+    try {
+      await store.reorderExpenseCategories(sourceCategoryId, categoryId)
+    } finally {
+      setSavingOrder(false)
     }
   }
 
@@ -203,7 +260,28 @@ export const CategoryManager = observer(function CategoryManager() {
 
       <CategoryList>
         {store.expenseCategories.map((category) => (
-          <CategoryRow key={category.id}>
+          <CategoryRow
+            key={category.id}
+            $isDragging={draggingId === category.id}
+            $isDragOver={dragOverId === category.id}
+            onDragOver={(event) => handleDragOver(event, category.id)}
+            onDragLeave={(event) => handleDragLeave(event, category.id)}
+            onDrop={(event) => void handleDrop(event, category.id)}
+          >
+            <DragHandle
+              type="button"
+              title="순서 변경"
+              aria-label={`${category.name} 순서 변경`}
+              draggable={!savingOrder}
+              disabled={savingOrder}
+              onDragStart={(event) => handleDragStart(event, category.id)}
+              onDragEnd={() => {
+                setDraggingId(null)
+                setDragOverId(null)
+              }}
+            >
+              <GripVertical size={16} />
+            </DragHandle>
             {editingId === category.id ? (
               <CategoryEditor>
                 <Input
@@ -440,13 +518,68 @@ const CategoryList = styled.div`
   padding: 4px 18px 12px;
 `
 
-const CategoryRow = styled.div`
+const BudgetField = styled.div`
+  display: flex;
+  gap: 6px;
+  input {
+    width: 110px;
+  }
+
+  @media (max-width: 860px) {
+    grid-column: 2 / -1;
+  }
+`
+
+const CategoryRow = styled.div<{
+  $isDragging: boolean
+  $isDragOver: boolean
+}>`
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, auto) auto;
+  grid-template-columns: 28px minmax(0, 1fr) minmax(220px, auto) auto;
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid ${colors.border};
   padding: 10px 0;
+  opacity: ${({ $isDragging }) => ($isDragging ? 0.45 : 1)};
+  background: ${({ $isDragOver }) =>
+    $isDragOver ? "rgba(45, 106, 79, 0.08)" : "transparent"};
+  box-shadow: ${({ $isDragOver }) =>
+    $isDragOver ? `inset 3px 0 0 ${colors.teal}` : "none"};
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
+
+  @media (max-width: 860px) {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+  }
+`
+
+const DragHandle = styled.button`
+  width: 28px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: ${radii.sm};
+  background: transparent;
+  color: ${colors.muted};
+  cursor: grab;
+
+  &:hover,
+  &:focus-visible {
+    background: ${colors.panelSubtle};
+    color: ${colors.ink};
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &:disabled {
+    cursor: progress;
+    opacity: 0.45;
+  }
 `
 
 const CategorySummary = styled.div`
@@ -470,14 +603,6 @@ const CategoryEditor = styled.div`
 const CategoryActions = styled.div`
   display: flex;
   gap: 4px;
-`
-
-const BudgetField = styled.div`
-  display: flex;
-  gap: 6px;
-  input {
-    width: 110px;
-  }
 `
 
 const RecurringSection = styled.div`
