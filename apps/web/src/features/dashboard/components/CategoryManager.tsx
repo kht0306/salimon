@@ -3,7 +3,30 @@
 import styled from "@emotion/styled"
 import { formatMoneyInput } from "@salimon/domain"
 import { colors, radii } from "@salimon/ui-tokens"
-import { Archive, Check, GripVertical, Pencil, Plus, X } from "lucide-react"
+import {
+  Archive,
+  BookOpen,
+  BriefcaseBusiness,
+  Bus,
+  Check,
+  Circle,
+  CirclePlus,
+  Coffee,
+  Ellipsis,
+  GripVertical,
+  HeartPulse,
+  House,
+  Pencil,
+  Plus,
+  Search,
+  ShoppingBag,
+  ShoppingBasket,
+  Ticket,
+  Utensils,
+  Wifi,
+  X,
+  type LucideIcon,
+} from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { type DragEvent, useState } from "react"
 import { useAppStore } from "../StoreProvider"
@@ -32,6 +55,7 @@ const iconOptions = [
   { value: "coffee", label: "카페" },
   { value: "bus", label: "교통" },
   { value: "shopping-bag", label: "쇼핑" },
+  { value: "shopping-basket", label: "생활" },
   { value: "home", label: "주거" },
   { value: "wifi", label: "통신" },
   { value: "heart-pulse", label: "의료" },
@@ -42,7 +66,39 @@ const iconOptions = [
 const iconLabels = Object.fromEntries(
   iconOptions.map((option) => [option.value, option.label]),
 )
+const categoryIconComponents: Record<string, LucideIcon> = {
+  utensils: Utensils,
+  coffee: Coffee,
+  bus: Bus,
+  "shopping-bag": ShoppingBag,
+  "shopping-basket": ShoppingBasket,
+  home: House,
+  wifi: Wifi,
+  "heart-pulse": HeartPulse,
+  ticket: Ticket,
+  "book-open": BookOpen,
+  "more-horizontal": Ellipsis,
+  ellipsis: Ellipsis,
+  "briefcase-business": BriefcaseBusiness,
+  "circle-plus": CirclePlus,
+}
 const hexColorPattern = /^#[0-9a-f]{6}$/i
+type CategorySortMode =
+  | "manual"
+  | "name-asc"
+  | "name-desc"
+  | "budget-asc"
+  | "budget-desc"
+
+function CategoryIcon({ icon, color }: { icon: string; color: string }) {
+  const Icon = categoryIconComponents[icon] ?? Circle
+
+  return (
+    <CategoryIconBadge $color={color} aria-hidden="true">
+      <Icon size={15} strokeWidth={2.2} />
+    </CategoryIconBadge>
+  )
+}
 
 function ColorPicker({
   value,
@@ -98,20 +154,12 @@ function ColorPicker({
   )
 }
 
-export const CategoryManager = observer(function CategoryManager() {
+const CategoryCreateForm = observer(function CategoryCreateForm() {
   const store = useAppStore()
   const [name, setName] = useState("")
   const [icon, setIcon] = useState(iconOptions[0].value)
   const [color, setColor] = useState(colorOptions[0])
   const [budget, setBudget] = useState("")
-  const [budgets, setBudgets] = useState<Record<string, string>>({})
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editName, setEditName] = useState("")
-  const [editIcon, setEditIcon] = useState(iconOptions[0].value)
-  const [editColor, setEditColor] = useState(colorOptions[0])
-  const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [dragOverId, setDragOverId] = useState<string | null>(null)
-  const [savingOrder, setSavingOrder] = useState(false)
 
   async function create() {
     if (
@@ -127,82 +175,8 @@ export const CategoryManager = observer(function CategoryManager() {
     }
   }
 
-  function startEditing(category: (typeof store.expenseCategories)[number]) {
-    setEditingId(category.id)
-    setEditName(category.name)
-    setEditIcon(category.icon)
-    setEditColor(category.color)
-  }
-
-  async function saveEditing() {
-    if (!editingId) return
-    if (
-      await store.updateCategory(editingId, {
-        name: editName,
-        icon: editIcon,
-        color: editColor,
-      })
-    ) {
-      setEditingId(null)
-    }
-  }
-
-  function handleDragStart(
-    event: DragEvent<HTMLButtonElement>,
-    categoryId: string,
-  ) {
-    if (savingOrder) return
-
-    event.dataTransfer.effectAllowed = "move"
-    event.dataTransfer.setData("text/plain", categoryId)
-    setDraggingId(categoryId)
-  }
-
-  function handleDragOver(
-    event: DragEvent<HTMLDivElement>,
-    categoryId: string,
-  ) {
-    if (!draggingId || draggingId === categoryId) return
-
-    event.preventDefault()
-    event.dataTransfer.dropEffect = "move"
-    setDragOverId(categoryId)
-  }
-
-  function handleDragLeave(
-    event: DragEvent<HTMLDivElement>,
-    categoryId: string,
-  ) {
-    const nextTarget = event.relatedTarget
-    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
-      return
-    }
-
-    setDragOverId((current) => (current === categoryId ? null : current))
-  }
-
-  async function handleDrop(
-    event: DragEvent<HTMLDivElement>,
-    categoryId: string,
-  ) {
-    event.preventDefault()
-    const sourceCategoryId =
-      draggingId || event.dataTransfer.getData("text/plain")
-
-    setDraggingId(null)
-    setDragOverId(null)
-    if (!sourceCategoryId || sourceCategoryId === categoryId) return
-
-    setSavingOrder(true)
-    try {
-      await store.reorderExpenseCategories(sourceCategoryId, categoryId)
-    } finally {
-      setSavingOrder(false)
-    }
-  }
-
   return (
-    <Panel>
+    <>
       <PanelHeader>
         <PanelTitle>지출 카테고리</PanelTitle>
         <Button
@@ -218,7 +192,9 @@ export const CategoryManager = observer(function CategoryManager() {
 
       <CategoryComposer>
         <Field>
-          <span>이름<RequiredMark>*</RequiredMark></span>
+          <span>
+            이름<RequiredMark>*</RequiredMark>
+          </span>
           <Input
             required
             value={name}
@@ -226,7 +202,9 @@ export const CategoryManager = observer(function CategoryManager() {
           />
         </Field>
         <Field>
-          <span>아이콘<RequiredMark>*</RequiredMark></span>
+          <span>
+            아이콘<RequiredMark>*</RequiredMark>
+          </span>
           <Select
             required
             value={icon}
@@ -257,9 +235,182 @@ export const CategoryManager = observer(function CategoryManager() {
           required
         />
       </CategoryComposer>
+    </>
+  )
+})
+
+export const CategoryManager = observer(function CategoryManager() {
+  const store = useAppStore()
+  const [budgets, setBudgets] = useState<Record<string, string>>({})
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editIcon, setEditIcon] = useState(iconOptions[0].value)
+  const [editColor, setEditColor] = useState(colorOptions[0])
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [savingOrder, setSavingOrder] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [sortMode, setSortMode] = useState<CategorySortMode>("manual")
+
+  const normalizedQuery = searchQuery.trim().toLocaleLowerCase("ko-KR")
+  const dndEnabled = sortMode === "manual" && normalizedQuery.length === 0
+  const budgetByCategoryId = new Map(
+    store.selectedMonthBudgets.map((item) => [
+      item.category.id,
+      item.amount,
+    ]),
+  )
+  const visibleCategories = store.expenseCategories
+    .filter((category) =>
+      normalizedQuery
+        ? `${category.name} ${iconLabels[category.icon] ?? category.icon}`
+            .toLocaleLowerCase("ko-KR")
+            .includes(normalizedQuery)
+        : true,
+    )
+    .sort((first, second) => {
+      if (sortMode === "name-asc") {
+        return first.name.localeCompare(second.name, "ko-KR")
+      }
+      if (sortMode === "name-desc") {
+        return second.name.localeCompare(first.name, "ko-KR")
+      }
+      if (sortMode === "budget-asc") {
+        return (
+          (budgetByCategoryId.get(first.id) ?? 0) -
+            (budgetByCategoryId.get(second.id) ?? 0) ||
+          first.sortOrder - second.sortOrder
+        )
+      }
+      if (sortMode === "budget-desc") {
+        return (
+          (budgetByCategoryId.get(second.id) ?? 0) -
+            (budgetByCategoryId.get(first.id) ?? 0) ||
+          first.sortOrder - second.sortOrder
+        )
+      }
+      return first.sortOrder - second.sortOrder
+    })
+
+  function startEditing(category: (typeof store.expenseCategories)[number]) {
+    setEditingId(category.id)
+    setEditName(category.name)
+    setEditIcon(category.icon)
+    setEditColor(category.color)
+  }
+
+  async function saveEditing() {
+    if (!editingId) return
+    if (
+      await store.updateCategory(editingId, {
+        name: editName,
+        icon: editIcon,
+        color: editColor,
+      })
+    ) {
+      setEditingId(null)
+    }
+  }
+
+  function handleDragStart(
+    event: DragEvent<HTMLButtonElement>,
+    categoryId: string,
+  ) {
+    if (savingOrder || !dndEnabled) return
+
+    event.dataTransfer.effectAllowed = "move"
+    event.dataTransfer.setData("text/plain", categoryId)
+    setDraggingId(categoryId)
+  }
+
+  function handleDragOver(
+    event: DragEvent<HTMLDivElement>,
+    categoryId: string,
+  ) {
+    if (!dndEnabled || !draggingId || draggingId === categoryId) return
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "move"
+    setDragOverId(categoryId)
+  }
+
+  function handleDragLeave(
+    event: DragEvent<HTMLDivElement>,
+    categoryId: string,
+  ) {
+    const nextTarget = event.relatedTarget
+    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+      return
+    }
+
+    setDragOverId((current) => (current === categoryId ? null : current))
+  }
+
+  async function handleDrop(
+    event: DragEvent<HTMLDivElement>,
+    categoryId: string,
+  ) {
+    event.preventDefault()
+    if (!dndEnabled) return
+
+    const sourceCategoryId =
+      draggingId || event.dataTransfer.getData("text/plain")
+
+    setDraggingId(null)
+    setDragOverId(null)
+    if (!sourceCategoryId || sourceCategoryId === categoryId) return
+
+    setSavingOrder(true)
+    try {
+      await store.reorderExpenseCategories(sourceCategoryId, categoryId)
+    } finally {
+      setSavingOrder(false)
+    }
+  }
+
+  return (
+    <Panel>
+      <CategoryCreateForm />
+
+      <CategoryListToolbar>
+        <CategorySearchField>
+          <Search size={15} aria-hidden="true" />
+          <Input
+            type="search"
+            aria-label="카테고리 검색"
+            placeholder="카테고리 검색"
+            value={searchQuery}
+            onChange={(event) => {
+              setSearchQuery(event.target.value)
+              setDraggingId(null)
+              setDragOverId(null)
+            }}
+          />
+        </CategorySearchField>
+        <CategorySortSelect
+          aria-label="카테고리 정렬"
+          value={sortMode}
+          onChange={(event) => {
+            setSortMode(event.target.value as CategorySortMode)
+            setDraggingId(null)
+            setDragOverId(null)
+          }}
+        >
+          <option value="manual">사용자 지정 순서</option>
+          <option value="name-asc">이름 오름차순</option>
+          <option value="name-desc">이름 내림차순</option>
+          <option value="budget-asc">예산 낮은 순</option>
+          <option value="budget-desc">예산 높은 순</option>
+        </CategorySortSelect>
+        {!dndEnabled ? (
+          <ReorderHint>
+            검색·별도 정렬 중에는 순서 변경이 꺼집니다.
+          </ReorderHint>
+        ) : null}
+      </CategoryListToolbar>
 
       <CategoryList>
-        {store.expenseCategories.map((category) => (
+        {visibleCategories.map((category) => (
           <CategoryRow
             key={category.id}
             $isDragging={draggingId === category.id}
@@ -270,10 +421,14 @@ export const CategoryManager = observer(function CategoryManager() {
           >
             <DragHandle
               type="button"
-              title="순서 변경"
+              title={
+                dndEnabled
+                  ? "순서 변경"
+                  : "사용자 지정 순서에서만 변경할 수 있습니다"
+              }
               aria-label={`${category.name} 순서 변경`}
-              draggable={!savingOrder}
-              disabled={savingOrder}
+              draggable={dndEnabled && !savingOrder}
+              disabled={!dndEnabled || savingOrder}
               onDragStart={(event) => handleDragStart(event, category.id)}
               onDragEnd={() => {
                 setDraggingId(null)
@@ -312,7 +467,7 @@ export const CategoryManager = observer(function CategoryManager() {
               </CategoryEditor>
             ) : (
               <CategorySummary>
-                <ColorDot $color={category.color} />
+                <CategoryIcon icon={category.icon} color={category.color} />
                 <CategoryInfo>
                   <strong>{category.name}</strong>
                   <span>
@@ -329,9 +484,7 @@ export const CategoryManager = observer(function CategoryManager() {
                 placeholder="월 예산"
                 value={formatMoneyInput(
                   budgets[category.id] ??
-                    store.selectedMonthBudgets.find(
-                      (item) => item.category.id === category.id,
-                    )?.amount ??
+                    budgetByCategoryId.get(category.id) ??
                     "",
                 )}
                 onChange={(event) =>
@@ -348,9 +501,7 @@ export const CategoryManager = observer(function CategoryManager() {
                     category.id,
                     Number(
                       budgets[category.id] ??
-                        store.selectedMonthBudgets.find(
-                          (item) => item.category.id === category.id,
-                        )?.amount ??
+                        budgetByCategoryId.get(category.id) ??
                         0,
                     ),
                   )
@@ -406,6 +557,9 @@ export const CategoryManager = observer(function CategoryManager() {
             </CategoryActions>
           </CategoryRow>
         ))}
+        {visibleCategories.length === 0 ? (
+          <EmptyCategoryList>검색 결과가 없습니다.</EmptyCategoryList>
+        ) : null}
       </CategoryList>
 
       <RecurringSection>
@@ -518,6 +672,57 @@ const CategoryList = styled.div`
   padding: 4px 18px 12px;
 `
 
+const CategoryListToolbar = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px 8px;
+
+  @media (max-width: 720px) {
+    align-items: stretch;
+    flex-direction: column;
+  }
+`
+
+const CategorySearchField = styled.div`
+  position: relative;
+  flex: 1;
+
+  svg {
+    position: absolute;
+    top: 50%;
+    left: 11px;
+    z-index: 1;
+    color: ${colors.muted};
+    pointer-events: none;
+    transform: translateY(-50%);
+  }
+
+  input {
+    padding-left: 34px;
+  }
+`
+
+const CategorySortSelect = styled(Select)`
+  width: 180px;
+
+  @media (max-width: 720px) {
+    width: 100%;
+  }
+`
+
+const ReorderHint = styled.span`
+  color: ${colors.muted};
+  font-size: 12px;
+`
+
+const EmptyCategoryList = styled.div`
+  padding: 28px 12px;
+  color: ${colors.muted};
+  text-align: center;
+  font-size: 13px;
+`
+
 const BudgetField = styled.div`
   display: flex;
   gap: 6px;
@@ -577,7 +782,7 @@ const DragHandle = styled.button`
   }
 
   &:disabled {
-    cursor: progress;
+    cursor: not-allowed;
     opacity: 0.45;
   }
 `
@@ -621,11 +826,16 @@ const RecurringRow = styled.div`
   font-size: 13px;
 `
 
-const ColorDot = styled.span<{ $color: string }>`
-  width: 14px;
-  height: 14px;
+const CategoryIconBadge = styled.span<{ $color: string }>`
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  flex: 0 0 30px;
+  place-items: center;
   border-radius: ${radii.round};
-  background: ${({ $color }) => $color};
+  background: ${({ $color }) =>
+    `color-mix(in srgb, ${$color} 14%, white)`};
+  color: ${({ $color }) => $color};
 `
 
 const CategoryInfo = styled.div`
