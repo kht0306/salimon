@@ -14,6 +14,7 @@ import {
   Panel,
   PanelHeader,
   PanelTitle,
+  RequiredMark,
   Textarea,
 } from "../styles"
 
@@ -81,8 +82,9 @@ export const SampleSubmissionPanel = observer(function SampleSubmissionPanel() {
           />
         </Field>
         <Field>
-          문자 예시
+          <span>문자 예시<RequiredMark>*</RequiredMark></span>
           <Textarea
+            required
             value={message}
             onChange={(event) => setMessage(event.target.value)}
           />
@@ -95,10 +97,13 @@ export const SampleSubmissionPanel = observer(function SampleSubmissionPanel() {
         <Consent>
           <input
             type="checkbox"
+            required
             checked={consent}
             onChange={(event) => setConsent(event.target.checked)}
           />
-          익명화된 샘플 저장 동의
+          <span>
+            익명화된 샘플 저장 동의<RequiredMark>*</RequiredMark>
+          </span>
         </Consent>
       </Preview>
 

@@ -622,6 +622,55 @@ export class AppStore {
     }
   }
 
+  async updateCard(
+    cardId: string,
+    input: {
+      ownerUserId: string
+      name: string
+      issuer: string
+      last4?: string
+      paymentDay: number
+      billingPeriodEndDay: number
+      billingPeriodEndMonthOffset: -1 | 0
+      isPrimary: boolean
+    },
+  ): Promise<boolean> {
+    const card = this.currentLedgerCards.find((item) => item.id === cardId)
+    if (!card || !input.name.trim() || !input.issuer.trim()) {
+      this.notify("카드사와 카드 별칭을 입력해 주세요.", "error")
+      return false
+    }
+    if (
+      !Number.isSafeInteger(input.paymentDay) ||
+      input.paymentDay < 1 ||
+      input.paymentDay > 31 ||
+      !Number.isSafeInteger(input.billingPeriodEndDay) ||
+      input.billingPeriodEndDay < 1 ||
+      input.billingPeriodEndDay > 31
+    ) {
+      this.notify("결제일과 이용기간 종료일을 확인해 주세요.", "error")
+      return false
+    }
+    try {
+      const isFirstCard = !this.currentLedgerCards.some(
+        (item) =>
+          item.id !== cardId && item.ownerUserId === input.ownerUserId,
+      )
+      await this.repository.updateCard(cardId, {
+        ...input,
+        name: input.name.trim(),
+        issuer: input.issuer.trim(),
+        isPrimary: isFirstCard || input.isPrimary,
+      })
+      await this.refreshFinanceData()
+      this.notify("카드를 수정했습니다.")
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
   async setCardActive(cardId: string, isActive: boolean): Promise<void> {
     try {
       await this.repository.setCardActive(cardId, isActive)
