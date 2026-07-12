@@ -13,7 +13,7 @@ import type { Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import { Check, Pencil, Plus, Save, Trash2, X } from "lucide-react"
 import { observer } from "mobx-react-lite"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useAppStore } from "../StoreProvider"
 import {
   Button,
@@ -43,6 +43,8 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const store = useAppStore()
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [isAdding, setAdding] = useState(false)
+  const [isSaving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const selectedDate = store.selectedDate
   const initialDraft = useMemo(
     () => ({
@@ -83,6 +85,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
       ? splitInstallmentPrincipal(amount, installmentMonths)
       : []
   const installmentMonthlyAmount = installmentAmounts[0] ?? amount
+  const [transactionDate = "", transactionTimeValue = "12:00"] =
+    draft.transactionAt.split("T")
+  const transactionTime = transactionTimeValue.slice(0, 5)
   const canSave =
     Number.isSafeInteger(amount) &&
     amount > 0 &&
@@ -155,42 +160,51 @@ export const TransactionPanel = observer(function TransactionPanel() {
   }
 
   async function save() {
+    if (savingRef.current) return
+
     const amount = Number(draft.amount)
     if (!Number.isSafeInteger(amount) || amount <= 0) {
       return
     }
 
-    const saved = await store.saveTransaction({
-      id: editing?.id,
-      ledgerId: store.selectedLedgerId,
-      type: draft.type as "expense" | "income" | "transfer",
-      status: draft.status as "pending" | "confirmed" | "excluded",
-      amount,
-      transactionAt: draft.transactionAt,
-      categoryId: draft.categoryId || undefined,
-      merchantName: draft.merchantName || undefined,
-      memo: draft.memo || undefined,
-      actorUserId: draft.actorUserId || undefined,
-      recurringType:
-        draft.recurringType === "none"
-          ? undefined
-          : (draft.recurringType as "fixed" | "installment"),
-      recurringRuleId: draft.recurringRuleId,
-      paymentMethodId:
-        draft.type === "expense"
-          ? draft.paymentMethodId || undefined
-          : undefined,
-      installmentMonths:
-        draft.recurringType === "installment"
-          ? Number(draft.installmentMonths)
-          : undefined,
-      installmentAmountType:
-        draft.recurringType === "installment"
-          ? draft.installmentAmountType
-          : undefined,
-    })
-    if (saved) {
-      closeForm()
+    savingRef.current = true
+    setSaving(true)
+    try {
+      const saved = await store.saveTransaction({
+        id: editing?.id,
+        ledgerId: store.selectedLedgerId,
+        type: draft.type as "expense" | "income" | "transfer",
+        status: draft.status as "pending" | "confirmed" | "excluded",
+        amount,
+        transactionAt: draft.transactionAt,
+        categoryId: draft.categoryId || undefined,
+        merchantName: draft.merchantName || undefined,
+        memo: draft.memo || undefined,
+        actorUserId: draft.actorUserId || undefined,
+        recurringType:
+          draft.recurringType === "none"
+            ? undefined
+            : (draft.recurringType as "fixed" | "installment"),
+        recurringRuleId: draft.recurringRuleId,
+        paymentMethodId:
+          draft.type === "expense"
+            ? draft.paymentMethodId || undefined
+            : undefined,
+        installmentMonths:
+          draft.recurringType === "installment"
+            ? Number(draft.installmentMonths)
+            : undefined,
+        installmentAmountType:
+          draft.recurringType === "installment"
+            ? draft.installmentAmountType
+            : undefined,
+      })
+      if (saved) {
+        closeForm()
+      }
+    } finally {
+      savingRef.current = false
+      setSaving(false)
     }
   }
 
@@ -403,14 +417,32 @@ export const TransactionPanel = observer(function TransactionPanel() {
 
           <Field>
             <span>거래일시<RequiredMark>*</RequiredMark></span>
-            <Input
-              required
-              type="datetime-local"
-              value={draft.transactionAt}
-              onChange={(event) =>
-                setDraft({ ...draft, transactionAt: event.target.value })
-              }
-            />
+            <DateTimeInputs>
+              <Input
+                required
+                type="date"
+                aria-label="거래 날짜"
+                value={transactionDate}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    transactionAt: `${event.target.value}T${transactionTime}`,
+                  })
+                }
+              />
+              <Input
+                required
+                type="time"
+                aria-label="거래 시간"
+                value={transactionTime}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    transactionAt: `${transactionDate}T${event.target.value}`,
+                  })
+                }
+              />
+            </DateTimeInputs>
           </Field>
 
           <Field>
@@ -471,10 +503,10 @@ export const TransactionPanel = observer(function TransactionPanel() {
 
           <Button
             $variant="primary"
-            disabled={!canSave}
+            disabled={!canSave || isSaving}
             onClick={() => void save()}
           >
-            <Save size={16} /> 저장
+            <Save size={16} /> {isSaving ? "저장 중" : "저장"}
           </Button>
         </Editor>
       ) : null}
@@ -672,6 +704,12 @@ const AmountControl = styled.div<{ $withType: boolean }>`
   display: grid;
   grid-template-columns: ${({ $withType }) =>
     $withType ? "130px minmax(0, 1fr)" : "minmax(0, 1fr)"};
+  gap: 8px;
+`
+
+const DateTimeInputs = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
   gap: 8px;
 `
 

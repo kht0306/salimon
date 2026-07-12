@@ -208,7 +208,7 @@ export const Textarea = styled.textarea`
 
 export const MetricRow = styled.div`
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   border-top: 1px solid ${colors.border};
   border-bottom: 1px solid ${colors.border};
 `
@@ -218,7 +218,7 @@ export const Metric = styled.div`
   padding: ${spacing[3]} ${spacing[2]};
 
   & + & {
-    border-left: 1px solid ${colors.border};
+    border-top: 1px solid ${colors.border};
   }
 `
 
