@@ -1,24 +1,24 @@
 import type { Category, TransactionType } from "@salimon/types"
 
 export const expenseCategorySeeds = [
-  { name: "식비", icon: "utensils", color: "#2d6a4f" },
-  { name: "카페/간식", icon: "coffee", color: "#9c6644" },
-  { name: "교통", icon: "bus", color: "#277da1" },
-  { name: "쇼핑", icon: "shopping-bag", color: "#b56576" },
-  { name: "생활", icon: "home", color: "#4d908e" },
-  { name: "주거/통신", icon: "wifi", color: "#577590" },
-  { name: "의료", icon: "heart-pulse", color: "#e76f51" },
-  { name: "문화/여가", icon: "ticket", color: "#7b2cbf" },
-  { name: "교육", icon: "book-open", color: "#f4a261" },
-  { name: "기타", icon: "more-horizontal", color: "#6c757d" },
+  { name: "식비", icon: "utensils", color: "#d65a3a" },
+  { name: "카페/간식", icon: "coffee", color: "#d99a24" },
+  { name: "교통", icon: "bus", color: "#3b7f9d" },
+  { name: "쇼핑", icon: "shopping-bag", color: "#a65e78" },
+  { name: "생활", icon: "shopping-basket", color: "#3f8a70" },
+  { name: "주거/통신", icon: "wifi", color: "#586f8f" },
+  { name: "의료", icon: "heart-pulse", color: "#c85b52" },
+  { name: "문화/여가", icon: "ticket", color: "#755aa8" },
+  { name: "교육", icon: "book-open", color: "#b8783e" },
+  { name: "기타", icon: "more-horizontal", color: "#727a82" },
 ] as const
 
 export const incomeCategorySeeds = [
-  { name: "급여", icon: "briefcase-business", color: "#2a9d8f" },
-  { name: "용돈", icon: "gift", color: "#f77f00" },
-  { name: "이자", icon: "landmark", color: "#457b9d" },
-  { name: "환급", icon: "rotate-ccw", color: "#06d6a0" },
-  { name: "기타", icon: "more-horizontal", color: "#6c757d" },
+  { name: "급여", icon: "briefcase-business", color: "#2d6a4f" },
+  { name: "용돈", icon: "gift", color: "#ce7b32" },
+  { name: "이자", icon: "landmark", color: "#416c8c" },
+  { name: "환급", icon: "rotate-ccw", color: "#2f8f83" },
+  { name: "기타", icon: "circle-plus", color: "#685a8f" },
 ] as const
 
 export function createDefaultCategories(ledgerId: string, userId: string): Category[] {
