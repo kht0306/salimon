@@ -57,12 +57,18 @@ export function createCategory(
 }
 
 export function findOtherCategory(categories: Category[], ledgerId: string): Category | undefined {
-  return categories.find(
+  const expenseCategories = categories.filter(
     (category) =>
       category.ledgerId === ledgerId &&
       category.type === "expense" &&
-      category.name === "기타" &&
       !category.isArchived,
+  )
+
+  return (
+    expenseCategories.find((category) => category.name === "기타") ??
+    expenseCategories
+      .filter((category) => category.isDefault)
+      .sort((a, b) => b.sortOrder - a.sortOrder)[0]
   )
 }
 

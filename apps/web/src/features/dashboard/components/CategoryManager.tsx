@@ -3,7 +3,7 @@
 import styled from "@emotion/styled"
 import { formatMoneyInput } from "@salimon/domain"
 import { colors, radii } from "@salimon/ui-tokens"
-import { Archive, Plus } from "lucide-react"
+import { Archive, Check, Pencil, Plus, X } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useState } from "react"
 import { useAppStore } from "../StoreProvider"
@@ -32,6 +32,10 @@ const iconOptions = [
   { value: "bus", label: "교통" },
   { value: "shopping-bag", label: "쇼핑" },
   { value: "home", label: "주거" },
+  { value: "wifi", label: "통신" },
+  { value: "heart-pulse", label: "의료" },
+  { value: "ticket", label: "문화/여가" },
+  { value: "book-open", label: "교육" },
   { value: "more-horizontal", label: "기타" },
 ]
 const iconLabels = Object.fromEntries(
@@ -44,10 +48,34 @@ export const CategoryManager = observer(function CategoryManager() {
   const [icon, setIcon] = useState(iconOptions[0].value)
   const [color, setColor] = useState(colorOptions[0])
   const [budgets, setBudgets] = useState<Record<string, string>>({})
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editIcon, setEditIcon] = useState(iconOptions[0].value)
+  const [editColor, setEditColor] = useState(colorOptions[0])
 
   async function create() {
     if (await store.createExpenseCategory(name, icon, color)) {
       setName("")
+    }
+  }
+
+  function startEditing(category: (typeof store.expenseCategories)[number]) {
+    setEditingId(category.id)
+    setEditName(category.name)
+    setEditIcon(category.icon)
+    setEditColor(category.color)
+  }
+
+  async function saveEditing() {
+    if (!editingId) return
+    if (
+      await store.updateCategory(editingId, {
+        name: editName,
+        icon: editIcon,
+        color: editColor,
+      })
+    ) {
+      setEditingId(null)
     }
   }
 
@@ -102,14 +130,54 @@ export const CategoryManager = observer(function CategoryManager() {
       <CategoryList>
         {store.expenseCategories.map((category) => (
           <CategoryRow key={category.id}>
-            <ColorDot $color={category.color} />
-            <CategoryInfo>
-              <strong>{category.name}</strong>
-              <span>
-                {category.isDefault ? "기본" : "사용자"} ·{" "}
-                {iconLabels[category.icon] ?? category.icon}
-              </span>
-            </CategoryInfo>
+            {editingId === category.id ? (
+              <CategoryEditor>
+                <Input
+                  aria-label={`${category.name} 카테고리 이름`}
+                  value={editName}
+                  onChange={(event) => setEditName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void saveEditing()
+                    if (event.key === "Escape") setEditingId(null)
+                  }}
+                />
+                <Select
+                  aria-label={`${category.name} 카테고리 아이콘`}
+                  value={editIcon}
+                  onChange={(event) => setEditIcon(event.target.value)}
+                >
+                  {iconOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+                <Swatches aria-label={`${category.name} 카테고리 색상`}>
+                  {colorOptions.map((option) => (
+                    <Swatch
+                      key={option}
+                      type="button"
+                      title={option}
+                      aria-label={option}
+                      $color={option}
+                      $selected={editColor.toLowerCase() === option}
+                      onClick={() => setEditColor(option)}
+                    />
+                  ))}
+                </Swatches>
+              </CategoryEditor>
+            ) : (
+              <CategorySummary>
+                <ColorDot $color={category.color} />
+                <CategoryInfo>
+                  <strong>{category.name}</strong>
+                  <span>
+                    {category.isDefault ? "기본" : "사용자"} ·{" "}
+                    {iconLabels[category.icon] ?? category.icon}
+                  </span>
+                </CategoryInfo>
+              </CategorySummary>
+            )}
             <BudgetField>
               <Input
                 aria-label={`${category.name} ${store.selectedMonth} 예산`}
@@ -147,15 +215,45 @@ export const CategoryManager = observer(function CategoryManager() {
                 예산 저장
               </Button>
             </BudgetField>
-            <IconButton
-              $variant="danger"
-              title="카테고리 비활성화"
-              aria-label={`${category.name} 비활성화`}
-              disabled={category.isDefault || category.name === "기타"}
-              onClick={() => void store.archiveCategory(category.id)}
-            >
-              <Archive size={15} />
-            </IconButton>
+            <CategoryActions>
+              {editingId === category.id ? (
+                <>
+                  <IconButton
+                    $variant="primary"
+                    title="카테고리 수정 저장"
+                    aria-label={`${category.name} 수정 저장`}
+                    disabled={!editName.trim()}
+                    onClick={() => void saveEditing()}
+                  >
+                    <Check size={15} />
+                  </IconButton>
+                  <IconButton
+                    title="카테고리 수정 취소"
+                    aria-label={`${category.name} 수정 취소`}
+                    onClick={() => setEditingId(null)}
+                  >
+                    <X size={15} />
+                  </IconButton>
+                </>
+              ) : (
+                <IconButton
+                  title="카테고리 수정"
+                  aria-label={`${category.name} 수정`}
+                  onClick={() => startEditing(category)}
+                >
+                  <Pencil size={15} />
+                </IconButton>
+              )}
+              <IconButton
+                $variant="danger"
+                title="카테고리 비활성화"
+                aria-label={`${category.name} 비활성화`}
+                disabled={category.isDefault || category.name === "기타"}
+                onClick={() => void store.archiveCategory(category.id)}
+              >
+                <Archive size={15} />
+              </IconButton>
+            </CategoryActions>
           </CategoryRow>
         ))}
       </CategoryList>
@@ -227,11 +325,34 @@ const CategoryList = styled.div`
 
 const CategoryRow = styled.div`
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(220px, auto) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, auto) auto;
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid ${colors.border};
   padding: 10px 0;
+`
+
+const CategorySummary = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+`
+
+const CategoryEditor = styled.div`
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 110px auto;
+  align-items: center;
+  gap: 8px;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+`
+
+const CategoryActions = styled.div`
+  display: flex;
+  gap: 4px;
 `
 
 const BudgetField = styled.div`

@@ -429,13 +429,40 @@ export class AppStore {
   async updateCategory(
     categoryId: string,
     patch: Partial<Pick<Category, "name" | "icon" | "color">>,
-  ): Promise<void> {
+  ): Promise<boolean> {
+    const category = this.data.categories.find((item) => item.id === categoryId)
+    const name = patch.name?.trim()
+    if (!category || (patch.name !== undefined && !name)) {
+      this.notify("카테고리 이름을 입력해 주세요.", "error")
+      return false
+    }
+
+    if (
+      name &&
+      this.data.categories.some(
+        (item) =>
+          item.id !== categoryId &&
+          item.ledgerId === category.ledgerId &&
+          item.type === category.type &&
+          !item.isArchived &&
+          item.name.toLowerCase() === name.toLowerCase(),
+      )
+    ) {
+      this.notify("이미 같은 이름의 카테고리가 있습니다.", "error")
+      return false
+    }
+
     try {
-      await this.repository.updateCategory(categoryId, patch)
+      await this.repository.updateCategory(categoryId, {
+        ...patch,
+        ...(name ? { name } : {}),
+      })
       await this.refreshFinanceData()
       this.notify("카테고리를 수정했습니다.")
+      return this.dataState === "ready"
     } catch (error) {
       this.setDataError(error)
+      return false
     }
   }
 
