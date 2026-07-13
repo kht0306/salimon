@@ -32,6 +32,7 @@ export const CalendarGrid = observer(function CalendarGrid() {
     }
     if (
       store.transactionEditorOpen &&
+      store.transactionEditorDirty &&
       !window.confirm("작성 중인 거래 등록 또는 수정을 취소하시겠습니까?")
     ) {
       return
