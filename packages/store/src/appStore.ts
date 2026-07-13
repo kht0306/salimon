@@ -66,6 +66,7 @@ export class AppStore {
   selectedMonth: string
   selectedDate: string
   transactionEditorOpen = false
+  transactionEditorDirty = false
   activeView:
     | "calendar"
     | "transactions"
@@ -397,6 +398,13 @@ export class AppStore {
 
   setTransactionEditorOpen(open: boolean): void {
     this.transactionEditorOpen = open
+    if (!open) {
+      this.transactionEditorDirty = false
+    }
+  }
+
+  setTransactionEditorDirty(dirty: boolean): void {
+    this.transactionEditorDirty = dirty
   }
 
   moveSelectedMonth(amount: number): void {

@@ -66,6 +66,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
   )
 
   const [draft, setDraft] = useState(initialDraft)
+  const initialDraftRef = useRef(initialDraft)
 
   useEffect(
     () => () => {
@@ -73,6 +74,14 @@ export const TransactionPanel = observer(function TransactionPanel() {
     },
     [store],
   )
+
+  useEffect(() => {
+    const dirty =
+      store.transactionEditorOpen &&
+      isAdding &&
+      JSON.stringify(draft) !== JSON.stringify(initialDraftRef.current)
+    store.setTransactionEditorDirty(dirty)
+  }, [draft, isAdding, store, store.transactionEditorOpen])
 
   const amount = Number(draft.amount)
   const installmentMonths = Number(draft.installmentMonths)
@@ -103,9 +112,11 @@ export const TransactionPanel = observer(function TransactionPanel() {
           amount >= installmentMonths)))
 
   function openNew() {
+    initialDraftRef.current = initialDraft
     setEditing(null)
     setDraft(initialDraft)
     setAdding(true)
+    store.setTransactionEditorDirty(false)
     store.setTransactionEditorOpen(true)
   }
 
@@ -123,8 +134,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
             !item.deletedAt,
         )
       : undefined
-    setEditing(transaction)
-    setDraft({
+    const editDraft = {
       amount: String(
         recurringRule?.installmentAmountType === "principal"
           ? (recurringRule.installmentPrincipal ?? transaction.amount)
@@ -148,8 +158,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
           firstInstallment?.transactionAt ??
           transaction.transactionAt,
       ),
-    })
+    }
+    initialDraftRef.current = editDraft
+    setEditing(transaction)
+    setDraft(editDraft)
     setAdding(true)
+    store.setTransactionEditorDirty(false)
     store.setTransactionEditorOpen(true)
   }
 
@@ -225,7 +239,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
         </IconButton>
       </PanelTop>
 
-      {isAdding ? (
+      {isAdding && store.transactionEditorOpen ? (
         <Editor>
           <EditorHeader>
             <strong>{editing ? "거래 수정" : "거래 추가"}</strong>
