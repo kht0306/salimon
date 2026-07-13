@@ -196,7 +196,7 @@ export class SupabaseFinanceRepository {
 
     if (input.recurringType === "installment") {
       const { data, error } = await client.rpc(
-        "save_purchase_day_installment_series",
+        "save_card_installment_series_v2",
         {
           p_rule_id: input.recurringRuleId ?? null,
           p_ledger_id: input.ledgerId,
