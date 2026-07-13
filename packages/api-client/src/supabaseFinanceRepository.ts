@@ -6,6 +6,7 @@ import type {
   Ledger,
   LedgerInvitation,
   LedgerMember,
+  LedgerType,
   PaymentMethod,
   Profile,
   RecurringRule,
@@ -551,17 +552,32 @@ export class SupabaseFinanceRepository {
     throwIfError(error)
   }
 
-  async createSharedLedger(name: string): Promise<string> {
+  async createLedger(input: {
+    name: string
+    type: LedgerType
+    setDefault: boolean
+  }): Promise<string> {
     const client = requireSupabaseClient()
-    const { data, error } = await client.rpc("create_shared_ledger", {
-      ledger_name: name,
+    const { data, error } = await client.rpc("create_ledger", {
+      p_name: input.name,
+      p_type: input.type,
+      p_set_default: input.setDefault,
     })
     throwIfError(error)
     if (typeof data !== "string") {
-      throw new Error("공동 가계부 생성 결과를 확인할 수 없습니다.")
+      throw new Error("가계부 생성 결과를 확인할 수 없습니다.")
     }
 
     return data
+  }
+
+  async renameLedger(ledgerId: string, name: string): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("rename_ledger", {
+      p_ledger_id: ledgerId,
+      p_name: name,
+    })
+    throwIfError(error)
   }
 
   async setDefaultLedger(ledgerId: string): Promise<void> {

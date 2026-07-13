@@ -27,6 +27,7 @@ import type {
   CategoryUsageType,
   Ledger,
   LedgerInvitation,
+  LedgerType,
   LocalSmsCandidate,
   Transaction,
   TransactionStatus,
@@ -54,6 +55,12 @@ export interface TransactionDraft {
   paymentMethodId?: string
 }
 
+export interface LedgerCreationInput {
+  name: string
+  type: LedgerType
+  setDefault: boolean
+}
+
 export class AppStore {
   private repository: SupabaseFinanceRepository
   private toastTimer?: ReturnType<typeof setTimeout>
@@ -74,7 +81,7 @@ export class AppStore {
     | "categories"
     | "cards"
     | "settlement"
-    | "shared"
+    | "ledger"
     | "sms"
     | "samples"
     | "connection" = "calendar"
@@ -83,6 +90,7 @@ export class AppStore {
   authError: string | null = null
   dataState: "idle" | "loading" | "ready" | "error" = "idle"
   dataError: string | null = null
+  ledgerMutationState: "idle" | "creating" | "renaming" = "idle"
   private initializedWorkspaceUserId: string | null = null
   private workspaceInitialization: Promise<void> | null = null
   supabaseConnection: SupabaseConnectionCheck = {
@@ -467,9 +475,7 @@ export class AppStore {
           : this.data.categories.find(
               (category) =>
                 category.ledgerId === draft.ledgerId &&
-                category.usageTypes.includes(
-                  draft.type as CategoryUsageType,
-                ) &&
+                category.usageTypes.includes(draft.type as CategoryUsageType) &&
                 !category.isArchived,
             )?.id)
 
@@ -868,23 +874,91 @@ export class AppStore {
     }
   }
 
-  async createSharedLedger(name: string): Promise<boolean> {
-    const trimmed = name.trim()
-    if (!trimmed || !this.authUser) {
+  async createLedger(input: LedgerCreationInput): Promise<boolean> {
+    const name = input.name.trim()
+    if (!this.authUser) {
       return false
     }
 
+    if (!name) {
+      this.notify("가계부 이름을 입력해 주세요.", "error")
+      return false
+    }
+
+    if (name.length > 30) {
+      this.notify("가계부 이름은 30자 이내로 입력해 주세요.", "error")
+      return false
+    }
+
+    if (this.ledgerMutationState !== "idle") return false
+    this.ledgerMutationState = "creating"
+
     try {
-      const ledgerId = await this.repository.createSharedLedger(trimmed)
+      const ledgerId = await this.repository.createLedger({
+        ...input,
+        name,
+      })
       await this.refreshFinanceData()
+      if (this.dataState !== "ready") return false
       runInAction(() => {
         this.selectedLedgerId = ledgerId
+        this.activeView = "calendar"
       })
-      this.notify("공동 가계부를 만들었습니다.")
+      this.notify(
+        `${input.type === "shared" ? "공동" : "개인"} 가계부를 만들었습니다.`,
+      )
       return true
     } catch (error) {
       this.setDataError(error)
       return false
+    } finally {
+      runInAction(() => {
+        this.ledgerMutationState = "idle"
+      })
+    }
+  }
+
+  async renameCurrentLedger(name: string): Promise<boolean> {
+    const trimmed = name.trim()
+    const ledger = this.currentLedger
+    const canRename =
+      Boolean(this.authUser && ledger) &&
+      (ledger?.type === "personal"
+        ? ledger.ownerId === this.authUser?.id
+        : ledger?.role === "owner" || ledger?.role === "admin")
+
+    if (!ledger || !canRename) {
+      this.notify("가계부 이름을 변경할 권한이 없습니다.", "error")
+      return false
+    }
+
+    if (!trimmed) {
+      this.notify("가계부 이름을 입력해 주세요.", "error")
+      return false
+    }
+
+    if (trimmed.length > 30) {
+      this.notify("가계부 이름은 30자 이내로 입력해 주세요.", "error")
+      return false
+    }
+
+    if (trimmed === ledger.name) return true
+    if (this.ledgerMutationState !== "idle") return false
+    this.ledgerMutationState = "renaming"
+
+    try {
+      await this.repository.renameLedger(ledger.id, trimmed)
+      await this.refreshFinanceData()
+      if (this.dataState !== "ready") return false
+      this.notify("가계부 이름을 변경했습니다.")
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    } finally {
+      runInAction(() => {
+        this.ledgerMutationState = "idle"
+      })
     }
   }
 

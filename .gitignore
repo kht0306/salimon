@@ -11,6 +11,7 @@ build/
 coverage/
 *.tsbuildinfo
 *.log
+AGENTS.md
 
 # Vercel local project metadata
 .vercel/
