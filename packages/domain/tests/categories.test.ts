@@ -16,3 +16,12 @@ describe("findOtherCategory", () => {
     expect(findOtherCategory(categories, "ledger-1")?.id).toBe(other.id)
   })
 })
+
+describe("createDefaultCategories", () => {
+  it("provides category choices for income and savings", () => {
+    const categories = createDefaultCategories("ledger-1", "user-1")
+
+    expect(categories.some((category) => category.type === "income")).toBe(true)
+    expect(categories.some((category) => category.type === "saving")).toBe(true)
+  })
+})

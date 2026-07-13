@@ -2,6 +2,7 @@ import type {
   CardMessageSample,
   Category,
   CategoryBudget,
+  CategoryUsageType,
   Ledger,
   LedgerInvitation,
   LedgerMember,
@@ -56,6 +57,7 @@ export class SupabaseFinanceRepository {
       ledgersResult,
       membersResult,
       categoriesResult,
+      categoryUsagesResult,
       budgetsResult,
       rulesResult,
       paymentMethodsResult,
@@ -86,6 +88,7 @@ export class SupabaseFinanceRepository {
           "id, ledger_id, created_by, type, name, icon, color, sort_order, is_default, is_archived",
         )
         .order("sort_order"),
+      client.from("category_usage_types").select("category_id, usage_type"),
       client
         .from("category_budgets")
         .select(
@@ -131,6 +134,7 @@ export class SupabaseFinanceRepository {
       ledgersResult,
       membersResult,
       categoriesResult,
+      categoryUsagesResult,
       budgetsResult,
       rulesResult,
       paymentMethodsResult,
@@ -147,6 +151,16 @@ export class SupabaseFinanceRepository {
     const members = ((membersResult.data ?? []) as Row[]).map((row) =>
       mapMember(row, profile, userId),
     )
+    const categoryUsages = new Map<string, CategoryUsageType[]>()
+    ;((categoryUsagesResult.data ?? []) as Row[]).forEach((row) => {
+      const categoryId = stringValue(row.category_id)
+      const usageType = mapCategoryUsageType(row.usage_type)
+      if (!categoryId || !usageType) return
+      categoryUsages.set(categoryId, [
+        ...(categoryUsages.get(categoryId) ?? []),
+        usageType,
+      ])
+    })
 
     return {
       profile,
@@ -155,7 +169,9 @@ export class SupabaseFinanceRepository {
       ),
       members,
       invitations: ((invitationsResult.data ?? []) as Row[]).map(mapInvitation),
-      categories: ((categoriesResult.data ?? []) as Row[]).map(mapCategory),
+      categories: ((categoriesResult.data ?? []) as Row[]).map((row) =>
+        mapCategory(row, categoryUsages.get(stringValue(row.id))),
+      ),
       categoryBudgets: ((budgetsResult.data ?? []) as Row[]).map(
         mapCategoryBudget,
       ),
@@ -304,9 +320,7 @@ export class SupabaseFinanceRepository {
         issuer: input.issuer,
         visibility: "ledger",
         payment_day: input.isDebit ? 31 : input.paymentDay,
-        billing_period_end_day: input.isDebit
-          ? 31
-          : input.billingPeriodEndDay,
+        billing_period_end_day: input.isDebit ? 31 : input.billingPeriodEndDay,
         billing_period_end_month_offset: input.isDebit
           ? -1
           : input.billingPeriodEndMonthOffset,
@@ -342,9 +356,7 @@ export class SupabaseFinanceRepository {
         issuer: input.issuer,
         last4: input.last4 || null,
         payment_day: input.isDebit ? 31 : input.paymentDay,
-        billing_period_end_day: input.isDebit
-          ? 31
-          : input.billingPeriodEndDay,
+        billing_period_end_day: input.isDebit ? 31 : input.billingPeriodEndDay,
         billing_period_end_month_offset: input.isDebit
           ? -1
           : input.billingPeriodEndMonthOffset,
@@ -460,13 +472,14 @@ export class SupabaseFinanceRepository {
     throwIfError(error)
   }
 
-  async createExpenseCategory(input: {
+  async createCategory(input: {
     ledgerId: string
     userId: string
     name: string
     icon: string
     color: string
     sortOrder: number
+    usageTypes: CategoryUsageType[]
   }): Promise<string> {
     const client = requireSupabaseClient()
     const { data, error } = await client
@@ -474,7 +487,7 @@ export class SupabaseFinanceRepository {
       .insert({
         ledger_id: input.ledgerId,
         created_by: input.userId,
-        type: "expense",
+        type: input.usageTypes[0],
         name: input.name,
         icon: input.icon,
         color: input.color,
@@ -487,12 +500,15 @@ export class SupabaseFinanceRepository {
     if (!data || typeof data.id !== "string") {
       throw new Error("생성한 카테고리를 확인할 수 없습니다.")
     }
+    await this.setCategoryUsageTypes(data.id, input.usageTypes)
     return data.id
   }
 
   async updateCategory(
     categoryId: string,
-    patch: Partial<Pick<Category, "name" | "icon" | "color" | "isArchived">>,
+    patch: Partial<
+      Pick<Category, "name" | "icon" | "color" | "isArchived" | "usageTypes">
+    >,
   ): Promise<void> {
     const client = requireSupabaseClient()
     const payload: Record<string, unknown> = {
@@ -507,6 +523,21 @@ export class SupabaseFinanceRepository {
       .from("categories")
       .update(payload)
       .eq("id", categoryId)
+    throwIfError(error)
+    if (patch.usageTypes !== undefined) {
+      await this.setCategoryUsageTypes(categoryId, patch.usageTypes)
+    }
+  }
+
+  private async setCategoryUsageTypes(
+    categoryId: string,
+    usageTypes: CategoryUsageType[],
+  ): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("set_category_usage_types", {
+      p_category_id: categoryId,
+      p_usage_types: usageTypes,
+    })
     throwIfError(error)
   }
 
@@ -543,10 +574,9 @@ export class SupabaseFinanceRepository {
 
   async convertPersonalLedgerToShared(ledgerId: string): Promise<void> {
     const client = requireSupabaseClient()
-    const { error } = await client.rpc(
-      "convert_personal_ledger_to_shared",
-      { p_ledger_id: ledgerId },
-    )
+    const { error } = await client.rpc("convert_personal_ledger_to_shared", {
+      p_ledger_id: ledgerId,
+    })
     throwIfError(error)
   }
 
@@ -682,12 +712,17 @@ function mapInvitation(row: Row): LedgerInvitation {
   }
 }
 
-function mapCategory(row: Row): Category {
+function mapCategory(row: Row, usageTypes?: CategoryUsageType[]): Category {
+  const type = mapTransactionType(row.type)
   return {
     id: stringValue(row.id),
     ledgerId: stringValue(row.ledger_id),
     createdBy: optionalString(row.created_by),
-    type: mapTransactionType(row.type),
+    type,
+    usageTypes:
+      usageTypes && usageTypes.length > 0
+        ? usageTypes
+        : [type === "income" || type === "saving" ? type : "expense"],
     name: optionalString(row.name) ?? "카테고리",
     icon: optionalString(row.icon) ?? "circle",
     color: optionalString(row.color) ?? "#6c757d",
@@ -695,6 +730,12 @@ function mapCategory(row: Row): Category {
     isDefault: Boolean(row.is_default),
     isArchived: Boolean(row.is_archived),
   }
+}
+
+function mapCategoryUsageType(value: unknown): CategoryUsageType | undefined {
+  return value === "expense" || value === "income" || value === "saving"
+    ? value
+    : undefined
 }
 
 function mapCategoryBudget(row: Row): CategoryBudget {
@@ -847,7 +888,9 @@ function mapRole(value: unknown): Ledger["role"] {
 }
 
 function mapTransactionType(value: unknown): TransactionType {
-  return value === "income" || value === "transfer" ? value : "expense"
+  return value === "income" || value === "transfer" || value === "saving"
+    ? value
+    : "expense"
 }
 
 function mapTransactionStatus(value: unknown): TransactionStatus {

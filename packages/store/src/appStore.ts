@@ -24,6 +24,7 @@ import {
 import { makeAutoObservable, runInAction } from "mobx"
 import type {
   Category,
+  CategoryUsageType,
   Ledger,
   LedgerInvitation,
   LocalSmsCandidate,
@@ -130,8 +131,8 @@ export class AppStore {
   }
 
   get expenseCategories(): Category[] {
-    return this.currentCategories.filter(
-      (category) => category.type === "expense",
+    return this.currentCategories.filter((category) =>
+      category.usageTypes.includes("expense"),
     )
   }
 
@@ -226,6 +227,15 @@ export class AppStore {
       .reduce((sum, transaction) => sum + transaction.amount, 0)
   }
 
+  get monthSavingTotal(): number {
+    return this.monthTransactions
+      .filter(
+        (transaction) =>
+          transaction.type === "saving" && transaction.status !== "excluded",
+      )
+      .reduce((sum, transaction) => sum + transaction.amount, 0)
+  }
+
   get deferredSmsCandidates(): LocalSmsCandidate[] {
     return this.data.smsCandidates.filter(
       (candidate) =>
@@ -242,11 +252,9 @@ export class AppStore {
       !this.data.ledgers.some((ledger) => ledger.id === this.selectedLedgerId)
     ) {
       const defaultLedgerId = this.data.members.find(
-        (member) =>
-          member.userId === this.authUser?.id && member.isDefault,
+        (member) => member.userId === this.authUser?.id && member.isDefault,
       )?.ledgerId
-      this.selectedLedgerId =
-        defaultLedgerId ?? this.data.ledgers[0]?.id ?? ""
+      this.selectedLedgerId = defaultLedgerId ?? this.data.ledgers[0]?.id ?? ""
     }
   }
 
@@ -449,19 +457,28 @@ export class AppStore {
 
     const categoryId =
       draft.categoryId ||
-      (draft.type === "expense"
-        ? findOtherCategory(this.data.categories, draft.ledgerId)?.id
-        : undefined)
+      (draft.type === "transfer"
+        ? this.data.categories.find(
+            (category) =>
+              category.ledgerId === draft.ledgerId && !category.isArchived,
+          )?.id
+        : draft.type === "expense"
+          ? findOtherCategory(this.data.categories, draft.ledgerId)?.id
+          : this.data.categories.find(
+              (category) =>
+                category.ledgerId === draft.ledgerId &&
+                category.usageTypes.includes(
+                  draft.type as CategoryUsageType,
+                ) &&
+                !category.isArchived,
+            )?.id)
 
     try {
-      await this.repository.saveTransaction(
-        this.authUser.id,
-        {
-          ...draft,
-          categoryId,
-          transactionAt: fromDateTimeLocalValue(draft.transactionAt),
-        },
-      )
+      await this.repository.saveTransaction(this.authUser.id, {
+        ...draft,
+        categoryId,
+        transactionAt: fromDateTimeLocalValue(draft.transactionAt),
+      })
       await this.refreshFinanceData()
       this.notify(draft.id ? "거래를 수정했습니다." : "거래를 저장했습니다.")
       return this.dataState === "ready"
@@ -486,10 +503,11 @@ export class AppStore {
     }
   }
 
-  async createExpenseCategory(
+  async createCategory(
     name: string,
     icon: string,
     color: string,
+    usageTypes: CategoryUsageType[],
     budget = 0,
   ): Promise<boolean> {
     const trimmed = name.trim()
@@ -501,12 +519,16 @@ export class AppStore {
       this.notify("색상은 # 뒤에 6자리 HEX 코드로 입력해 주세요.", "error")
       return false
     }
+    if (usageTypes.length === 0) {
+      this.notify("카테고리 용도를 하나 이상 선택해 주세요.", "error")
+      return false
+    }
     if (!Number.isSafeInteger(budget) || budget < 0) {
       this.notify("올바른 예산 금액을 입력해 주세요.", "error")
       return false
     }
 
-    const duplicate = this.expenseCategories.some(
+    const duplicate = this.currentCategories.some(
       (category) => category.name.toLowerCase() === trimmed.toLowerCase(),
     )
     if (duplicate) {
@@ -515,15 +537,16 @@ export class AppStore {
     }
 
     try {
-      const categoryId = await this.repository.createExpenseCategory({
+      const categoryId = await this.repository.createCategory({
         ledgerId: this.selectedLedgerId,
         userId: this.authUser.id,
         name: trimmed,
         icon,
         color,
-        sortOrder: this.expenseCategories.length,
+        sortOrder: this.currentCategories.length,
+        usageTypes,
       })
-      if (budget > 0) {
+      if (budget > 0 && usageTypes.includes("expense")) {
         await this.repository.setCategoryBudget({
           ledgerId: this.selectedLedgerId,
           categoryId,
@@ -543,7 +566,7 @@ export class AppStore {
 
   async updateCategory(
     categoryId: string,
-    patch: Partial<Pick<Category, "name" | "icon" | "color">>,
+    patch: Partial<Pick<Category, "name" | "icon" | "color" | "usageTypes">>,
   ): Promise<boolean> {
     const category = this.data.categories.find((item) => item.id === categoryId)
     const name = patch.name?.trim()
@@ -555,6 +578,10 @@ export class AppStore {
       this.notify("색상은 # 뒤에 6자리 HEX 코드로 입력해 주세요.", "error")
       return false
     }
+    if (patch.usageTypes !== undefined && patch.usageTypes.length === 0) {
+      this.notify("카테고리 용도를 하나 이상 선택해 주세요.", "error")
+      return false
+    }
 
     if (
       name &&
@@ -562,7 +589,6 @@ export class AppStore {
         (item) =>
           item.id !== categoryId &&
           item.ledgerId === category.ledgerId &&
-          item.type === category.type &&
           !item.isArchived &&
           item.name.toLowerCase() === name.toLowerCase(),
       )
@@ -598,13 +624,13 @@ export class AppStore {
     }
   }
 
-  async reorderExpenseCategories(
+  async reorderCategories(
     sourceCategoryId: string,
     targetCategoryId: string,
   ): Promise<boolean> {
     if (sourceCategoryId === targetCategoryId) return true
 
-    const visibleCategories = this.expenseCategories
+    const visibleCategories = this.currentCategories
     const sourceIndex = visibleCategories.findIndex(
       (category) => category.id === sourceCategoryId,
     )
@@ -621,9 +647,7 @@ export class AppStore {
     const archivedCategories = this.data.categories
       .filter(
         (category) =>
-          category.ledgerId === this.selectedLedgerId &&
-          category.type === "expense" &&
-          category.isArchived,
+          category.ledgerId === this.selectedLedgerId && category.isArchived,
       )
       .sort((a, b) => a.sortOrder - b.sortOrder)
     const orderedCategories = [
@@ -771,8 +795,7 @@ export class AppStore {
     }
     try {
       const isFirstCard = !this.currentLedgerCards.some(
-        (item) =>
-          item.id !== cardId && item.ownerUserId === input.ownerUserId,
+        (item) => item.id !== cardId && item.ownerUserId === input.ownerUserId,
       )
       await this.repository.updateCard(cardId, {
         ...input,
@@ -876,9 +899,7 @@ export class AppStore {
     }
 
     try {
-      await this.repository.convertPersonalLedgerToShared(
-        this.currentLedger.id,
-      )
+      await this.repository.convertPersonalLedgerToShared(this.currentLedger.id)
       await this.refreshFinanceData()
       this.notify("개인 가계부를 공동 가계부로 전환했습니다.")
       return this.dataState === "ready"

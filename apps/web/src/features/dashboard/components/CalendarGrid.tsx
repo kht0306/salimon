@@ -122,6 +122,13 @@ export const CalendarGrid = observer(function CalendarGrid() {
                       transaction.status !== "excluded",
                   )
                   .reduce((sum, transaction) => sum + transaction.amount, 0)
+                const saving = transactions
+                  .filter(
+                    (transaction) =>
+                      transaction.type === "saving" &&
+                      transaction.status !== "excluded",
+                  )
+                  .reduce((sum, transaction) => sum + transaction.amount, 0)
 
                 return (
                   <DayCell
@@ -148,6 +155,7 @@ export const CalendarGrid = observer(function CalendarGrid() {
                       {income > 0 ? (
                         <Income>+{formatKrw(income)}</Income>
                       ) : null}
+                      {saving > 0 ? <Saving>{formatKrw(saving)}</Saving> : null}
                     </DayAmounts>
                   </DayCell>
                 )
@@ -345,6 +353,12 @@ const Expense = styled.div`
 
 const Income = styled.div`
   color: ${colors.green};
+  overflow: hidden;
+  text-overflow: ellipsis;
+`
+
+const Saving = styled.div`
+  color: ${colors.violet};
   overflow: hidden;
   text-overflow: ellipsis;
 `

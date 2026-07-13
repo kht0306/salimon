@@ -94,14 +94,18 @@ export const PanelTitle = styled.h2`
   line-height: 1.3;
 `
 
-export const Button = styled.button<{ $variant?: "primary" | "ghost" | "danger" | "soft" }>`
+export const Button = styled.button<{
+  $variant?: "primary" | "ghost" | "danger" | "soft"
+}>`
   min-height: ${controls.default};
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   border-radius: ${radii.sm};
-  border: 1px solid ${({ $variant }) => ($variant === "danger" ? "#fecaca" : colors.borderStrong)};
+  border: 1px solid
+    ${({ $variant }) =>
+      $variant === "danger" ? "#fecaca" : colors.borderStrong};
   background: ${({ $variant }) => {
     if ($variant === "primary") return colors.ink
     if ($variant === "danger") return colors.coralSoft
@@ -125,7 +129,8 @@ export const Button = styled.button<{ $variant?: "primary" | "ghost" | "danger" 
 
   &:hover {
     border-color: ${colors.borderStrong};
-    background: ${({ $variant }) => ($variant === "primary" ? "#27272a" : colors.panelSubtle)};
+    background: ${({ $variant }) =>
+      $variant === "primary" ? "#27272a" : colors.panelSubtle};
   }
 
   &:disabled {
@@ -162,7 +167,9 @@ export const Input = styled.input`
   background: #fff;
   color: ${colors.ink};
   padding: 7px 10px;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 
   &:focus {
     border-color: ${colors.focus};
@@ -227,9 +234,18 @@ export const MetricLabel = styled.div`
   font-size: 11px;
 `
 
-export const MetricValue = styled.div<{ $tone?: "expense" | "income" }>`
+export const MetricValue = styled.div<{
+  $tone?: "expense" | "income" | "saving"
+}>`
   margin-top: 3px;
-  color: ${({ $tone }) => ($tone === "income" ? colors.green : $tone === "expense" ? colors.coral : colors.ink)};
+  color: ${({ $tone }) =>
+    $tone === "income"
+      ? colors.green
+      : $tone === "expense"
+        ? colors.coral
+        : $tone === "saving"
+          ? colors.violet
+          : colors.ink};
   font-family: var(--font-geist-mono);
   font-size: 14px;
   font-weight: 650;

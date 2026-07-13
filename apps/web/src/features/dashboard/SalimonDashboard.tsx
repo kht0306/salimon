@@ -121,9 +121,14 @@ const DashboardContent = observer(function DashboardContent() {
                   ? "현재 기본 가계부"
                   : "기본 가계부로 설정"
               }
-              onClick={() => void store.setDefaultLedger(store.selectedLedgerId)}
+              onClick={() =>
+                void store.setDefaultLedger(store.selectedLedgerId)
+              }
             >
-              <Star size={15} fill={currentMembership?.isDefault ? "currentColor" : "none"} />
+              <Star
+                size={15}
+                fill={currentMembership?.isDefault ? "currentColor" : "none"}
+              />
             </DefaultLedgerButton>
           </LedgerControl>
         </LedgerField>
@@ -139,6 +144,12 @@ const DashboardContent = observer(function DashboardContent() {
             <MetricLabel>월 수입</MetricLabel>
             <MetricValue $tone="income">
               {formatKrw(store.monthIncomeTotal)}
+            </MetricValue>
+          </Metric>
+          <Metric>
+            <MetricLabel>월 저축</MetricLabel>
+            <MetricValue $tone="saving">
+              {formatKrw(store.monthSavingTotal)}
             </MetricValue>
           </Metric>
         </MetricRow>

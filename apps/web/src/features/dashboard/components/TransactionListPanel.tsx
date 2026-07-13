@@ -16,6 +16,7 @@ const typeLabels: Record<Transaction["type"], string> = {
   expense: "지출",
   income: "수입",
   transfer: "이체",
+  saving: "저축",
 }
 const statusLabels: Record<Transaction["status"], string> = {
   pending: "대기",
@@ -101,6 +102,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
 
   const expense = sumByType(transactions, "expense")
   const income = sumByType(transactions, "income")
+  const saving = sumByType(transactions, "saving")
 
   return (
     <Panel>
@@ -167,6 +169,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
             <option value="expense">지출</option>
             <option value="income">수입</option>
             <option value="transfer">이체</option>
+            <option value="saving">저축</option>
           </Select>
         </Field>
         <Field>
@@ -224,6 +227,9 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
         </span>
         <span>
           수입 <strong data-tone="income">+{formatKrw(income)}</strong>
+        </span>
+        <span>
+          저축 <strong data-tone="saving">{formatKrw(saving)}</strong>
         </span>
         <span>
           정산 <strong>{formatKrw(income - expense)}</strong>
@@ -374,6 +380,9 @@ const Totals = styled.div`
   strong[data-tone="income"] {
     color: ${colors.green};
   }
+  strong[data-tone="saving"] {
+    color: ${colors.violet};
+  }
 `
 const Rows = styled.div`
   display: grid;
@@ -419,7 +428,9 @@ const Amount = styled.strong<{ $type: Transaction["type"] }>`
       ? colors.green
       : $type === "expense"
         ? colors.coral
-        : colors.blue};
+        : $type === "saving"
+          ? colors.violet
+          : colors.blue};
   font-family: var(--font-geist-mono);
   font-size: 12px;
 `
