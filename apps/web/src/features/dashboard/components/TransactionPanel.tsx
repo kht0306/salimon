@@ -9,7 +9,7 @@ import {
   getDateTimeLocalValue,
   splitInstallmentPrincipal,
 } from "@salimon/domain"
-import type { Transaction } from "@salimon/types"
+import type { CategoryUsageType, Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import { Check, Pencil, Plus, Save, Trash2, X } from "lucide-react"
 import { observer } from "mobx-react-lite"
@@ -37,7 +37,17 @@ const typeLabels: Record<Transaction["type"], string> = {
   expense: "지출",
   income: "수입",
   transfer: "이체",
+  saving: "저축",
 }
+
+const categoryUsageGroups: Array<{
+  type: CategoryUsageType
+  label: string
+}> = [
+  { type: "expense", label: "지출용" },
+  { type: "income", label: "수입용" },
+  { type: "saving", label: "저축용" },
+]
 
 export const TransactionPanel = observer(function TransactionPanel() {
   const store = useAppStore()
@@ -97,10 +107,17 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const [transactionDate = "", transactionTimeValue = "12:00"] =
     draft.transactionAt.split("T")
   const transactionTime = transactionTimeValue.slice(0, 5)
+  const showsAllCategories = draft.type === "transfer"
+  const selectableCategories = store.currentCategories.filter(
+    (category) =>
+      showsAllCategories ||
+      category.usageTypes.includes(draft.type as CategoryUsageType),
+  )
   const canSave =
     Number.isSafeInteger(amount) &&
     amount > 0 &&
-    Boolean(draft.transactionAt) &&
+    isValidDateInput(transactionDate) &&
+    /^\d{2}:\d{2}$/.test(transactionTime) &&
     Boolean(store.selectedLedgerId) &&
     (draft.recurringType !== "installment" ||
       (Number.isSafeInteger(installmentMonths) &&
@@ -149,8 +166,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
       recurringType: transaction.recurringType ?? "none",
       recurringRuleId: transaction.recurringRuleId,
       installmentMonths: String(transaction.installmentTotal ?? 2),
-      installmentAmountType:
-        recurringRule?.installmentAmountType ?? "monthly",
+      installmentAmountType: recurringRule?.installmentAmountType ?? "monthly",
       paymentMethodId:
         transaction.paymentMethodId ?? recurringRule?.paymentMethodId ?? "",
       transactionAt: getDateTimeLocalValue(
@@ -187,7 +203,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
       const saved = await store.saveTransaction({
         id: editing?.id,
         ledgerId: store.selectedLedgerId,
-        type: draft.type as "expense" | "income" | "transfer",
+        type: draft.type as Transaction["type"],
         status: draft.status as "pending" | "confirmed" | "excluded",
         amount,
         transactionAt: draft.transactionAt,
@@ -250,15 +266,32 @@ export const TransactionPanel = observer(function TransactionPanel() {
 
           <TwoColumns>
             <Field>
-              <span>유형<RequiredMark>*</RequiredMark></span>
+              <span>
+                유형<RequiredMark>*</RequiredMark>
+              </span>
               <Select
                 required
                 value={draft.type}
                 onChange={(event) => {
-                  const type = event.target.value
+                  const type = event.target.value as Transaction["type"]
                   setDraft({
                     ...draft,
                     type,
+                    categoryId:
+                      type === "transfer"
+                        ? draft.categoryId ||
+                          store.currentCategories[0]?.id ||
+                          ""
+                        : (store.currentCategories.find((category) =>
+                            category.usageTypes.includes(
+                              type as CategoryUsageType,
+                            ),
+                          )?.id ?? ""),
+                    recurringType:
+                      type !== "expense" &&
+                      draft.recurringType === "installment"
+                        ? "none"
+                        : draft.recurringType,
                     paymentMethodId:
                       type === "expense" ? draft.paymentMethodId : "",
                   })
@@ -267,10 +300,13 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 <option value="expense">지출</option>
                 <option value="income">수입</option>
                 <option value="transfer">이체</option>
+                <option value="saving">저축</option>
               </Select>
             </Field>
             <Field>
-              <span>상태<RequiredMark>*</RequiredMark></span>
+              <span>
+                상태<RequiredMark>*</RequiredMark>
+              </span>
               <Select
                 required
                 value={draft.status}
@@ -305,12 +341,16 @@ export const TransactionPanel = observer(function TransactionPanel() {
               >
                 <option value="none">일반 거래</option>
                 <option value="fixed">고정비</option>
-                <option value="installment">카드 할부</option>
+                <option value="installment" disabled={draft.type !== "expense"}>
+                  카드 할부
+                </option>
               </Select>
             </Field>
             {draft.recurringType === "installment" ? (
               <Field>
-                <span>할부 개월<RequiredMark>*</RequiredMark></span>
+                <span>
+                  할부 개월<RequiredMark>*</RequiredMark>
+                </span>
                 {editing?.recurringType === "installment"
                   ? ` (${editing.installmentNumber ?? 1}/${draft.installmentMonths})`
                   : ""}
@@ -337,7 +377,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
             <Field>
               <span>
                 결제 수단
-                {draft.recurringType === "installment" ? <RequiredMark>*</RequiredMark> : null}
+                {draft.recurringType === "installment" ? (
+                  <RequiredMark>*</RequiredMark>
+                ) : null}
               </span>
               <Select
                 required={draft.recurringType === "installment"}
@@ -424,25 +466,34 @@ export const TransactionPanel = observer(function TransactionPanel() {
             draft.installmentAmountType === "principal" &&
             installmentMonthlyAmount > 0 ? (
               <InstallmentPreview>
-                월 {formatKrw(installmentMonthlyAmount)} · 마지막 회차에 잔액 반영
+                월 {formatKrw(installmentMonthlyAmount)} · 마지막 회차에 잔액
+                반영
               </InstallmentPreview>
             ) : null}
           </Field>
 
           <Field>
-            <span>거래일시<RequiredMark>*</RequiredMark></span>
+            <span>
+              거래일시<RequiredMark>*</RequiredMark>
+            </span>
             <DateTimeInputs>
               <Input
                 required
-                type="date"
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="YYYY-MM-DD"
+                pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}"
+                maxLength={10}
                 aria-label="거래 날짜"
                 value={transactionDate}
-                onChange={(event) =>
+                onChange={(event) => {
+                  const date = formatDateInput(event.target.value)
                   setDraft({
                     ...draft,
-                    transactionAt: `${event.target.value}T${transactionTime}`,
+                    transactionAt: `${date}T${transactionTime}`,
                   })
-                }
+                }}
               />
               <Input
                 required
@@ -477,21 +528,38 @@ export const TransactionPanel = observer(function TransactionPanel() {
           </Field>
 
           <Field>
-            카테고리
+            기준 카테고리
             <Select
               value={draft.categoryId}
               onChange={(event) =>
                 setDraft({ ...draft, categoryId: event.target.value })
               }
             >
-              <option value="">기타 자동 적용</option>
-              {store.currentCategories
-                .filter((category) => category.type === draft.type)
-                .map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
+              <option value="">기본 카테고리 자동 적용</option>
+              {showsAllCategories
+                ? categoryUsageGroups.map((group) => {
+                    const categories = store.currentCategories.filter(
+                      (category) => category.usageTypes.includes(group.type),
+                    )
+
+                    return categories.length > 0 ? (
+                      <optgroup key={group.type} label={group.label}>
+                        {categories.map((category) => (
+                          <option
+                            key={`${group.type}-${category.id}`}
+                            value={category.id}
+                          >
+                            {category.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null
+                  })
+                : selectableCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
             </Select>
           </Field>
 
@@ -646,6 +714,19 @@ export const TransactionPanel = observer(function TransactionPanel() {
             )}
           </SummaryAmount>
         </SummaryRow>
+        <SummaryRow>
+          <span>저축 합계</span>
+          <SummaryAmount $tone="saving">
+            {formatKrw(
+              store.selectedDateTransactions
+                .filter(
+                  (item) =>
+                    item.type === "saving" && item.status !== "excluded",
+                )
+                .reduce((sum, item) => sum + item.amount, 0),
+            )}
+          </SummaryAmount>
+        </SummaryRow>
         <SettlementRow>
           <span>정산 합계</span>
           <strong>
@@ -669,6 +750,28 @@ export const TransactionPanel = observer(function TransactionPanel() {
     </SidePanel>
   )
 })
+
+function formatDateInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8)
+  if (digits.length <= 4) return digits
+  if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`
+}
+
+function isValidDateInput(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(year, month - 1, day)
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  )
+}
 
 const PanelTop = styled.div`
   display: flex;
@@ -813,7 +916,9 @@ const Amount = styled.div<{ $type: Transaction["type"] }>`
       ? colors.green
       : $type === "expense"
         ? colors.coral
-        : colors.blue};
+        : $type === "saving"
+          ? colors.violet
+          : colors.blue};
   font-family: var(--font-geist-mono);
   font-size: 12px;
   font-weight: 650;
@@ -875,8 +980,15 @@ const SummaryRow = styled.div`
   font-size: 12px;
 `
 
-const SummaryAmount = styled.strong<{ $tone: "expense" | "income" }>`
-  color: ${({ $tone }) => ($tone === "expense" ? colors.coral : colors.green)};
+const SummaryAmount = styled.strong<{
+  $tone: "expense" | "income" | "saving"
+}>`
+  color: ${({ $tone }) =>
+    $tone === "expense"
+      ? colors.coral
+      : $tone === "saving"
+        ? colors.violet
+        : colors.green};
   font-family: var(--font-geist-mono);
 `
 

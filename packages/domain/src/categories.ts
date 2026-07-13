@@ -1,4 +1,8 @@
-import type { Category, TransactionType } from "@salimon/types"
+import type {
+  Category,
+  CategoryUsageType,
+  TransactionType,
+} from "@salimon/types"
 
 export const expenseCategorySeeds = [
   { name: "식비", icon: "utensils", color: "#d65a3a" },
@@ -21,15 +25,55 @@ export const incomeCategorySeeds = [
   { name: "기타", icon: "circle-plus", color: "#685a8f" },
 ] as const
 
-export function createDefaultCategories(ledgerId: string, userId: string): Category[] {
+export const savingCategorySeeds = [
+  { name: "예금", icon: "landmark", color: "#0f766e" },
+  { name: "적금", icon: "piggy-bank", color: "#7c3aed" },
+  { name: "투자", icon: "chart-no-axes-combined", color: "#2563eb" },
+  { name: "기타 저축", icon: "wallet", color: "#727a82" },
+] as const
+
+export function createDefaultCategories(
+  ledgerId: string,
+  userId: string,
+): Category[] {
   const expense = expenseCategorySeeds.map((seed, index) =>
-    createCategory(ledgerId, userId, "expense", seed.name, seed.icon, seed.color, index, true),
+    createCategory(
+      ledgerId,
+      userId,
+      "expense",
+      seed.name,
+      seed.icon,
+      seed.color,
+      index,
+      true,
+    ),
   )
   const income = incomeCategorySeeds.map((seed, index) =>
-    createCategory(ledgerId, userId, "income", seed.name, seed.icon, seed.color, index, true),
+    createCategory(
+      ledgerId,
+      userId,
+      "income",
+      seed.name,
+      seed.icon,
+      seed.color,
+      index,
+      true,
+    ),
+  )
+  const saving = savingCategorySeeds.map((seed, index) =>
+    createCategory(
+      ledgerId,
+      userId,
+      "saving",
+      seed.name,
+      seed.icon,
+      seed.color,
+      index,
+      true,
+    ),
   )
 
-  return [...expense, ...income]
+  return [...expense, ...income, ...saving]
 }
 
 export function createCategory(
@@ -42,11 +86,14 @@ export function createCategory(
   sortOrder = 0,
   isDefault = false,
 ): Category {
+  const usageType: CategoryUsageType =
+    type === "income" || type === "saving" ? type : "expense"
   return {
     id: `${ledgerId}-${type}-${slugify(name)}`,
     ledgerId,
     createdBy: userId,
     type,
+    usageTypes: [usageType],
     name,
     icon,
     color,
@@ -56,7 +103,10 @@ export function createCategory(
   }
 }
 
-export function findOtherCategory(categories: Category[], ledgerId: string): Category | undefined {
+export function findOtherCategory(
+  categories: Category[],
+  ledgerId: string,
+): Category | undefined {
   const expenseCategories = categories.filter(
     (category) =>
       category.ledgerId === ledgerId &&

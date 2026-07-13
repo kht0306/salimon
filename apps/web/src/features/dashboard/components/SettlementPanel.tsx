@@ -48,7 +48,9 @@ export const SettlementPanel = observer(function SettlementPanel() {
           ? "지출"
           : item.type === "income"
             ? "수입"
-            : "이체",
+            : item.type === "saving"
+              ? "저축"
+              : "이체",
         category,
         item.merchantName ?? "",
         item.memo ?? "",
@@ -127,9 +129,7 @@ export const SettlementPanel = observer(function SettlementPanel() {
             <PieChartLayout>
               <Pie style={{ background: pieGradient(pieRows) }}>
                 <span>
-                  {formatKrw(
-                    pieRows.reduce((sum, row) => sum + row.spent, 0),
-                  )}
+                  {formatKrw(pieRows.reduce((sum, row) => sum + row.spent, 0))}
                 </span>
               </Pie>
               <PieLegend aria-label="카테고리별 지출 범례">

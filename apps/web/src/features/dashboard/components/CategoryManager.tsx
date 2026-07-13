@@ -2,6 +2,7 @@
 
 import styled from "@emotion/styled"
 import { formatMoneyInput } from "@salimon/domain"
+import type { Category, CategoryUsageType } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import {
   Archive,
@@ -134,6 +135,54 @@ type CategorySortMode =
   | "name-desc"
   | "budget-asc"
   | "budget-desc"
+type CategoryUsageFilter = "all" | CategoryUsageType
+
+const categoryUsageOptions: Array<{
+  value: CategoryUsageType
+  label: string
+}> = [
+  { value: "expense", label: "지출용" },
+  { value: "income", label: "수입용" },
+  { value: "saving", label: "저축용" },
+]
+
+function toggleUsageType(
+  current: CategoryUsageType[],
+  usageType: CategoryUsageType,
+): CategoryUsageType[] {
+  return current.includes(usageType)
+    ? current.filter((item) => item !== usageType)
+    : [...current, usageType]
+}
+
+function CategoryUsageSelector({
+  value,
+  onChange,
+  label,
+}: {
+  value: CategoryUsageType[]
+  onChange: (value: CategoryUsageType[]) => void
+  label: string
+}) {
+  return (
+    <UsageField>
+      <span>{label}</span>
+      <UsageOptions>
+        {categoryUsageOptions.map((option) => (
+          <UsageOption
+            key={option.value}
+            type="button"
+            $selected={value.includes(option.value)}
+            aria-pressed={value.includes(option.value)}
+            onClick={() => onChange(toggleUsageType(value, option.value))}
+          >
+            {option.label}
+          </UsageOption>
+        ))}
+      </UsageOptions>
+    </UsageField>
+  )
+}
 
 function CategoryIcon({ icon, color }: { icon: string; color: string }) {
   const Icon = categoryIconComponents[icon] ?? Circle
@@ -205,13 +254,15 @@ const CategoryCreateForm = observer(function CategoryCreateForm() {
   const [icon, setIcon] = useState(iconOptions[0].value)
   const [color, setColor] = useState(colorOptions[0])
   const [budget, setBudget] = useState("")
+  const [usageTypes, setUsageTypes] = useState<CategoryUsageType[]>(["expense"])
 
   async function create() {
     if (
-      await store.createExpenseCategory(
+      await store.createCategory(
         name,
         icon,
         color,
+        usageTypes,
         Number(budget || 0),
       )
     ) {
@@ -223,12 +274,15 @@ const CategoryCreateForm = observer(function CategoryCreateForm() {
   return (
     <>
       <PanelHeader>
-        <PanelTitle>지출 카테고리</PanelTitle>
+        <PanelTitle>카테고리</PanelTitle>
         <Button
           $variant="primary"
           onClick={() => void create()}
           disabled={
-            !name.trim() || !store.authUser || !hexColorPattern.test(color)
+            !name.trim() ||
+            !store.authUser ||
+            !hexColorPattern.test(color) ||
+            usageTypes.length === 0
           }
         >
           <Plus size={16} /> 추가
@@ -262,17 +316,26 @@ const CategoryCreateForm = observer(function CategoryCreateForm() {
             ))}
           </Select>
         </Field>
-        <Field>
-          {store.selectedMonth} 예산
-          <Input
-            inputMode="numeric"
-            placeholder="선택 입력"
-            value={formatMoneyInput(budget)}
-            onChange={(event) =>
-              setBudget(event.target.value.replace(/\D/g, ""))
-            }
-          />
-        </Field>
+        <CategoryUsageSelector
+          value={usageTypes}
+          onChange={setUsageTypes}
+          label="적용 용도*"
+        />
+        {usageTypes.includes("expense") ? (
+          <Field>
+            {store.selectedMonth} 예산
+            <Input
+              inputMode="numeric"
+              placeholder="선택 입력"
+              value={formatMoneyInput(budget)}
+              onChange={(event) =>
+                setBudget(event.target.value.replace(/\D/g, ""))
+              }
+            />
+          </Field>
+        ) : (
+          <ComposerSpacer />
+        )}
         <ColorPicker
           value={color}
           onChange={setColor}
@@ -291,21 +354,27 @@ export const CategoryManager = observer(function CategoryManager() {
   const [editName, setEditName] = useState("")
   const [editIcon, setEditIcon] = useState(iconOptions[0].value)
   const [editColor, setEditColor] = useState(colorOptions[0])
+  const [editUsageTypes, setEditUsageTypes] = useState<CategoryUsageType[]>([])
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [savingOrder, setSavingOrder] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [sortMode, setSortMode] = useState<CategorySortMode>("manual")
+  const [usageFilter, setUsageFilter] = useState<CategoryUsageFilter>("all")
 
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase("ko-KR")
-  const dndEnabled = sortMode === "manual" && normalizedQuery.length === 0
+  const dndEnabled =
+    usageFilter === "all" &&
+    sortMode === "manual" &&
+    normalizedQuery.length === 0
   const budgetByCategoryId = new Map(
-    store.selectedMonthBudgets.map((item) => [
-      item.category.id,
-      item.amount,
-    ]),
+    store.selectedMonthBudgets.map((item) => [item.category.id, item.amount]),
   )
-  const visibleCategories = store.expenseCategories
+  const visibleCategories = store.currentCategories
+    .filter(
+      (category) =>
+        usageFilter === "all" || category.usageTypes.includes(usageFilter),
+    )
     .filter((category) =>
       normalizedQuery
         ? `${category.name} ${iconLabels[category.icon] ?? category.icon}`
@@ -337,11 +406,12 @@ export const CategoryManager = observer(function CategoryManager() {
       return first.sortOrder - second.sortOrder
     })
 
-  function startEditing(category: (typeof store.expenseCategories)[number]) {
+  function startEditing(category: Category) {
     setEditingId(category.id)
     setEditName(category.name)
     setEditIcon(category.icon)
     setEditColor(category.color)
+    setEditUsageTypes(category.usageTypes)
   }
 
   async function saveEditing() {
@@ -351,6 +421,7 @@ export const CategoryManager = observer(function CategoryManager() {
         name: editName,
         icon: editIcon,
         color: editColor,
+        usageTypes: editUsageTypes,
       })
     ) {
       setEditingId(null)
@@ -384,7 +455,10 @@ export const CategoryManager = observer(function CategoryManager() {
     categoryId: string,
   ) {
     const nextTarget = event.relatedTarget
-    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+    if (
+      nextTarget instanceof Node &&
+      event.currentTarget.contains(nextTarget)
+    ) {
       return
     }
 
@@ -407,7 +481,7 @@ export const CategoryManager = observer(function CategoryManager() {
 
     setSavingOrder(true)
     try {
-      await store.reorderExpenseCategories(sourceCategoryId, categoryId)
+      await store.reorderCategories(sourceCategoryId, categoryId)
     } finally {
       setSavingOrder(false)
     }
@@ -432,6 +506,20 @@ export const CategoryManager = observer(function CategoryManager() {
             }}
           />
         </CategorySearchField>
+        <CategoryFilterSelect
+          aria-label="카테고리 용도 조회"
+          value={usageFilter}
+          onChange={(event) => {
+            setUsageFilter(event.target.value as CategoryUsageFilter)
+            setDraggingId(null)
+            setDragOverId(null)
+          }}
+        >
+          <option value="all">전체</option>
+          <option value="expense">지출용</option>
+          <option value="income">수입용</option>
+          <option value="saving">저축용</option>
+        </CategoryFilterSelect>
         <CategorySortSelect
           aria-label="카테고리 정렬"
           value={sortMode}
@@ -449,7 +537,8 @@ export const CategoryManager = observer(function CategoryManager() {
         </CategorySortSelect>
         {!dndEnabled ? (
           <ReorderHint>
-            검색·별도 정렬 중에는 순서 변경이 꺼집니다.
+            전체 조회·사용자 지정 순서이며 검색어가 없을 때만 순서를 변경할 수
+            있습니다.
           </ReorderHint>
         ) : null}
       </CategoryListToolbar>
@@ -509,6 +598,11 @@ export const CategoryManager = observer(function CategoryManager() {
                   onChange={setEditColor}
                   label={`${category.name} 카테고리`}
                 />
+                <CategoryUsageSelector
+                  value={editUsageTypes}
+                  onChange={setEditUsageTypes}
+                  label="적용 용도"
+                />
               </CategoryEditor>
             ) : (
               <CategorySummary>
@@ -516,45 +610,56 @@ export const CategoryManager = observer(function CategoryManager() {
                 <CategoryInfo>
                   <strong>{category.name}</strong>
                   <span>
-                    {category.isDefault ? "기본" : "사용자"} ·{" "}
-                    {iconLabels[category.icon] ?? category.icon}
+                    {category.usageTypes
+                      .map(
+                        (usageType) =>
+                          categoryUsageOptions.find(
+                            (option) => option.value === usageType,
+                          )?.label,
+                      )
+                      .filter(Boolean)
+                      .join(" · ")}
                   </span>
                 </CategoryInfo>
               </CategorySummary>
             )}
-            <BudgetField>
-              <Input
-                aria-label={`${category.name} ${store.selectedMonth} 예산`}
-                inputMode="numeric"
-                placeholder="월 예산"
-                value={formatMoneyInput(
-                  budgets[category.id] ??
-                    budgetByCategoryId.get(category.id) ??
-                    "",
-                )}
-                onChange={(event) =>
-                  setBudgets({
-                    ...budgets,
-                    [category.id]: event.target.value.replace(/\D/g, ""),
-                  })
-                }
-              />
-              <Button
-                $variant="soft"
-                onClick={() =>
-                  void store.setCategoryBudget(
-                    category.id,
-                    Number(
-                      budgets[category.id] ??
-                        budgetByCategoryId.get(category.id) ??
-                        0,
-                    ),
-                  )
-                }
-              >
-                예산 저장
-              </Button>
-            </BudgetField>
+            {category.usageTypes.includes("expense") ? (
+              <BudgetField>
+                <Input
+                  aria-label={`${category.name} ${store.selectedMonth} 예산`}
+                  inputMode="numeric"
+                  placeholder="월 예산"
+                  value={formatMoneyInput(
+                    budgets[category.id] ??
+                      budgetByCategoryId.get(category.id) ??
+                      "",
+                  )}
+                  onChange={(event) =>
+                    setBudgets({
+                      ...budgets,
+                      [category.id]: event.target.value.replace(/\D/g, ""),
+                    })
+                  }
+                />
+                <Button
+                  $variant="soft"
+                  onClick={() =>
+                    void store.setCategoryBudget(
+                      category.id,
+                      Number(
+                        budgets[category.id] ??
+                          budgetByCategoryId.get(category.id) ??
+                          0,
+                      ),
+                    )
+                  }
+                >
+                  예산 저장
+                </Button>
+              </BudgetField>
+            ) : (
+              <BudgetUnavailable>예산 미적용</BudgetUnavailable>
+            )}
             <CategoryActions>
               {editingId === category.id ? (
                 <>
@@ -563,7 +668,9 @@ export const CategoryManager = observer(function CategoryManager() {
                     title="카테고리 수정 저장"
                     aria-label={`${category.name} 수정 저장`}
                     disabled={
-                      !editName.trim() || !hexColorPattern.test(editColor)
+                      !editName.trim() ||
+                      !hexColorPattern.test(editColor) ||
+                      editUsageTypes.length === 0
                     }
                     onClick={() => void saveEditing()}
                   >
@@ -639,7 +746,7 @@ export const CategoryManager = observer(function CategoryManager() {
 
 const CategoryComposer = styled.div`
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) 150px 150px auto;
+  grid-template-columns: minmax(140px, 1fr) 140px minmax(210px, auto) 140px auto;
   gap: 12px;
   padding: 16px 18px;
   align-items: end;
@@ -649,6 +756,35 @@ const CategoryComposer = styled.div`
   @media (max-width: 720px) {
     grid-template-columns: 1fr;
   }
+`
+
+const ComposerSpacer = styled.div``
+
+const UsageField = styled.div`
+  display: grid;
+  gap: 8px;
+  color: ${colors.muted};
+  font-size: 12px;
+  font-weight: 600;
+`
+
+const UsageOptions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+`
+
+const UsageOption = styled.button<{ $selected: boolean }>`
+  min-height: 32px;
+  border: 1px solid
+    ${({ $selected }) => ($selected ? colors.teal : colors.borderStrong)};
+  border-radius: ${radii.sm};
+  background: ${({ $selected }) =>
+    $selected ? colors.tealSoft : colors.panel};
+  color: ${({ $selected }) => ($selected ? colors.teal : colors.muted)};
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 650;
 `
 
 const Swatches = styled.div`
@@ -756,6 +892,10 @@ const CategorySortSelect = styled(Select)`
   }
 `
 
+const CategoryFilterSelect = styled(CategorySortSelect)`
+  width: 120px;
+`
+
 const ReorderHint = styled.span`
   color: ${colors.muted};
   font-size: 12px;
@@ -778,6 +918,12 @@ const BudgetField = styled.div`
   @media (max-width: 860px) {
     grid-column: 2 / -1;
   }
+`
+
+const BudgetUnavailable = styled.span`
+  color: ${colors.subtle};
+  font-size: 12px;
+  text-align: center;
 `
 
 const CategoryRow = styled.div<{
@@ -841,7 +987,7 @@ const CategorySummary = styled.div`
 
 const CategoryEditor = styled.div`
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) 110px minmax(300px, auto);
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
   align-items: center;
   gap: 8px;
 
@@ -878,8 +1024,7 @@ const CategoryIconBadge = styled.span<{ $color: string }>`
   flex: 0 0 30px;
   place-items: center;
   border-radius: ${radii.round};
-  background: ${({ $color }) =>
-    `color-mix(in srgb, ${$color} 14%, white)`};
+  background: ${({ $color }) => `color-mix(in srgb, ${$color} 14%, white)`};
   color: ${({ $color }) => $color};
 `
 
