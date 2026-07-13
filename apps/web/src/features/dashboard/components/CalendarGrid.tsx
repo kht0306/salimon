@@ -24,7 +24,12 @@ export const CalendarGrid = observer(function CalendarGrid() {
   const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"]
 
   function selectDate(date: string) {
-    if (date === store.selectedDate) return
+    if (
+      date === store.selectedDate &&
+      store.selectedMonth === date.slice(0, 7)
+    ) {
+      return
+    }
     if (
       store.transactionEditorOpen &&
       !window.confirm("작성 중인 거래 등록 또는 수정을 취소하시겠습니까?")
