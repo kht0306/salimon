@@ -5,10 +5,11 @@ import {
   CalendarDays,
   Database,
   ListFilter,
+  Plus,
   RefreshCw,
+  Settings2,
   Star,
   Tags,
-  Users,
   WalletCards,
   ChartNoAxesCombined,
 } from "lucide-react"
@@ -18,7 +19,7 @@ import { AuthControls } from "./components/AuthControls"
 import { CategoryManager } from "./components/CategoryManager"
 import { CardManager } from "./components/CardManager"
 import { ConnectionPanel } from "./components/ConnectionPanel"
-import { SharedLedgerPanel } from "./components/SharedLedgerPanel"
+import { LedgerManagementPanel } from "./components/LedgerManagementPanel"
 import { TransactionPanel } from "./components/TransactionPanel"
 import { TransactionListPanel } from "./components/TransactionListPanel"
 import { SettlementPanel } from "./components/SettlementPanel"
@@ -101,7 +102,7 @@ const DashboardContent = observer(function DashboardContent() {
               ) : null}
               {store.data.ledgers.map((ledger) => (
                 <option key={ledger.id} value={ledger.id}>
-                  {ledger.name}
+                  {ledger.name} · {ledger.type === "shared" ? "공동" : "개인"}
                 </option>
               ))}
             </LedgerSelect>
@@ -130,6 +131,15 @@ const DashboardContent = observer(function DashboardContent() {
                 fill={currentMembership?.isDefault ? "currentColor" : "none"}
               />
             </DefaultLedgerButton>
+            <LedgerManageButton
+              type="button"
+              $active={false}
+              title="새 가계부 만들기"
+              aria-label="새 가계부 만들기"
+              onClick={() => store.setView("ledger")}
+            >
+              <Plus size={15} />
+            </LedgerManageButton>
           </LedgerControl>
         </LedgerField>
 
@@ -197,11 +207,11 @@ const DashboardContent = observer(function DashboardContent() {
             <WalletCards size={17} /> 카드 관리
           </NavButton>
           <NavButton
-            $active={store.activeView === "shared"}
-            aria-current={store.activeView === "shared" ? "page" : undefined}
-            onClick={() => store.setView("shared")}
+            $active={store.activeView === "ledger"}
+            aria-current={store.activeView === "ledger" ? "page" : undefined}
+            onClick={() => store.setView("ledger")}
           >
-            <Users size={17} /> 공유
+            <Settings2 size={17} /> 가계부 관리
           </NavButton>
           {isLocalDevelopment ? (
             <NavButton
@@ -254,7 +264,9 @@ const DashboardContent = observer(function DashboardContent() {
         {store.activeView === "categories" ? <CategoryManager /> : null}
         {store.activeView === "cards" ? <CardManager /> : null}
         {store.activeView === "settlement" ? <SettlementPanel /> : null}
-        {store.activeView === "shared" ? <SharedLedgerPanel /> : null}
+        {store.activeView === "ledger" ? (
+          <LedgerManagementPanel key={store.selectedLedgerId} />
+        ) : null}
         {isLocalDevelopment && store.activeView === "connection" ? (
           <ConnectionPanel />
         ) : null}
@@ -326,7 +338,7 @@ const LedgerField = styled.div`
 
 const LedgerControl = styled.div`
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 36px;
+  grid-template-columns: minmax(0, 1fr) 36px 36px;
   gap: 6px;
 `
 
@@ -342,6 +354,16 @@ const DefaultLedgerButton = styled.button<{ $active: boolean }>`
 
   &:disabled {
     cursor: default;
+  }
+`
+
+const LedgerManageButton = styled(DefaultLedgerButton)`
+  background: #fff;
+  color: ${colors.muted};
+
+  &:hover {
+    background: ${colors.panelSubtle};
+    color: ${colors.ink};
   }
 `
 
