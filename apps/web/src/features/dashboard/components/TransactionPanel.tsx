@@ -11,7 +11,7 @@ import {
 } from "@salimon/domain"
 import type { CategoryUsageType, Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
-import { Check, Pencil, Plus, Save, Trash2, X } from "lucide-react"
+import { Check, Copy, Pencil, Plus, Save, Trash2, X } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useAppStore } from "../StoreProvider"
@@ -26,6 +26,12 @@ import {
   SidePanel,
   Textarea,
 } from "../styles"
+import {
+  canCopyTransaction,
+  createCopiedTransactionDraft,
+  createNewTransactionDraft,
+  type TransactionEditorDraft,
+} from "./transactionEditorDraft"
 
 const statusLabels: Record<Transaction["status"], string> = {
   pending: "대기",
@@ -52,27 +58,25 @@ const categoryUsageGroups: Array<{
 export const TransactionPanel = observer(function TransactionPanel() {
   const store = useAppStore()
   const [editing, setEditing] = useState<Transaction | null>(null)
+  const [copySource, setCopySource] = useState<Transaction | null>(null)
   const [isAdding, setAdding] = useState(false)
   const [isSaving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const selectedDate = store.selectedDate
   const initialDraft = useMemo(
-    () => ({
-      amount: "",
-      merchantName: "",
-      memo: "",
-      type: "expense",
-      status: "confirmed",
-      categoryId: store.expenseCategories[0]?.id ?? "",
-      actorUserId: store.authUser?.id ?? "",
-      recurringType: "none",
-      recurringRuleId: undefined as string | undefined,
-      installmentMonths: "2",
-      installmentAmountType: "monthly" as "monthly" | "principal",
-      paymentMethodId: "",
-      transactionAt: `${selectedDate}T12:00`,
-    }),
-    [selectedDate, store.expenseCategories, store.authUser?.id],
+    () =>
+      createNewTransactionDraft({
+        selectedDate,
+        expenseCategoryId: store.expenseCategories[0]?.id,
+        actorUserId: store.authUser?.id,
+        primaryPaymentMethodId: store.currentUserPrimaryCard?.id,
+      }),
+    [
+      selectedDate,
+      store.expenseCategories,
+      store.authUser?.id,
+      store.currentUserPrimaryCard?.id,
+    ],
   )
 
   const [draft, setDraft] = useState(initialDraft)
@@ -131,6 +135,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
   function openNew() {
     initialDraftRef.current = initialDraft
     setEditing(null)
+    setCopySource(null)
     setDraft(initialDraft)
     setAdding(true)
     store.setTransactionEditorDirty(false)
@@ -151,7 +156,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
             !item.deletedAt,
         )
       : undefined
-    const editDraft = {
+    const editDraft: TransactionEditorDraft = {
       amount: String(
         recurringRule?.installmentAmountType === "principal"
           ? (recurringRule.installmentPrincipal ?? transaction.amount)
@@ -177,7 +182,40 @@ export const TransactionPanel = observer(function TransactionPanel() {
     }
     initialDraftRef.current = editDraft
     setEditing(transaction)
+    setCopySource(null)
     setDraft(editDraft)
+    setAdding(true)
+    store.setTransactionEditorDirty(false)
+    store.setTransactionEditorOpen(true)
+  }
+
+  function openCopy(transaction: Transaction) {
+    const validCategories = store.currentCategories.filter(
+      (category) =>
+        transaction.type === "transfer" ||
+        category.usageTypes.includes(transaction.type as CategoryUsageType),
+    )
+    const fallbackCategoryId = validCategories[0]?.id
+    const copyDraft = createCopiedTransactionDraft({
+      transaction,
+      fallbackCategoryId,
+      fallbackActorUserId: store.authUser?.id,
+      activeCategoryIds: new Set(
+        validCategories.map((category) => category.id),
+      ),
+      activeMemberIds: new Set(
+        store.currentMembers.map((member) => member.userId),
+      ),
+      activePaymentMethodIds: new Set(
+        store.currentCards.map((card) => card.id),
+      ),
+      primaryPaymentMethodId: store.currentUserPrimaryCard?.id,
+    })
+
+    initialDraftRef.current = copyDraft
+    setEditing(null)
+    setCopySource(transaction)
+    setDraft(copyDraft)
     setAdding(true)
     store.setTransactionEditorDirty(false)
     store.setTransactionEditorOpen(true)
@@ -186,6 +224,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
   function closeForm() {
     setAdding(false)
     setEditing(null)
+    setCopySource(null)
     store.setTransactionEditorOpen(false)
   }
 
@@ -258,11 +297,27 @@ export const TransactionPanel = observer(function TransactionPanel() {
       {isAdding && store.transactionEditorOpen ? (
         <Editor>
           <EditorHeader>
-            <strong>{editing ? "거래 수정" : "거래 추가"}</strong>
+            <strong>
+              {editing
+                ? "거래 수정"
+                : copySource
+                  ? "거래 복사 · 신규 등록"
+                  : "거래 추가"}
+            </strong>
             <IconButton title="닫기" onClick={closeForm}>
               <X size={16} />
             </IconButton>
           </EditorHeader>
+
+          {copySource ? (
+            <CopyNotice role="status">
+              <Copy size={16} />
+              <span>
+                원본 거래 내용을 복사한 신규 거래입니다. 저장하면 별도 거래로
+                등록됩니다.
+              </span>
+            </CopyNotice>
+          ) : null}
 
           <TwoColumns>
             <Field>
@@ -293,7 +348,11 @@ export const TransactionPanel = observer(function TransactionPanel() {
                         ? "none"
                         : draft.recurringType,
                     paymentMethodId:
-                      type === "expense" ? draft.paymentMethodId : "",
+                      type === "expense"
+                        ? draft.paymentMethodId ||
+                          store.currentUserPrimaryCard?.id ||
+                          ""
+                        : "",
                   })
                 }}
               >
@@ -311,7 +370,10 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 required
                 value={draft.status}
                 onChange={(event) =>
-                  setDraft({ ...draft, status: event.target.value })
+                  setDraft({
+                    ...draft,
+                    status: event.target.value as Transaction["status"],
+                  })
                 }
               >
                 <option value="confirmed">확정</option>
@@ -328,13 +390,14 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 value={draft.recurringType}
                 disabled={Boolean(editing)}
                 onChange={(event) => {
-                  const recurringType = event.target.value
+                  const recurringType = event.target
+                    .value as TransactionEditorDraft["recurringType"]
                   setDraft({
                     ...draft,
                     recurringType,
                     paymentMethodId:
                       recurringType === "installment"
-                        ? (store.defaultInstallmentCard?.id ?? "")
+                        ? (store.currentUserPrimaryCard?.id ?? "")
                         : draft.paymentMethodId,
                   })
                 }}
@@ -479,19 +542,13 @@ export const TransactionPanel = observer(function TransactionPanel() {
             <DateTimeInputs>
               <Input
                 required
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder="YYYY-MM-DD"
-                pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}"
-                maxLength={10}
+                type="date"
                 aria-label="거래 날짜"
                 value={transactionDate}
                 onChange={(event) => {
-                  const date = formatDateInput(event.target.value)
                   setDraft({
                     ...draft,
-                    transactionAt: `${date}T${transactionTime}`,
+                    transactionAt: `${event.target.value}T${transactionTime}`,
                   })
                 }}
               />
@@ -588,7 +645,8 @@ export const TransactionPanel = observer(function TransactionPanel() {
             disabled={!canSave || isSaving}
             onClick={() => void save()}
           >
-            <Save size={16} /> {isSaving ? "저장 중" : "저장"}
+            <Save size={16} />{" "}
+            {isSaving ? "저장 중" : copySource ? "복사본 신규 등록" : "저장"}
           </Button>
         </Editor>
       ) : null}
@@ -656,6 +714,14 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 </Amount>
                 <RegistrantName>등록자: {registrant}</RegistrantName>
                 <ActionCluster>
+                  {canCopyTransaction(transaction) ? (
+                    <CompactAction
+                      title="복사하여 신규 등록"
+                      onClick={() => openCopy(transaction)}
+                    >
+                      <Copy size={14} />
+                    </CompactAction>
+                  ) : null}
                   <CompactAction
                     title="수정"
                     onClick={() => openEdit(transaction)}
@@ -751,13 +817,6 @@ export const TransactionPanel = observer(function TransactionPanel() {
   )
 })
 
-function formatDateInput(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 8)
-  if (digits.length <= 4) return digits
-  if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`
-  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`
-}
-
 function isValidDateInput(value: string): boolean {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
   if (!match) return false
@@ -803,6 +862,25 @@ const CardRequired = styled.span`
   color: ${colors.coral};
   font-size: 12px;
   font-weight: 600;
+`
+
+const CopyNotice = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid ${colors.focus};
+  border-radius: ${radii.sm};
+  background: ${colors.tealSoft};
+  color: ${colors.ink};
+  padding: 10px 11px;
+  font-size: 12px;
+  line-height: 1.45;
+
+  svg {
+    flex: 0 0 auto;
+    margin-top: 1px;
+    color: ${colors.teal};
+  }
 `
 
 const EditorHeader = styled.div`

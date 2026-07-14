@@ -157,17 +157,10 @@ export class AppStore {
     )
   }
 
-  get defaultInstallmentCard() {
-    const userPrimary = this.currentCards.find(
-      (card) =>
-        card.ownerUserId === this.authUser?.id && Boolean(card.isPrimary),
-    )
-    if (userPrimary) return userPrimary
-
+  get currentUserPrimaryCard() {
     return this.currentCards.find(
       (card) =>
-        card.ownerUserId === this.currentLedger?.ownerId &&
-        Boolean(card.isPrimary),
+        card.ownerUserId === this.authUser?.id && Boolean(card.isPrimary),
     )
   }
 
