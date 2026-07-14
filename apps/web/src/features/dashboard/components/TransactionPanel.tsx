@@ -42,7 +42,7 @@ import {
   createNewTransactionDraft,
   type TransactionEditorDraft,
 } from "./transactionEditorDraft"
-import { getPaymentLabel } from "./transactionPresentation"
+import { getInstallmentLabel, getPaymentLabel } from "./transactionPresentation"
 
 export const TransactionPanel = observer(function TransactionPanel() {
   const store = useAppStore()
@@ -484,8 +484,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                     setDraft({
                       ...draft,
                       installmentAmountType: event.target.value as
-                        | "monthly"
-                        | "principal",
+                        "monthly" | "principal",
                     })
                   }
                 >
@@ -633,6 +632,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
               )?.nickname ?? registrant)
             : "공통"
           const paymentLabel = getPaymentLabel(transaction, paymentMethod)
+          const installmentLabel = getInstallmentLabel(transaction)
           return (
             <TransactionItem
               key={transaction.id}
@@ -641,7 +641,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
               <TransactionTop>
                 <MetadataChips>
                   {paymentLabel ? (
-                    <PaymentChip>
+                    <PaymentChip title={paymentLabel}>
                       {paymentMethod?.type === "card" ? (
                         <CreditCard size={13} />
                       ) : paymentMethod?.type === "bank" ? (
@@ -651,6 +651,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
                       )}
                       {paymentLabel}
                     </PaymentChip>
+                  ) : null}
+                  {installmentLabel ? (
+                    <InstallmentChip>{installmentLabel}</InstallmentChip>
                   ) : null}
                   <CategoryTag $color={category?.color ?? colors.subtle}>
                     <i />
@@ -934,22 +937,37 @@ const PaymentChip = styled.span`
   white-space: nowrap;
 `
 
+const InstallmentChip = styled.span`
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #e7d3a0;
+  border-radius: ${radii.round};
+  background: #fff8e6;
+  color: #7a5311;
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.2;
+  white-space: nowrap;
+`
+
 const CategoryTag = styled.span<{ $color: string }>`
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  border: 1px solid ${colors.border};
+  border: 1px solid
+    color-mix(in srgb, ${({ $color }) => $color} 48%, ${colors.border});
   border-radius: ${radii.round};
-  background: ${colors.panelSubtle};
-  color: ${colors.muted};
+  background: color-mix(in srgb, ${({ $color }) => $color} 14%, #fff);
+  color: ${colors.ink};
   padding: 3px 7px;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 650;
   line-height: 1.2;
 
   i {
-    width: 6px;
-    height: 6px;
+    width: 9px;
+    height: 9px;
     flex: 0 0 auto;
     border-radius: 50%;
     background: ${({ $color }) => $color};

@@ -879,7 +879,7 @@ function mapPaymentMethod(row: Row): PaymentMethod {
     ledgerId: stringValue(row.ledger_id),
     ownerUserId: optionalString(row.owner_user_id),
     name: stringValue(row.name),
-    type: "card",
+    type: mapPaymentMethodType(row.type),
     last4: optionalString(row.last4),
     issuer: optionalString(row.issuer),
     visibility: row.visibility === "private" ? "private" : "ledger",
@@ -895,6 +895,10 @@ function mapPaymentMethod(row: Row): PaymentMethod {
         : numberValue(row.billing_period_end_day),
     billingPeriodEndMonthOffset: offset === 0 ? 0 : -1,
   }
+}
+
+export function mapPaymentMethodType(value: unknown): PaymentMethod["type"] {
+  return value === "bank" ? "bank" : "card"
 }
 
 function mapTransaction(row: Row): Transaction {

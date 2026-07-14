@@ -1,6 +1,6 @@
 import type { PaymentMethod, Transaction } from "@salimon/types"
 import { describe, expect, it } from "vitest"
-import { getPaymentLabel } from "./transactionPresentation"
+import { getInstallmentLabel, getPaymentLabel } from "./transactionPresentation"
 
 const transaction: Transaction = {
   id: "transaction-1",
@@ -38,10 +38,10 @@ const account: PaymentMethod = {
 describe("getPaymentLabel", () => {
   it("formats cash, card, installment and bank account labels", () => {
     expect(getPaymentLabel(transaction)).toBe("현금")
-    expect(getPaymentLabel(transaction, card)).toBe("카드[생활비]")
+    expect(getPaymentLabel(transaction, card)).toBe("현대(생활비)")
     expect(
       getPaymentLabel({ ...transaction, recurringType: "installment" }, card),
-    ).toBe("할부[생활비]")
+    ).toBe("현대(생활비)")
     expect(getPaymentLabel(transaction, account)).toBe(
       "계좌 · 국민은행 · 급여 계좌",
     )
@@ -49,5 +49,17 @@ describe("getPaymentLabel", () => {
 
   it("does not invent a payment method for non-expense transactions", () => {
     expect(getPaymentLabel({ ...transaction, type: "income" })).toBeUndefined()
+  })
+
+  it("formats installment progress as a separate label", () => {
+    expect(
+      getInstallmentLabel({
+        ...transaction,
+        recurringType: "installment",
+        installmentNumber: 2,
+        installmentTotal: 6,
+      }),
+    ).toBe("할부 2/6회")
+    expect(getInstallmentLabel(transaction)).toBeUndefined()
   })
 })
