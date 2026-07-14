@@ -80,6 +80,7 @@ export class AppStore {
     | "transactions"
     | "categories"
     | "cards"
+    | "accounts"
     | "settlement"
     | "ledger"
     | "sms"
@@ -146,6 +147,23 @@ export class AppStore {
 
   get currentCards() {
     return this.currentLedgerCards.filter((method) => method.isActive)
+  }
+
+  get currentAccounts() {
+    return this.currentLedgerAccounts.filter((method) => method.isActive)
+  }
+
+  get currentLedgerAccounts() {
+    return this.data.paymentMethods.filter(
+      (method) =>
+        method.ledgerId === this.selectedLedgerId &&
+        method.type === "bank" &&
+        !method.isDeleted,
+    )
+  }
+
+  get currentPaymentMethods() {
+    return [...this.currentCards, ...this.currentAccounts]
   }
 
   get currentLedgerCards() {
@@ -458,19 +476,14 @@ export class AppStore {
 
     const categoryId =
       draft.categoryId ||
-      (draft.type === "transfer"
-        ? this.data.categories.find(
+      (draft.type === "expense"
+        ? findOtherCategory(this.data.categories, draft.ledgerId)?.id
+        : this.data.categories.find(
             (category) =>
-              category.ledgerId === draft.ledgerId && !category.isArchived,
-          )?.id
-        : draft.type === "expense"
-          ? findOtherCategory(this.data.categories, draft.ledgerId)?.id
-          : this.data.categories.find(
-              (category) =>
-                category.ledgerId === draft.ledgerId &&
-                category.usageTypes.includes(draft.type as CategoryUsageType) &&
-                !category.isArchived,
-            )?.id)
+              category.ledgerId === draft.ledgerId &&
+              category.usageTypes.includes(draft.type as CategoryUsageType) &&
+              !category.isArchived,
+          )?.id)
 
     try {
       await this.repository.saveTransaction(this.authUser.id, {
@@ -843,13 +856,108 @@ export class AppStore {
     }
   }
 
+  async createAccount(input: {
+    ownerUserId: string
+    name: string
+    bank: string
+    last4?: string
+  }): Promise<boolean> {
+    if (
+      !this.selectedLedgerId ||
+      !input.ownerUserId ||
+      !input.name.trim() ||
+      !input.bank.trim() ||
+      (input.last4 && !/^\d{4}$/.test(input.last4))
+    ) {
+      this.notify("은행과 계좌 별칭을 확인해 주세요.", "error")
+      return false
+    }
+
+    try {
+      await this.repository.createAccount({
+        ...input,
+        ledgerId: this.selectedLedgerId,
+        name: input.name.trim(),
+        bank: input.bank.trim(),
+      })
+      await this.refreshFinanceData()
+      this.notify("계좌를 등록했습니다.")
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async updateAccount(
+    accountId: string,
+    input: {
+      ownerUserId: string
+      name: string
+      bank: string
+      last4?: string
+    },
+  ): Promise<boolean> {
+    const account = this.currentLedgerAccounts.find(
+      (item) => item.id === accountId,
+    )
+    if (
+      !account ||
+      !input.ownerUserId ||
+      !input.name.trim() ||
+      !input.bank.trim() ||
+      (input.last4 && !/^\d{4}$/.test(input.last4))
+    ) {
+      this.notify("은행과 계좌 별칭을 확인해 주세요.", "error")
+      return false
+    }
+
+    try {
+      await this.repository.updateAccount(accountId, {
+        ...input,
+        name: input.name.trim(),
+        bank: input.bank.trim(),
+      })
+      await this.refreshFinanceData()
+      this.notify("계좌를 수정했습니다.")
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async setAccountActive(accountId: string, isActive: boolean): Promise<void> {
+    try {
+      await this.repository.setAccountActive(accountId, isActive)
+      await this.refreshFinanceData()
+      this.notify(
+        isActive ? "계좌를 다시 활성화했습니다." : "계좌를 비활성화했습니다.",
+      )
+    } catch (error) {
+      this.setDataError(error)
+    }
+  }
+
+  async deleteAccount(accountId: string): Promise<void> {
+    try {
+      await this.repository.deleteAccount(accountId)
+      await this.refreshFinanceData()
+      this.notify("계좌를 삭제했습니다.")
+    } catch (error) {
+      this.setDataError(error)
+    }
+  }
+
   async resetMyFinanceData(): Promise<boolean> {
     try {
       await this.repository.resetMyFinanceData()
       this.initializedWorkspaceUserId = null
       await this.ensureWorkspace(this.authUser?.id ?? "")
       await this.refreshFinanceData()
-      this.notify("카테고리와 카드는 유지하고 테스트 데이터를 초기화했습니다.")
+      this.notify(
+        "카테고리, 카드와 계좌는 유지하고 테스트 데이터를 초기화했습니다.",
+      )
       return true
     } catch (error) {
       this.setDataError(error)

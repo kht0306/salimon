@@ -2,7 +2,7 @@ export type Currency = "KRW"
 
 export type LedgerType = "personal" | "shared"
 export type LedgerRole = "owner" | "admin" | "member" | "viewer"
-export type TransactionType = "expense" | "income" | "transfer" | "saving"
+export type TransactionType = "expense" | "income" | "saving"
 export type CategoryUsageType = "expense" | "income" | "saving"
 export type TransactionStatus = "pending" | "confirmed" | "excluded"
 export type TransactionSourceType =

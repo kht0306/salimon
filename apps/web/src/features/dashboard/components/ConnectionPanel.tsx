@@ -85,7 +85,7 @@ export const ConnectionPanel = observer(function ConnectionPanel() {
             <strong>테스트 데이터 초기화</strong>
             <p>
               거래와 고정비·할부 규칙 등 테스트 데이터를 삭제합니다. 가계부,
-              카테고리, 예산과 카드 설정은 유지됩니다.
+              카테고리, 예산, 카드와 계좌 설정은 유지됩니다.
             </p>
           </div>
           <Button
@@ -93,7 +93,7 @@ export const ConnectionPanel = observer(function ConnectionPanel() {
             onClick={() => {
               if (
                 window.confirm(
-                  "거래와 고정비·할부 규칙을 초기화하시겠습니까? 카테고리와 카드 설정은 유지되며, 삭제한 거래 데이터는 되돌릴 수 없습니다.",
+                  "거래와 고정비·할부 규칙을 초기화하시겠습니까? 카테고리, 카드와 계좌 설정은 유지되며, 삭제한 거래 데이터는 되돌릴 수 없습니다.",
                 )
               )
                 void store.resetMyFinanceData()

@@ -4,6 +4,7 @@ import { observer } from "mobx-react-lite"
 import {
   CalendarDays,
   Database,
+  Landmark,
   ListFilter,
   Plus,
   RefreshCw,
@@ -16,6 +17,7 @@ import {
 import { StoreProvider, useAppStore } from "./StoreProvider"
 import { CalendarGrid } from "./components/CalendarGrid"
 import { AuthControls } from "./components/AuthControls"
+import { AccountManager } from "./components/AccountManager"
 import { CategoryManager } from "./components/CategoryManager"
 import { CardManager } from "./components/CardManager"
 import { ConnectionPanel } from "./components/ConnectionPanel"
@@ -207,6 +209,13 @@ const DashboardContent = observer(function DashboardContent() {
             <WalletCards size={17} /> 카드 관리
           </NavButton>
           <NavButton
+            $active={store.activeView === "accounts"}
+            aria-current={store.activeView === "accounts" ? "page" : undefined}
+            onClick={() => store.setView("accounts")}
+          >
+            <Landmark size={17} /> 계좌 관리
+          </NavButton>
+          <NavButton
             $active={store.activeView === "ledger"}
             aria-current={store.activeView === "ledger" ? "page" : undefined}
             onClick={() => store.setView("ledger")}
@@ -263,6 +272,9 @@ const DashboardContent = observer(function DashboardContent() {
         {store.activeView === "transactions" ? <TransactionListPanel /> : null}
         {store.activeView === "categories" ? <CategoryManager /> : null}
         {store.activeView === "cards" ? <CardManager /> : null}
+        {store.activeView === "accounts" ? (
+          <AccountManager key={store.selectedLedgerId} />
+        ) : null}
         {store.activeView === "settlement" ? <SettlementPanel /> : null}
         {store.activeView === "ledger" ? (
           <LedgerManagementPanel key={store.selectedLedgerId} />
