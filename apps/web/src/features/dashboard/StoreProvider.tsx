@@ -15,6 +15,26 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe
   }, [store])
 
+  useEffect(() => {
+    const refresh = () => {
+      if (!store.authUser || store.dataState === "loading") return
+      void store.refreshFinanceData()
+    }
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh()
+    }
+
+    window.addEventListener("focus", refresh)
+    window.addEventListener("online", refresh)
+    document.addEventListener("visibilitychange", refreshWhenVisible)
+
+    return () => {
+      window.removeEventListener("focus", refresh)
+      window.removeEventListener("online", refresh)
+      document.removeEventListener("visibilitychange", refreshWhenVisible)
+    }
+  }, [store])
+
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>
 }
 

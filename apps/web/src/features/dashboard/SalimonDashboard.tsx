@@ -7,7 +7,6 @@ import {
   Landmark,
   ListFilter,
   Plus,
-  RefreshCw,
   Settings2,
   Star,
   Tags,
@@ -26,7 +25,6 @@ import { TransactionPanel } from "./components/TransactionPanel"
 import { TransactionListPanel } from "./components/TransactionListPanel"
 import { SettlementPanel } from "./components/SettlementPanel"
 import {
-  Button,
   Metric,
   MetricLabel,
   MetricRow,
@@ -236,19 +234,6 @@ const DashboardContent = observer(function DashboardContent() {
         </Nav>
 
         <SidebarFooter>
-          <Button
-            $variant="ghost"
-            onClick={async () => {
-              await store.refreshFinanceData()
-              if (store.dataState === "ready")
-                store.notify("최신 데이터로 새로고침했습니다.")
-            }}
-            disabled={!store.authUser || store.dataState === "loading"}
-            title="Supabase 데이터 새로고침"
-          >
-            <RefreshCw size={15} />{" "}
-            {store.dataState === "loading" ? "동기화 중" : "새로고침"}
-          </Button>
           <AuthControls />
         </SidebarFooter>
       </Sidebar>
@@ -262,10 +247,6 @@ const DashboardContent = observer(function DashboardContent() {
             </Eyebrow>
             <PageTitle>{store.currentLedger?.name ?? "가계부"}</PageTitle>
           </div>
-          <ConnectionStatus $connected={Boolean(store.authUser)}>
-            <StatusDot />
-            {store.authUser ? "동기화됨" : "로그인 필요"}
-          </ConnectionStatus>
         </Topline>
 
         {store.activeView === "calendar" ? <CalendarGrid /> : null}
@@ -448,7 +429,7 @@ const SidebarFooter = styled.div`
   }
 
   @media (max-width: 820px) {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    max-width: 320px;
   }
 `
 
@@ -472,27 +453,6 @@ const PageTitle = styled.h1`
   font-weight: 650;
   line-height: 1.2;
   letter-spacing: 0;
-`
-
-const ConnectionStatus = styled.div<{ $connected: boolean }>`
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: ${colors.muted};
-  padding-top: 7px;
-  font-size: 12px;
-  font-weight: 500;
-
-  > span {
-    background: ${({ $connected }) =>
-      $connected ? colors.green : colors.subtle};
-  }
-`
-
-const StatusDot = styled.span`
-  width: 7px;
-  height: 7px;
-  border-radius: ${radii.round};
 `
 
 const DataError = styled.p`

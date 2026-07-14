@@ -656,7 +656,6 @@ export const TransactionPanel = observer(function TransactionPanel() {
                     <InstallmentChip>{installmentLabel}</InstallmentChip>
                   ) : null}
                   <CategoryTag $color={category?.color ?? colors.subtle}>
-                    <i />
                     {category?.name ?? "기타"}
                   </CategoryTag>
                 </MetadataChips>
@@ -676,15 +675,14 @@ export const TransactionPanel = observer(function TransactionPanel() {
               </TransactionBody>
               <TransactionFooter>
                 <AuditInfo>
-                  <span>행위자 {actor}</span>
-                  <span>
-                    등록{" "}
+                  <span>거래 {actor}</span>
+                  <span>등록 {registrant}</span>
+                  <time dateTime={transaction.createdAt}>
                     {new Date(transaction.createdAt).toLocaleString("ko-KR", {
                       dateStyle: "short",
                       timeStyle: "short",
                     })}
-                  </span>
-                  <span>등록자 {registrant}</span>
+                  </time>
                 </AuditInfo>
                 <ActionCluster>
                   {canCopyTransaction(transaction) ? (
@@ -919,59 +917,38 @@ const MetadataChips = styled.div`
   gap: 5px;
 `
 
-const PaymentChip = styled.span`
+const MetadataChip = styled.span`
   min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  border: 1px solid ${colors.borderStrong};
-  border-radius: ${radii.round};
+  border: 1px solid ${colors.border};
+  border-radius: ${radii.sm};
+  background: ${colors.panelSubtle};
+  color: ${colors.muted};
+  padding: 4px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+`
+
+const PaymentChip = styled(MetadataChip)`
   background: #fff;
   color: ${colors.ink};
-  padding: 3px 7px;
-  font-size: 10px;
   font-weight: 650;
-  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 `
 
-const InstallmentChip = styled.span`
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid #e7d3a0;
-  border-radius: ${radii.round};
-  background: #fff8e6;
-  color: #7a5311;
-  padding: 3px 7px;
-  font-size: 10px;
-  font-weight: 650;
-  line-height: 1.2;
-  white-space: nowrap;
+const InstallmentChip = styled(MetadataChip)`
+  color: ${colors.muted};
 `
 
-const CategoryTag = styled.span<{ $color: string }>`
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: 1px solid
-    color-mix(in srgb, ${({ $color }) => $color} 48%, ${colors.border});
-  border-radius: ${radii.round};
-  background: color-mix(in srgb, ${({ $color }) => $color} 14%, #fff);
+const CategoryTag = styled(MetadataChip)<{ $color: string }>`
   color: ${colors.ink};
-  padding: 3px 7px;
-  font-size: 10px;
-  font-weight: 650;
-  line-height: 1.2;
-
-  i {
-    width: 9px;
-    height: 9px;
-    flex: 0 0 auto;
-    border-radius: 50%;
-    background: ${({ $color }) => $color};
-  }
+  padding-left: 10px;
+  box-shadow: inset 3px 0 0 ${({ $color }) => $color};
 `
 
 const TransactionBody = styled.div`
@@ -1026,7 +1003,8 @@ const AuditInfo = styled.div`
   color: ${colors.subtle};
   font-size: 9px;
 
-  span {
+  span,
+  time {
     white-space: nowrap;
   }
 `
