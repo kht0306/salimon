@@ -150,11 +150,9 @@ export const CalendarGrid = observer(function CalendarGrid() {
                     </DayTop>
                     <DayAmounts>
                       {expense > 0 ? (
-                        <Expense>-{formatKrw(expense)}</Expense>
+                        <Expense>{formatKrw(expense)}</Expense>
                       ) : null}
-                      {income > 0 ? (
-                        <Income>+{formatKrw(income)}</Income>
-                      ) : null}
+                      {income > 0 ? <Income>{formatKrw(income)}</Income> : null}
                       {saving > 0 ? <Saving>{formatKrw(saving)}</Saving> : null}
                     </DayAmounts>
                   </DayCell>

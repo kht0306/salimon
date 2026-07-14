@@ -107,7 +107,7 @@ export class SupabaseFinanceRepository {
         .select(
           "id, ledger_id, owner_user_id, name, type, last4, issuer, visibility, is_active, is_primary, is_debit, deleted_at, payment_day, billing_period_end_day, billing_period_end_month_offset",
         )
-        .eq("type", "card")
+        .in("type", ["card", "bank"])
         .order("created_at"),
       client
         .from("transactions")
@@ -332,6 +332,81 @@ export class SupabaseFinanceRepository {
       .single()
     throwIfError(error)
     if (input.isPrimary && data?.id) await this.setCardPrimary(data.id)
+  }
+
+  async createAccount(input: {
+    ledgerId: string
+    ownerUserId: string
+    name: string
+    bank: string
+    last4?: string
+  }): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.from("payment_methods").insert({
+      ledger_id: input.ledgerId,
+      owner_user_id: input.ownerUserId,
+      name: input.name,
+      type: "bank",
+      last4: input.last4 || null,
+      issuer: input.bank,
+      visibility: "ledger",
+      is_active: true,
+      is_primary: false,
+      is_debit: false,
+    })
+    throwIfError(error)
+  }
+
+  async updateAccount(
+    accountId: string,
+    input: {
+      ownerUserId: string
+      name: string
+      bank: string
+      last4?: string
+    },
+  ): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client
+      .from("payment_methods")
+      .update({
+        owner_user_id: input.ownerUserId,
+        name: input.name,
+        issuer: input.bank,
+        last4: input.last4 || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", accountId)
+      .eq("type", "bank")
+    throwIfError(error)
+  }
+
+  async setAccountActive(accountId: string, isActive: boolean): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client
+      .from("payment_methods")
+      .update({
+        is_active: isActive,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", accountId)
+      .eq("type", "bank")
+    throwIfError(error)
+  }
+
+  async deleteAccount(accountId: string): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client
+      .from("payment_methods")
+      .update({
+        is_active: false,
+        is_primary: false,
+        deleted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", accountId)
+      .eq("type", "bank")
+    throwIfError(error)
   }
 
   async updateCard(
@@ -904,9 +979,7 @@ function mapRole(value: unknown): Ledger["role"] {
 }
 
 function mapTransactionType(value: unknown): TransactionType {
-  return value === "income" || value === "transfer" || value === "saving"
-    ? value
-    : "expense"
+  return value === "income" || value === "saving" ? value : "expense"
 }
 
 function mapTransactionStatus(value: unknown): TransactionStatus {

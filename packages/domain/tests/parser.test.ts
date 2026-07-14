@@ -3,7 +3,10 @@ import { maskSensitiveText, parseCardSmsText } from "../src"
 
 describe("parseCardSmsText", () => {
   it("parses amount, date, merchant and expense type", () => {
-    const parsed = parseCardSmsText("[카드사] 06/28 12:34 스타벅스 5,800원 승인", new Date("2026-06-28T01:00:00.000Z"))
+    const parsed = parseCardSmsText(
+      "[카드사] 06/28 12:34 스타벅스 5,800원 승인",
+      new Date("2026-06-28T01:00:00.000Z"),
+    )
 
     expect(parsed.amount).toBe(5800)
     expect(parsed.type).toBe("expense")
@@ -12,16 +15,30 @@ describe("parseCardSmsText", () => {
   })
 
   it("recognizes refunds as income candidates", () => {
-    const parsed = parseCardSmsText("현대카드 환급 23,400원 쿠팡", new Date("2026-06-28T01:00:00.000Z"))
+    const parsed = parseCardSmsText(
+      "현대카드 환급 23,400원 쿠팡",
+      new Date("2026-06-28T01:00:00.000Z"),
+    )
 
     expect(parsed.amount).toBe(23400)
     expect(parsed.type).toBe("income")
+  })
+
+  it("treats account transfers as expense candidates", () => {
+    const parsed = parseCardSmsText(
+      "국민은행 이체 30,000원 관리비",
+      new Date("2026-06-28T01:00:00.000Z"),
+    )
+
+    expect(parsed.type).toBe("expense")
   })
 })
 
 describe("maskSensitiveText", () => {
   it("masks account and card-like numbers", () => {
-    expect(maskSensitiveText("카드 1234567812345678 승인번호 998877")).toContain("카드 ****")
+    expect(
+      maskSensitiveText("카드 1234567812345678 승인번호 998877"),
+    ).toContain("카드 ****")
     expect(maskSensitiveText("010-1234-5678")).toBe("****")
   })
 })

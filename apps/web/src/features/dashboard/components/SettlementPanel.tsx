@@ -48,9 +48,7 @@ export const SettlementPanel = observer(function SettlementPanel() {
           ? "지출"
           : item.type === "income"
             ? "수입"
-            : item.type === "saving"
-              ? "저축"
-              : "이체",
+            : "저축",
         category,
         item.merchantName ?? "",
         item.memo ?? "",

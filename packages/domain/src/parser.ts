@@ -12,7 +12,11 @@ const sensitivePatterns = [
 export function parseCardSmsText(
   rawText: string,
   receivedAt = new Date(),
-  options: { sourceApp?: string; sourceSender?: string; targetLedgerId?: string } = {},
+  options: {
+    sourceApp?: string
+    sourceSender?: string
+    targetLedgerId?: string
+  } = {},
 ): ParsedTransaction {
   const text = normalizeWhitespace(rawText)
   const amountMatch = text.match(amountPattern)
@@ -20,7 +24,12 @@ export function parseCardSmsText(
   const transactionAt = parseTransactionDate(text, receivedAt)
   const type = inferType(text)
   const merchantName = extractMerchantName(text, amountMatch?.[0])
-  const confidence = scoreConfidence({ amount, merchantName, hasDate: Boolean(text.match(datePattern)), type })
+  const confidence = scoreConfidence({
+    amount,
+    merchantName,
+    hasDate: Boolean(text.match(datePattern)),
+    type,
+  })
   const rawTextMasked = maskSensitiveText(text)
 
   return {
@@ -46,12 +55,19 @@ export function parseCardSmsText(
 }
 
 export function maskSensitiveText(value: string): string {
-  return sensitivePatterns.reduce((result, pattern) => result.replace(pattern, maskMatch), value)
+  return sensitivePatterns.reduce(
+    (result, pattern) => result.replace(pattern, maskMatch),
+    value,
+  )
 }
 
-export function createNormalizedHash(parts: Array<string | number | undefined>): string {
+export function createNormalizedHash(
+  parts: Array<string | number | undefined>,
+): string {
   const normalized = parts
-    .filter((part): part is string | number => part !== undefined && part !== "")
+    .filter(
+      (part): part is string | number => part !== undefined && part !== "",
+    )
     .map((part) => String(part).trim().toLowerCase())
     .join("|")
 
@@ -70,7 +86,13 @@ function parseTransactionDate(text: string, receivedAt: Date): Date {
     return receivedAt
   }
 
-  const [, month, day, hour = String(receivedAt.getHours()), minute = String(receivedAt.getMinutes())] = match
+  const [
+    ,
+    month,
+    day,
+    hour = String(receivedAt.getHours()),
+    minute = String(receivedAt.getMinutes()),
+  ] = match
   return new Date(
     receivedAt.getFullYear(),
     Number(month) - 1,
@@ -85,18 +107,20 @@ function inferType(text: string): TransactionType {
     return "income"
   }
 
-  if (/(이체)/.test(text)) {
-    return "transfer"
-  }
-
   return "expense"
 }
 
-function extractMerchantName(text: string, amountToken?: string): string | undefined {
+function extractMerchantName(
+  text: string,
+  amountToken?: string,
+): string | undefined {
   let scrubbed = text
     .replace(/\[[^\]]+\]/g, " ")
     .replace(datePattern, " ")
-    .replace(/일시불|체크카드|신용카드|승인취소|승인|결제|사용|출금|입금|환급|캐시백|누적|잔액/gi, " ")
+    .replace(
+      /일시불|체크카드|신용카드|승인취소|승인|결제|사용|출금|입금|환급|캐시백|누적|잔액/gi,
+      " ",
+    )
 
   if (amountToken) {
     scrubbed = scrubbed.replace(amountToken, " ")

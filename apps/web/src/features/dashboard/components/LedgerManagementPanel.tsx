@@ -203,8 +203,8 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
             <div>
               <strong>현재 개인 가계부를 함께 사용하기</strong>
               <p>
-                거래, 카테고리와 카드를 유지한 채 공동 가계부로 전환합니다. 전환
-                후에는 개인 가계부로 되돌릴 수 없습니다.
+                거래, 카테고리, 카드와 계좌를 유지한 채 공동 가계부로
+                전환합니다. 전환 후에는 개인 가계부로 되돌릴 수 없습니다.
               </p>
             </div>
             <Button

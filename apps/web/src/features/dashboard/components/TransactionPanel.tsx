@@ -3,7 +3,6 @@
 import styled from "@emotion/styled"
 import {
   formatKoreanDate,
-  formatKoreanTime,
   formatMoneyInput,
   formatKrw,
   getDateTimeLocalValue,
@@ -11,7 +10,18 @@ import {
 } from "@salimon/domain"
 import type { CategoryUsageType, Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
-import { Check, Copy, Pencil, Plus, Save, Trash2, X } from "lucide-react"
+import {
+  Check,
+  Copy,
+  CreditCard,
+  Landmark,
+  Pencil,
+  Plus,
+  Save,
+  Trash2,
+  Wallet,
+  X,
+} from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useAppStore } from "../StoreProvider"
@@ -32,28 +42,7 @@ import {
   createNewTransactionDraft,
   type TransactionEditorDraft,
 } from "./transactionEditorDraft"
-
-const statusLabels: Record<Transaction["status"], string> = {
-  pending: "대기",
-  confirmed: "확정",
-  excluded: "제외",
-}
-
-const typeLabels: Record<Transaction["type"], string> = {
-  expense: "지출",
-  income: "수입",
-  transfer: "이체",
-  saving: "저축",
-}
-
-const categoryUsageGroups: Array<{
-  type: CategoryUsageType
-  label: string
-}> = [
-  { type: "expense", label: "지출용" },
-  { type: "income", label: "수입용" },
-  { type: "saving", label: "저축용" },
-]
+import { getPaymentLabel } from "./transactionPresentation"
 
 export const TransactionPanel = observer(function TransactionPanel() {
   const store = useAppStore()
@@ -111,11 +100,8 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const [transactionDate = "", transactionTimeValue = "12:00"] =
     draft.transactionAt.split("T")
   const transactionTime = transactionTimeValue.slice(0, 5)
-  const showsAllCategories = draft.type === "transfer"
-  const selectableCategories = store.currentCategories.filter(
-    (category) =>
-      showsAllCategories ||
-      category.usageTypes.includes(draft.type as CategoryUsageType),
+  const selectableCategories = store.currentCategories.filter((category) =>
+    category.usageTypes.includes(draft.type as CategoryUsageType),
   )
   const canSave =
     Number.isSafeInteger(amount) &&
@@ -190,10 +176,8 @@ export const TransactionPanel = observer(function TransactionPanel() {
   }
 
   function openCopy(transaction: Transaction) {
-    const validCategories = store.currentCategories.filter(
-      (category) =>
-        transaction.type === "transfer" ||
-        category.usageTypes.includes(transaction.type as CategoryUsageType),
+    const validCategories = store.currentCategories.filter((category) =>
+      category.usageTypes.includes(transaction.type as CategoryUsageType),
     )
     const fallbackCategoryId = validCategories[0]?.id
     const copyDraft = createCopiedTransactionDraft({
@@ -207,7 +191,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
         store.currentMembers.map((member) => member.userId),
       ),
       activePaymentMethodIds: new Set(
-        store.currentCards.map((card) => card.id),
+        store.currentPaymentMethods.map((method) => method.id),
       ),
       primaryPaymentMethodId: store.currentUserPrimaryCard?.id,
     })
@@ -333,15 +317,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
                     ...draft,
                     type,
                     categoryId:
-                      type === "transfer"
-                        ? draft.categoryId ||
-                          store.currentCategories[0]?.id ||
-                          ""
-                        : (store.currentCategories.find((category) =>
-                            category.usageTypes.includes(
-                              type as CategoryUsageType,
-                            ),
-                          )?.id ?? ""),
+                      store.currentCategories.find((category) =>
+                        category.usageTypes.includes(type as CategoryUsageType),
+                      )?.id ?? "",
                     recurringType:
                       type !== "expense" &&
                       draft.recurringType === "installment"
@@ -358,7 +336,6 @@ export const TransactionPanel = observer(function TransactionPanel() {
               >
                 <option value="expense">지출</option>
                 <option value="income">수입</option>
-                <option value="transfer">이체</option>
                 <option value="saving">저축</option>
               </Select>
             </Field>
@@ -457,21 +434,27 @@ export const TransactionPanel = observer(function TransactionPanel() {
                     : "현금"}
                 </option>
                 {store.currentMembers.map((member) => {
-                  const memberCards = store.currentCards
-                    .filter((card) => card.ownerUserId === member.userId)
+                  const memberMethods = (
+                    draft.recurringType === "installment"
+                      ? store.currentCards
+                      : store.currentPaymentMethods
+                  )
+                    .filter((method) => method.ownerUserId === member.userId)
                     .sort(
                       (a, b) =>
                         Number(Boolean(b.isPrimary)) -
                           Number(Boolean(a.isPrimary)) ||
+                        Number(a.type === "bank") - Number(b.type === "bank") ||
                         a.name.localeCompare(b.name, "ko"),
                     )
-                  return memberCards.length > 0 ? (
+                  return memberMethods.length > 0 ? (
                     <optgroup key={member.userId} label={member.nickname}>
-                      {memberCards.map((card) => (
-                        <option key={card.id} value={card.id}>
-                          {card.isPrimary ? "[주 카드] " : ""}
-                          {card.issuer} · {card.name}
-                          {card.last4 ? ` (${card.last4})` : ""}
+                      {memberMethods.map((method) => (
+                        <option key={method.id} value={method.id}>
+                          {method.isPrimary ? "[주 카드] " : ""}
+                          {method.type === "bank" ? "계좌" : "카드"} ·{" "}
+                          {method.issuer} · {method.name}
+                          {method.last4 ? ` (${method.last4})` : ""}
                         </option>
                       ))}
                     </optgroup>
@@ -593,30 +576,11 @@ export const TransactionPanel = observer(function TransactionPanel() {
               }
             >
               <option value="">기본 카테고리 자동 적용</option>
-              {showsAllCategories
-                ? categoryUsageGroups.map((group) => {
-                    const categories = store.currentCategories.filter(
-                      (category) => category.usageTypes.includes(group.type),
-                    )
-
-                    return categories.length > 0 ? (
-                      <optgroup key={group.type} label={group.label}>
-                        {categories.map((category) => (
-                          <option
-                            key={`${group.type}-${category.id}`}
-                            value={category.id}
-                          >
-                            {category.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ) : null
-                  })
-                : selectableCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
+              {selectableCategories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
             </Select>
           </Field>
 
@@ -656,7 +620,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           const category = store.data.categories.find(
             (item) => item.id === transaction.categoryId,
           )
-          const card = store.data.paymentMethods.find(
+          const paymentMethod = store.data.paymentMethods.find(
             (item) => item.id === transaction.paymentMethodId,
           )
           const registrant =
@@ -668,51 +632,57 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 (member) => member.userId === transaction.actorUserId,
               )?.nickname ?? registrant)
             : "공통"
+          const paymentLabel = getPaymentLabel(transaction, paymentMethod)
           return (
-            <TransactionItem key={transaction.id}>
-              <TransactionWhen>
-                <TransactionTime>
-                  {formatKoreanTime(transaction.transactionAt)}
-                </TransactionTime>
-                <ActorName>
-                  <strong>행위자</strong> {actor}
-                </ActorName>
-              </TransactionWhen>
+            <TransactionItem
+              key={transaction.id}
+              $excluded={transaction.status === "excluded"}
+            >
+              <TransactionTop>
+                <MetadataChips>
+                  {paymentLabel ? (
+                    <PaymentChip>
+                      {paymentMethod?.type === "card" ? (
+                        <CreditCard size={13} />
+                      ) : paymentMethod?.type === "bank" ? (
+                        <Landmark size={13} />
+                      ) : (
+                        <Wallet size={13} />
+                      )}
+                      {paymentLabel}
+                    </PaymentChip>
+                  ) : null}
+                  <CategoryTag $color={category?.color ?? colors.subtle}>
+                    <i />
+                    {category?.name ?? "기타"}
+                  </CategoryTag>
+                </MetadataChips>
+                <Amount $type={transaction.type}>
+                  {formatKrw(transaction.amount)}
+                </Amount>
+              </TransactionTop>
               <TransactionBody>
                 <TransactionName>
                   {transaction.merchantName || transaction.memo || "거래"}
                 </TransactionName>
-                <TransactionMeta>
-                  {typeLabels[transaction.type]} · {category?.name ?? "기타"} ·{" "}
-                  {statusLabels[transaction.status]}
-                  {transaction.recurringType === "fixed" ? " · 고정비" : ""}
-                  {transaction.recurringType === "installment"
-                    ? ` · (${transaction.installmentNumber}/${transaction.installmentTotal}개월)`
-                    : ""}
-                  {card
-                    ? ` · ${card.name}${card.isDeleted ? " (삭제)" : ""}`
-                    : transaction.type === "expense"
-                      ? " · 현금"
-                      : ""}
-                </TransactionMeta>
-                <RegisteredAt>
-                  등록{" "}
-                  {new Date(transaction.createdAt).toLocaleString("ko-KR", {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  })}
-                </RegisteredAt>
+                {transaction.memo ? (
+                  <TransactionMemo title={transaction.memo}>
+                    {transaction.memo}
+                  </TransactionMemo>
+                ) : null}
               </TransactionBody>
-              <TransactionEnd>
-                <Amount $type={transaction.type}>
-                  {transaction.type === "income"
-                    ? "+"
-                    : transaction.type === "expense"
-                      ? "-"
-                      : ""}
-                  {formatKrw(transaction.amount)}
-                </Amount>
-                <RegistrantName>등록자: {registrant}</RegistrantName>
+              <TransactionFooter>
+                <AuditInfo>
+                  <span>행위자 {actor}</span>
+                  <span>
+                    등록{" "}
+                    {new Date(transaction.createdAt).toLocaleString("ko-KR", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    })}
+                  </span>
+                  <span>등록자 {registrant}</span>
+                </AuditInfo>
                 <ActionCluster>
                   {canCopyTransaction(transaction) ? (
                     <CompactAction
@@ -738,7 +708,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                     <Trash2 size={14} />
                   </CompactAction>
                 </ActionCluster>
-              </TransactionEnd>
+              </TransactionFooter>
             </TransactionItem>
           )
         })}
@@ -918,41 +888,71 @@ const TransactionList = styled.div`
   display: grid;
 `
 
-const TransactionItem = styled.article`
+const TransactionItem = styled.article<{ $excluded: boolean }>`
   display: grid;
-  grid-template-columns: 68px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: start;
+  gap: 9px;
+  min-height: 126px;
   border-bottom: 1px solid ${colors.border};
   padding: 12px 0;
+  opacity: ${({ $excluded }) => ($excluded ? 0.52 : 1)};
 
-  &:hover > div:last-of-type > div:last-of-type,
-  &:focus-within > div:last-of-type > div:last-of-type {
+  &:hover > footer > div:last-of-type,
+  &:focus-within > footer > div:last-of-type {
     opacity: 1;
   }
 `
 
-const TransactionTime = styled.div`
-  color: ${colors.muted};
-  font-family: var(--font-geist-mono);
-  font-size: 12px;
-  line-height: 20px;
+const TransactionTop = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
 `
 
-const TransactionWhen = styled.div`
+const MetadataChips = styled.div`
   min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
 `
 
-const ActorName = styled.div`
-  margin-top: 5px;
+const PaymentChip = styled.span`
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid ${colors.borderStrong};
+  border-radius: ${radii.round};
+  background: #fff;
   color: ${colors.ink};
+  padding: 3px 7px;
   font-size: 10px;
-  overflow-wrap: anywhere;
+  font-weight: 650;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
 
-  strong {
-    display: block;
-    color: ${colors.teal};
-    font-weight: 700;
+const CategoryTag = styled.span<{ $color: string }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid ${colors.border};
+  border-radius: ${radii.round};
+  background: ${colors.panelSubtle};
+  color: ${colors.muted};
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+
+  i {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: ${({ $color }) => $color};
   }
 `
 
@@ -968,24 +968,13 @@ const TransactionName = styled.div`
   font-weight: 600;
 `
 
-const TransactionMeta = styled.div`
-  margin-top: 2px;
+const TransactionMemo = styled.div`
+  margin-top: 4px;
   color: ${colors.muted};
-  font-size: 12px;
-`
-
-const RegisteredAt = styled.div`
-  margin-top: 2px;
-  color: ${colors.subtle};
-  font-size: 10px;
-`
-
-const RegistrantName = styled.div`
-  max-width: 94px;
-  color: ${colors.muted};
-  font-size: 10px;
-  text-align: right;
-  overflow-wrap: anywhere;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `
 
 const Amount = styled.div<{ $type: Transaction["type"] }>`
@@ -1003,10 +992,25 @@ const Amount = styled.div<{ $type: Transaction["type"] }>`
   white-space: nowrap;
 `
 
-const TransactionEnd = styled.div`
-  display: grid;
-  justify-items: end;
-  gap: 7px;
+const TransactionFooter = styled.footer`
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+`
+
+const AuditInfo = styled.div`
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 8px;
+  color: ${colors.subtle};
+  font-size: 9px;
+
+  span {
+    white-space: nowrap;
+  }
 `
 
 const ActionCluster = styled.div`

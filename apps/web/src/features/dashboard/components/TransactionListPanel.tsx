@@ -15,7 +15,6 @@ type PeriodPreset = "3" | "7" | "14" | "21" | "28" | "custom" | "all"
 const typeLabels: Record<Transaction["type"], string> = {
   expense: "지출",
   income: "수입",
-  transfer: "이체",
   saving: "저축",
 }
 const statusLabels: Record<Transaction["status"], string> = {
@@ -168,7 +167,6 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
             <option value="common">공통</option>
             <option value="expense">지출</option>
             <option value="income">수입</option>
-            <option value="transfer">이체</option>
             <option value="saving">저축</option>
           </Select>
         </Field>
