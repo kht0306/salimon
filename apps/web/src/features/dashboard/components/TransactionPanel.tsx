@@ -50,6 +50,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const [copySource, setCopySource] = useState<Transaction | null>(null)
   const [isAdding, setAdding] = useState(false)
   const [isSaving, setSaving] = useState(false)
+  const editorRef = useRef<HTMLDivElement>(null)
   const savingRef = useRef(false)
   const selectedDate = store.selectedDate
   const initialDraft = useMemo(
@@ -77,6 +78,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
     },
     [store],
   )
+
+  useEffect(() => {
+    if (!isAdding || !store.transactionEditorOpen) return
+
+    editorRef.current?.scrollIntoView({ block: "start" })
+  }, [copySource, editing, isAdding, store.transactionEditorOpen])
 
   useEffect(() => {
     const dirty =
@@ -279,7 +286,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
       </PanelTop>
 
       {isAdding && store.transactionEditorOpen ? (
-        <Editor>
+        <Editor ref={editorRef}>
           <EditorHeader>
             <strong>
               {editing
