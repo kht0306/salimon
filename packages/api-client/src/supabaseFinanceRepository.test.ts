@@ -65,3 +65,18 @@ describe("saveTransaction", () => {
     expect(from).not.toHaveBeenCalled()
   })
 })
+
+describe("deactivateFixedRule", () => {
+  it("deactivates the rule and its transactions from the selected month", async () => {
+    rpc.mockResolvedValue({ data: null, error: null })
+    const repository = new SupabaseFinanceRepository()
+
+    await repository.deactivateFixedRule("rule-1", "2026-07")
+
+    expect(rpc).toHaveBeenCalledWith("deactivate_fixed_rule_from_month", {
+      p_rule_id: "rule-1",
+      p_month: "2026-07-01",
+    })
+    expect(from).not.toHaveBeenCalled()
+  })
+})

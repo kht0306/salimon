@@ -73,6 +73,7 @@ export class AppStore {
   selectedLedgerId: string
   selectedMonth: string
   selectedDate: string
+  calendarRegistrantId = ""
   transactionEditorOpen = false
   transactionEditorDirty = false
   activeView:
@@ -228,6 +229,20 @@ export class AppStore {
     )
   }
 
+  get calendarMonthTransactions(): Transaction[] {
+    if (!this.calendarRegistrantId) return this.monthTransactions
+    return this.monthTransactions.filter(
+      (transaction) => transaction.createdBy === this.calendarRegistrantId,
+    )
+  }
+
+  get calendarSelectedDateTransactions(): Transaction[] {
+    return this.calendarMonthTransactions.filter(
+      (transaction) =>
+        toDateKey(new Date(transaction.transactionAt)) === this.selectedDate,
+    )
+  }
+
   get monthExpenseTotal(): number {
     return this.monthTransactions
       .filter(
@@ -306,6 +321,10 @@ export class AppStore {
 
   setView(view: AppStore["activeView"]): void {
     this.activeView = view
+  }
+
+  setCalendarRegistrant(registrantId: string): void {
+    this.calendarRegistrantId = registrantId
   }
 
   notify(
@@ -395,6 +414,7 @@ export class AppStore {
 
   switchLedger(ledgerId: string): void {
     this.selectedLedgerId = ledgerId
+    this.calendarRegistrantId = ""
     this.activeView = "calendar"
   }
 

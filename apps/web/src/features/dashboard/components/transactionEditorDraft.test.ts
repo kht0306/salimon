@@ -77,6 +77,21 @@ describe("transaction editor drafts", () => {
     expect(draft.paymentMethodId).toBe("card-1")
   })
 
+  it("keeps the selected account when copying a saving transaction", () => {
+    const draft = createCopiedTransactionDraft({
+      transaction: {
+        ...transaction,
+        type: "saving",
+        paymentMethodId: "account-1",
+      },
+      activeCategoryIds: new Set(["category-1"]),
+      activeMemberIds: new Set(["user-2"]),
+      activePaymentMethodIds: new Set(["account-1"]),
+    })
+
+    expect(draft.paymentMethodId).toBe("account-1")
+  })
+
   it("allows copy only for non-recurring transactions", () => {
     expect(canCopyTransaction(transaction)).toBe(true)
     expect(canCopyTransaction({ ...transaction, recurringType: "fixed" })).toBe(

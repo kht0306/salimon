@@ -531,27 +531,10 @@ export class SupabaseFinanceRepository {
 
   async deactivateFixedRule(ruleId: string, month: string): Promise<void> {
     const client = requireSupabaseClient()
-    const { error: ruleError } = await client
-      .from("recurring_rules")
-      .update({
-        inactive_from_month: `${month}-01`,
-        is_active: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", ruleId)
-    throwIfError(ruleError)
-    const start = new Date(`${month}-01T00:00:00`)
-    const end = new Date(
-      start.getFullYear(),
-      start.getMonth() + 1,
-      1,
-    ).toISOString()
-    const { error } = await client
-      .from("transactions")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("recurring_rule_id", ruleId)
-      .gte("transaction_at", start.toISOString())
-      .lt("transaction_at", end)
+    const { error } = await client.rpc("deactivate_fixed_rule_from_month", {
+      p_rule_id: ruleId,
+      p_month: `${month}-01`,
+    })
     throwIfError(error)
   }
 
