@@ -31,7 +31,7 @@ const LoginContent = observer(function LoginContent() {
           <WalletCards size={25} />
         </Logo>
         <Header>
-          <Eyebrow>Salimon · 살림온도</Eyebrow>
+          <Eyebrow>Salimon · 살림온</Eyebrow>
           <h1>내 가계부를 시작하세요</h1>
           <p>
             카카오 계정으로 로그인하면 거래 내역이 안전하게 저장되고 여러

@@ -83,7 +83,7 @@ const DashboardContent = observer(function DashboardContent() {
           aria-label="기본 대시보드로 이동"
         >
           <BrandMark aria-hidden="true">S</BrandMark>
-          <BrandName>Salimon · 살림온도</BrandName>
+          <BrandName>Salimon · 살림온</BrandName>
         </Brand>
 
         <LedgerField>
