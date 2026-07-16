@@ -81,7 +81,7 @@ export function groupTransactionsByRecurrence(
   )
 
   return [
-    { key: "recurring", label: "반복 결제", transactions: recurring },
+    { key: "recurring", label: "반복 거래", transactions: recurring },
     { key: "general", label: "일반 거래", transactions: general },
   ].filter(
     (group) => group.transactions.length > 0,

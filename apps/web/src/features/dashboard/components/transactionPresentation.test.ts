@@ -176,7 +176,7 @@ describe("groupTransactionsByRecurrence", () => {
     ).toEqual([
       {
         key: "recurring",
-        label: "반복 결제",
+        label: "반복 거래",
         ids: ["installment", "fixed"],
       },
       { key: "general", label: "일반 거래", ids: ["general"] },

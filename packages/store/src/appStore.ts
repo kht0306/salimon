@@ -80,6 +80,7 @@ export class AppStore {
   selectedDate: string
   calendarRegistrantId = ""
   transactionGrouping: TransactionGrouping = "actor"
+  collapsedTransactionGroupKeys = new Set<string>()
   transactionEditorOpen = false
   transactionEditorDirty = false
   activeView:
@@ -352,6 +353,15 @@ export class AppStore {
 
   setTransactionGrouping(grouping: TransactionGrouping): void {
     this.transactionGrouping = grouping
+  }
+
+  toggleTransactionGroup(groupKey: string): void {
+    if (this.collapsedTransactionGroupKeys.has(groupKey)) {
+      this.collapsedTransactionGroupKeys.delete(groupKey)
+      return
+    }
+
+    this.collapsedTransactionGroupKeys.add(groupKey)
   }
 
   notify(
