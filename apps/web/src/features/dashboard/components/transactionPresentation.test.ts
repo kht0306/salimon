@@ -4,6 +4,7 @@ import {
   getInstallmentLabel,
   getPaymentLabel,
   groupTransactionsByActor,
+  matchesPaymentMethodFilter,
 } from "./transactionPresentation"
 
 const transaction: Transaction = {
@@ -111,5 +112,21 @@ describe("groupTransactionsByActor", () => {
       { key: "user-1", label: "민호" },
       { key: "user-2", label: "수진" },
     ])
+  })
+})
+
+describe("matchesPaymentMethodFilter", () => {
+  it("matches multiple payment methods and cash expenses", () => {
+    expect(matchesPaymentMethodFilter(transaction, [])).toBe(true)
+    expect(
+      matchesPaymentMethodFilter({ ...transaction, paymentMethodId: card.id }, [
+        card.id,
+        account.id,
+      ]),
+    ).toBe(true)
+    expect(matchesPaymentMethodFilter(transaction, ["cash"])).toBe(true)
+    expect(
+      matchesPaymentMethodFilter({ ...transaction, type: "income" }, ["cash"]),
+    ).toBe(false)
   })
 })
