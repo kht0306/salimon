@@ -110,7 +110,9 @@ const DashboardContent = observer(function DashboardContent() {
               type="button"
               $active={Boolean(currentMembership?.isDefault)}
               disabled={
-                !store.selectedLedgerId || Boolean(currentMembership?.isDefault)
+                !store.selectedLedgerId ||
+                Boolean(currentMembership?.isDefault) ||
+                store.ledgerMutationState !== "idle"
               }
               title={
                 currentMembership?.isDefault

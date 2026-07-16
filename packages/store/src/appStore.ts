@@ -99,7 +99,8 @@ export class AppStore {
   authError: string | null = null
   dataState: "idle" | "loading" | "ready" | "error" = "idle"
   dataError: string | null = null
-  ledgerMutationState: "idle" | "creating" | "renaming" = "idle"
+  ledgerMutationState: "idle" | "creating" | "renaming" | "setting-default" =
+    "idle"
   private initializedWorkspaceUserId: string | null = null
   private workspaceInitialization: Promise<void> | null = null
   supabaseConnection: SupabaseConnectionCheck = {
@@ -457,6 +458,19 @@ export class AppStore {
 
   async setDefaultLedger(ledgerId: string): Promise<boolean> {
     if (!this.authUser || !ledgerId) return false
+    if (
+      this.data.members.some(
+        (member) =>
+          member.ledgerId === ledgerId &&
+          member.userId === this.authUser?.id &&
+          member.isDefault,
+      )
+    ) {
+      return true
+    }
+    if (this.ledgerMutationState !== "idle") return false
+
+    this.ledgerMutationState = "setting-default"
 
     try {
       await this.repository.setDefaultLedger(ledgerId)
@@ -466,6 +480,10 @@ export class AppStore {
     } catch (error) {
       this.setDataError(error)
       return false
+    } finally {
+      runInAction(() => {
+        this.ledgerMutationState = "idle"
+      })
     }
   }
 
