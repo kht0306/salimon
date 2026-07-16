@@ -8,6 +8,7 @@ import type {
   LedgerMember,
   LedgerType,
   PaymentMethod,
+  PaymentInstrument,
   Profile,
   RecurringRule,
   Transaction,
@@ -69,6 +70,7 @@ export class SupabaseFinanceRepository {
       budgetsResult,
       rulesResult,
       paymentMethodsResult,
+      paymentInstrumentsResult,
       transactionsResult,
       invitationsResult,
       samplesResult,
@@ -81,7 +83,9 @@ export class SupabaseFinanceRepository {
         .single(),
       client
         .from("ledgers")
-        .select("id, owner_id, name, type, currency")
+        .select(
+          "id, owner_id, name, type, currency, archived_at, purge_after",
+        )
         .order("created_at"),
       client
         .from("ledger_members")
@@ -112,7 +116,14 @@ export class SupabaseFinanceRepository {
       client
         .from("payment_methods")
         .select(
-          "id, ledger_id, owner_user_id, name, type, last4, issuer, visibility, is_active, is_primary, is_debit, deleted_at, payment_day, billing_period_end_day, billing_period_end_month_offset",
+          "id, payment_instrument_id, ledger_id, owner_user_id, name, type, last4, issuer, visibility, is_active, is_primary, is_debit, deleted_at, payment_day, billing_period_end_day, billing_period_end_month_offset",
+        )
+        .in("type", ["card", "bank"])
+        .order("created_at"),
+      client
+        .from("user_payment_methods")
+        .select(
+          "id, owner_user_id, name, type, last4, issuer, is_active, is_debit, deleted_at, payment_day, billing_period_end_day, billing_period_end_month_offset",
         )
         .in("type", ["card", "bank"])
         .order("created_at"),
@@ -146,6 +157,7 @@ export class SupabaseFinanceRepository {
       budgetsResult,
       rulesResult,
       paymentMethodsResult,
+      paymentInstrumentsResult,
       transactionsResult,
       invitationsResult,
       samplesResult,
@@ -187,6 +199,9 @@ export class SupabaseFinanceRepository {
       paymentMethods: ((paymentMethodsResult.data ?? []) as Row[]).map(
         mapPaymentMethod,
       ),
+      paymentInstruments: (
+        (paymentInstrumentsResult.data ?? []) as Row[]
+      ).map(mapPaymentInstrument),
       transactions: ((transactionsResult.data ?? []) as Row[]).map(
         mapTransaction,
       ),
@@ -647,12 +662,16 @@ export class SupabaseFinanceRepository {
     name: string
     type: LedgerType
     setDefault: boolean
+    paymentInstrumentIds: string[]
+    ledgerVisibleInstrumentIds: string[]
   }): Promise<string> {
     const client = requireSupabaseClient()
     const { data, error } = await client.rpc("create_ledger", {
       p_name: input.name,
       p_type: input.type,
       p_set_default: input.setDefault,
+      p_payment_instrument_ids: input.paymentInstrumentIds,
+      p_ledger_visible_instrument_ids: input.ledgerVisibleInstrumentIds,
     })
     throwIfError(error)
     if (typeof data !== "string") {
@@ -674,6 +693,30 @@ export class SupabaseFinanceRepository {
   async setDefaultLedger(ledgerId: string): Promise<void> {
     const client = requireSupabaseClient()
     const { error } = await client.rpc("set_default_ledger", {
+      p_ledger_id: ledgerId,
+    })
+    throwIfError(error)
+  }
+
+  async archiveLedger(ledgerId: string): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("archive_ledger", {
+      p_ledger_id: ledgerId,
+    })
+    throwIfError(error)
+  }
+
+  async restoreLedger(ledgerId: string): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("restore_ledger", {
+      p_ledger_id: ledgerId,
+    })
+    throwIfError(error)
+  }
+
+  async leaveSharedLedger(ledgerId: string): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("leave_shared_ledger", {
       p_ledger_id: ledgerId,
     })
     throwIfError(error)
@@ -794,6 +837,8 @@ function mapLedger(row: Row, members: LedgerMember[], userId: string): Ledger {
     type: row.type === "shared" ? "shared" : "personal",
     currency: "KRW",
     role: ownMembership?.role ?? "member",
+    archivedAt: optionalString(row.archived_at),
+    purgeAfter: optionalString(row.purge_after),
   }
 }
 
@@ -898,6 +943,7 @@ function mapPaymentMethod(row: Row): PaymentMethod {
   const offset = numberValue(row.billing_period_end_month_offset)
   return {
     id: stringValue(row.id),
+    instrumentId: stringValue(row.payment_instrument_id) || stringValue(row.id),
     ledgerId: stringValue(row.ledger_id),
     ownerUserId: optionalString(row.owner_user_id),
     name: stringValue(row.name),
@@ -921,6 +967,28 @@ function mapPaymentMethod(row: Row): PaymentMethod {
 
 export function mapPaymentMethodType(value: unknown): PaymentMethod["type"] {
   return value === "bank" ? "bank" : "card"
+}
+
+function mapPaymentInstrument(row: Row): PaymentInstrument {
+  const offset = numberValue(row.billing_period_end_month_offset)
+  return {
+    id: stringValue(row.id),
+    ownerUserId: stringValue(row.owner_user_id),
+    name: stringValue(row.name),
+    type: mapPaymentMethodType(row.type),
+    last4: optionalString(row.last4),
+    issuer: optionalString(row.issuer),
+    isActive: Boolean(row.is_active),
+    isDeleted: Boolean(row.deleted_at),
+    isDebit: Boolean(row.is_debit),
+    paymentDay:
+      row.payment_day == null ? undefined : numberValue(row.payment_day),
+    billingPeriodEndDay:
+      row.billing_period_end_day == null
+        ? undefined
+        : numberValue(row.billing_period_end_day),
+    billingPeriodEndMonthOffset: offset === 0 ? 0 : -1,
+  }
 }
 
 function mapTransaction(row: Row): Transaction {

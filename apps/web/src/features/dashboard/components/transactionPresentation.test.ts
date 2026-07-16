@@ -23,6 +23,7 @@ const transaction: Transaction = {
 
 const card: PaymentMethod = {
   id: "card-1",
+  instrumentId: "card-1",
   ledgerId: "ledger-1",
   ownerUserId: "user-1",
   name: "생활비",

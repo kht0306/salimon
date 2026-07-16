@@ -102,3 +102,26 @@ describe("deactivateFixedRule", () => {
     expect(from).not.toHaveBeenCalled()
   })
 })
+
+describe("createLedger", () => {
+  it("passes selected instruments and shared visibility separately", async () => {
+    rpc.mockResolvedValue({ data: "ledger-2", error: null })
+    const repository = new SupabaseFinanceRepository()
+
+    await repository.createLedger({
+      name: "여행 가계부",
+      type: "shared",
+      setDefault: false,
+      paymentInstrumentIds: ["instrument-1", "instrument-2"],
+      ledgerVisibleInstrumentIds: ["instrument-2"],
+    })
+
+    expect(rpc).toHaveBeenCalledWith("create_ledger", {
+      p_name: "여행 가계부",
+      p_type: "shared",
+      p_set_default: false,
+      p_payment_instrument_ids: ["instrument-1", "instrument-2"],
+      p_ledger_visible_instrument_ids: ["instrument-2"],
+    })
+  })
+})

@@ -4,7 +4,15 @@ import styled from "@emotion/styled"
 import type { CreatedLedgerInvitation } from "@salimon/api-client"
 import type { LedgerType } from "@salimon/types"
 import { colors, radii, spacing } from "@salimon/ui-tokens"
-import { Copy, Link, Pencil, Plus, Share2 } from "lucide-react"
+import {
+  Archive,
+  Copy,
+  Link,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Share2,
+} from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useState } from "react"
 import { useAppStore } from "../StoreProvider"
@@ -40,6 +48,12 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
   const [newName, setNewName] = useState("")
   const [newType, setNewType] = useState<LedgerType>("personal")
   const [setAsDefault, setSetAsDefault] = useState(false)
+  const [newLedgerPaymentMethodIds, setNewLedgerPaymentMethodIds] = useState<
+    string[]
+  >([])
+  const [newLedgerVisibleMethodIds, setNewLedgerVisibleMethodIds] = useState<
+    string[]
+  >([])
   const [inviteCode, setInviteCode] = useState("")
   const [createdInvitation, setCreatedInvitation] =
     useState<CreatedLedgerInvitation | null>(null)
@@ -112,7 +126,65 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
             이 가계부의 이름을 변경할 권한이 없습니다.
           </PermissionNotice>
         ) : null}
+        {ledger ? (
+          <DangerActions>
+            {ledger.role !== "owner" && ledger.type === "shared" ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  if (window.confirm("이 공동 가계부에서 나가시겠습니까?")) {
+                    void store.leaveCurrentSharedLedger()
+                  }
+                }}
+              >
+                공동 가계부 나가기
+              </Button>
+            ) : null}
+            {ledger.ownerId === store.authUser?.id ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "가계부를 보관하시겠습니까? 30일 동안 복구할 수 있으며 카드·계좌 원본은 유지됩니다.",
+                    )
+                  ) {
+                    void store.archiveCurrentLedger()
+                  }
+                }}
+              >
+                <Archive size={15} /> 가계부 보관
+              </Button>
+            ) : null}
+          </DangerActions>
+        ) : null}
       </Panel>
+
+      {store.archivedOwnedLedgers.length > 0 ? (
+        <Panel>
+          <PanelHeader>
+            <PanelTitle>보관한 가계부</PanelTitle>
+          </PanelHeader>
+          <ArchivedLedgers>
+            {store.archivedOwnedLedgers.map((archivedLedger) => (
+              <div key={archivedLedger.id}>
+                <span>
+                  <strong>{archivedLedger.name}</strong>
+                  {archivedLedger.purgeAfter
+                    ? ` · ${new Date(archivedLedger.purgeAfter).toLocaleDateString("ko-KR")}까지 복구 가능`
+                    : ""}
+                </span>
+                <Button
+                  type="button"
+                  onClick={() => void store.restoreLedger(archivedLedger.id)}
+                >
+                  <RotateCcw size={15} /> 복구
+                </Button>
+              </div>
+            ))}
+          </ArchivedLedgers>
+        </Panel>
+      ) : null}
 
       <Panel>
         <PanelHeader>
@@ -152,6 +224,70 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
             />
             로그인할 때 기본 가계부로 사용
           </CheckboxField>
+          {store.myPaymentInstruments.length > 0 ? (
+            <NewLedgerPaymentMethods>
+              <strong>연결할 내 카드·계좌</strong>
+              <span>
+                선택하지 않아도 가계부를 만들 수 있습니다. 공동 공개는 별도로
+                선택합니다.
+              </span>
+              {store.myPaymentInstruments.map((method) => {
+                const isConnected = newLedgerPaymentMethodIds.includes(
+                  method.id,
+                )
+                return (
+                  <PaymentMethodOption key={method.id}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={isConnected}
+                        disabled={isMutating}
+                        onChange={(event) => {
+                          setNewLedgerPaymentMethodIds((current) =>
+                            event.target.checked
+                              ? [...current, method.id]
+                              : current.filter(
+                                  (id) => id !== method.id,
+                                ),
+                          )
+                          if (!event.target.checked) {
+                            setNewLedgerVisibleMethodIds((current) =>
+                              current.filter(
+                                (id) => id !== method.id,
+                              ),
+                            )
+                          }
+                        }}
+                      />
+                      {method.type === "card" ? "카드" : "계좌"} · {method.name}
+                      {method.last4 ? ` (•••• ${method.last4})` : ""}
+                    </label>
+                    {newType === "shared" && isConnected ? (
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={newLedgerVisibleMethodIds.includes(
+                            method.id,
+                          )}
+                          disabled={isMutating}
+                          onChange={(event) =>
+                            setNewLedgerVisibleMethodIds((current) =>
+                              event.target.checked
+                                ? [...current, method.id]
+                                : current.filter(
+                                    (id) => id !== method.id,
+                                  ),
+                            )
+                          }
+                        />
+                        공동 멤버에게 공개
+                      </label>
+                    ) : null}
+                  </PaymentMethodOption>
+                )
+              })}
+            </NewLedgerPaymentMethods>
+          ) : null}
           <Button
             type="button"
             $variant="soft"
@@ -161,6 +297,9 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
                 name: newName,
                 type: newType,
                 setDefault: setAsDefault,
+                paymentInstrumentIds: newLedgerPaymentMethodIds,
+                ledgerVisibleInstrumentIds:
+                  newType === "shared" ? newLedgerVisibleMethodIds : [],
               })
             }}
           >
@@ -396,6 +535,40 @@ const JoinRow = styled(FormRow)`
   background: ${colors.panelSubtle};
 `
 
+const NewLedgerPaymentMethods = styled.div`
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid ${colors.border};
+  border-radius: ${radii.md};
+  background: ${colors.panel};
+
+  > span {
+    color: ${colors.muted};
+    font-size: 11px;
+  }
+`
+
+const PaymentMethodOption = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+  }
+
+  input {
+    width: 16px;
+    height: 16px;
+    accent-color: ${colors.teal};
+  }
+`
+
 const CheckboxField = styled.label`
   min-height: 34px;
   display: inline-flex;
@@ -423,6 +596,29 @@ const PermissionNotice = styled.p`
   padding: 0 18px 16px;
   color: ${colors.muted};
   font-size: 12px;
+`
+
+const DangerActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 18px 16px;
+`
+
+const ArchivedLedgers = styled.div`
+  display: grid;
+  padding: 8px 18px;
+
+  > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid ${colors.border};
+    color: ${colors.muted};
+    font-size: 12px;
+  }
 `
 
 const ConversionNotice = styled.div`

@@ -7,6 +7,7 @@ import type {
   LedgerMember,
   LocalSmsCandidate,
   PaymentMethod,
+  PaymentInstrument,
   Profile,
   RecurringRule,
   Transaction,
@@ -21,6 +22,7 @@ export interface FinanceData {
   categoryBudgets: CategoryBudget[]
   recurringRules: RecurringRule[]
   paymentMethods: PaymentMethod[]
+  paymentInstruments: PaymentInstrument[]
   transactions: Transaction[]
   smsCandidates: LocalSmsCandidate[]
   cardMessageSamples: CardMessageSample[]
@@ -41,6 +43,7 @@ export function createEmptyFinanceData(): FinanceData {
     categoryBudgets: [],
     recurringRules: [],
     paymentMethods: [],
+    paymentInstruments: [],
     transactions: [],
     smsCandidates: [],
     cardMessageSamples: [],

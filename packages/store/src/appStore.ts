@@ -60,6 +60,8 @@ export interface LedgerCreationInput {
   name: string
   type: LedgerType
   setDefault: boolean
+  paymentInstrumentIds: string[]
+  ledgerVisibleInstrumentIds: string[]
 }
 
 export class AppStore {
@@ -126,6 +128,17 @@ export class AppStore {
     )
   }
 
+  get activeLedgers() {
+    return this.data.ledgers.filter((ledger) => !ledger.archivedAt)
+  }
+
+  get archivedOwnedLedgers() {
+    return this.data.ledgers.filter(
+      (ledger) =>
+        Boolean(ledger.archivedAt) && ledger.ownerId === this.authUser?.id,
+    )
+  }
+
   get currentMembers() {
     return this.data.members.filter(
       (member) =>
@@ -163,6 +176,12 @@ export class AppStore {
         method.type === "bank" &&
         !method.isDeleted,
     )
+  }
+
+  get myPaymentInstruments() {
+    return this.data.paymentInstruments
+      .filter((method) => !method.isDeleted)
+      .sort((a, b) => a.name.localeCompare(b.name, "ko"))
   }
 
   get currentPaymentMethods() {
@@ -285,12 +304,12 @@ export class AppStore {
   hydrate(data: FinanceData): void {
     this.data = data
     if (
-      !this.data.ledgers.some((ledger) => ledger.id === this.selectedLedgerId)
+      !this.activeLedgers.some((ledger) => ledger.id === this.selectedLedgerId)
     ) {
       const defaultLedgerId = this.data.members.find(
         (member) => member.userId === this.authUser?.id && member.isDefault,
       )?.ledgerId
-      this.selectedLedgerId = defaultLedgerId ?? this.data.ledgers[0]?.id ?? ""
+      this.selectedLedgerId = defaultLedgerId ?? this.activeLedgers[0]?.id ?? ""
     }
   }
 
@@ -1113,6 +1132,51 @@ export class AppStore {
       )
       await this.refreshFinanceData()
       this.notify("개인 가계부를 공동 가계부로 전환했습니다.")
+      return this.dataState === "ready"
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async archiveCurrentLedger(): Promise<boolean> {
+    const ledger = this.currentLedger
+    if (!ledger || ledger.ownerId !== this.authUser?.id) return false
+    try {
+      await this.repository.archiveLedger(ledger.id)
+      await this.refreshFinanceData()
+      this.notify("가계부를 30일 보관함으로 옮겼습니다.")
+      return this.dataState === "ready"
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async restoreLedger(ledgerId: string): Promise<boolean> {
+    try {
+      await this.repository.restoreLedger(ledgerId)
+      await this.refreshFinanceData()
+      runInAction(() => {
+        this.selectedLedgerId = ledgerId
+      })
+      this.notify("가계부를 복구했습니다.")
+      return this.dataState === "ready"
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async leaveCurrentSharedLedger(): Promise<boolean> {
+    const ledger = this.currentLedger
+    if (!ledger || ledger.type !== "shared" || ledger.role === "owner") {
+      return false
+    }
+    try {
+      await this.repository.leaveSharedLedger(ledger.id)
+      await this.refreshFinanceData()
+      this.notify("공동 가계부에서 나왔습니다.")
       return this.dataState === "ready"
     } catch (error) {
       this.setDataError(error)
