@@ -4,6 +4,8 @@ import {
   getInstallmentLabel,
   getPaymentLabel,
   groupTransactionsByActor,
+  groupTransactionsByRecurrence,
+  groupTransactionsByRegistrant,
   matchesPaymentMethodFilter,
 } from "./transactionPresentation"
 
@@ -116,6 +118,74 @@ describe("groupTransactionsByActor", () => {
       { key: "user-1", label: "민호" },
       { key: "user-2", label: "수진" },
     ])
+  })
+})
+
+describe("groupTransactionsByRegistrant", () => {
+  it("groups transactions by the member who registered them", () => {
+    const groups = groupTransactionsByRegistrant(
+      [
+        { ...transaction, id: "registered-2", createdBy: "user-2" },
+        { ...transaction, id: "registered-1", createdBy: "user-1" },
+      ],
+      [
+        {
+          id: "member-1",
+          ledgerId: "ledger-1",
+          userId: "user-1",
+          nickname: "민호",
+          role: "owner",
+          status: "active",
+          isDefault: true,
+          joinedAt: "2026-07-01T00:00:00.000Z",
+        },
+        {
+          id: "member-2",
+          ledgerId: "ledger-1",
+          userId: "user-2",
+          nickname: "수진",
+          role: "member",
+          status: "active",
+          isDefault: false,
+          joinedAt: "2026-07-01T00:00:00.000Z",
+        },
+      ],
+    )
+
+    expect(groups.map(({ key, label }) => ({ key, label }))).toEqual([
+      { key: "user-1", label: "민호" },
+      { key: "user-2", label: "수진" },
+    ])
+  })
+})
+
+describe("groupTransactionsByRecurrence", () => {
+  it("places fixed and installment transactions before general transactions", () => {
+    const groups = groupTransactionsByRecurrence([
+      { ...transaction, id: "general" },
+      { ...transaction, id: "installment", recurringType: "installment" },
+      { ...transaction, id: "fixed", recurringType: "fixed" },
+    ])
+
+    expect(
+      groups.map(({ key, label, transactions }) => ({
+        key,
+        label,
+        ids: transactions.map((item) => item.id),
+      })),
+    ).toEqual([
+      {
+        key: "recurring",
+        label: "반복 결제",
+        ids: ["installment", "fixed"],
+      },
+      { key: "general", label: "일반 거래", ids: ["general"] },
+    ])
+  })
+
+  it("omits empty recurrence sections", () => {
+    expect(groupTransactionsByRecurrence([transaction])).toHaveLength(1)
+    expect(groupTransactionsByRecurrence([])).toEqual([])
   })
 })
 

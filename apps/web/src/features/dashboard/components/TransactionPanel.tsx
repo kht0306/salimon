@@ -8,6 +8,7 @@ import {
   getDateTimeLocalValue,
   splitInstallmentPrincipal,
 } from "@salimon/domain"
+import type { TransactionGrouping } from "@salimon/store"
 import type { CategoryUsageType, Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import {
@@ -43,7 +44,11 @@ import {
   type TransactionEditorDraft,
 } from "./transactionEditorDraft"
 import { TransactionMetadataChips } from "./TransactionMetadataChips"
-import { groupTransactionsByActor } from "./transactionPresentation"
+import {
+  groupTransactionsByActor,
+  groupTransactionsByRecurrence,
+  groupTransactionsByRegistrant,
+} from "./transactionPresentation"
 
 export const TransactionPanel = observer(function TransactionPanel() {
   const store = useAppStore()
@@ -133,18 +138,29 @@ export const TransactionPanel = observer(function TransactionPanel() {
         (isEditingInstallment ||
           draft.installmentAmountType !== "principal" ||
           amount >= installmentMonths)))
-  const transactionGroups = store.separateTransactionsByUser
-    ? groupTransactionsByActor(
-        store.calendarSelectedDateTransactions,
-        store.currentMembers,
-      )
-    : [
-        {
-          key: "all",
-          label: "",
-          transactions: store.calendarSelectedDateTransactions,
-        },
-      ]
+  const recurrenceGroups = groupTransactionsByRecurrence(
+    store.calendarSelectedDateTransactions,
+  ).map((recurrenceGroup) => ({
+    ...recurrenceGroup,
+    userGroups:
+      store.transactionGrouping === "actor"
+        ? groupTransactionsByActor(
+            recurrenceGroup.transactions,
+            store.currentMembers,
+          )
+        : store.transactionGrouping === "registrant"
+          ? groupTransactionsByRegistrant(
+              recurrenceGroup.transactions,
+              store.currentMembers,
+            )
+          : [
+              {
+                key: "all",
+                label: "",
+                transactions: recurrenceGroup.transactions,
+              },
+            ],
+  }))
 
   function openNew() {
     initialDraftRef.current = initialDraft
@@ -295,16 +311,23 @@ export const TransactionPanel = observer(function TransactionPanel() {
           <Subtle>{store.calendarSelectedDateTransactions.length}건</Subtle>
         </div>
         <HeaderActions>
-          <GroupToggle $active={store.separateTransactionsByUser}>
-            <input
-              type="checkbox"
-              checked={store.separateTransactionsByUser}
+          <GroupingControl>
+            <UsersRound size={14} aria-hidden="true" />
+            <span>구분 기준</span>
+            <GroupingSelect
+              aria-label="거래 목록 구분 기준"
+              value={store.transactionGrouping}
               onChange={(event) =>
-                store.setSeparateTransactionsByUser(event.target.checked)
+                store.setTransactionGrouping(
+                  event.target.value as TransactionGrouping,
+                )
               }
-            />
-            <UsersRound size={14} /> 사용자 구분
-          </GroupToggle>
+            >
+              <option value="actor">거래자별</option>
+              <option value="registrant">등록자별</option>
+              <option value="none">구분 없음</option>
+            </GroupingSelect>
+          </GroupingControl>
           <IconButton
             $variant="primary"
             title="거래 추가"
@@ -729,107 +752,121 @@ export const TransactionPanel = observer(function TransactionPanel() {
       ) : null}
 
       <TransactionList>
-        {transactionGroups.map((group) => (
-          <TransactionGroup key={group.key}>
-            {store.separateTransactionsByUser ? (
-              <TransactionGroupHeader>
-                <span>{group.label}</span>
-                <small>{group.transactions.length}건</small>
-              </TransactionGroupHeader>
-            ) : null}
-            {group.transactions.map((transaction) => {
-              const category = store.data.categories.find(
-                (item) => item.id === transaction.categoryId,
-              )
-              const paymentMethod = store.data.paymentMethods.find(
-                (item) => item.id === transaction.paymentMethodId,
-              )
-              const registrant =
-                store.currentMembers.find(
-                  (member) => member.userId === transaction.createdBy,
-                )?.nickname ?? "알 수 없음"
-              const actor = transaction.actorUserId
-                ? (store.currentMembers.find(
-                    (member) => member.userId === transaction.actorUserId,
-                  )?.nickname ?? registrant)
-                : "공통"
-              return (
-                <TransactionItem
-                  key={transaction.id}
-                  $excluded={transaction.status === "excluded"}
-                >
-                  <TransactionTop>
-                    <TransactionMetadataChips
-                      transaction={transaction}
-                      category={category}
-                      paymentMethod={paymentMethod}
-                    />
-                    <Amount $type={transaction.type}>
-                      {formatKrw(transaction.amount)}
-                    </Amount>
-                  </TransactionTop>
-                  <TransactionBody>
-                    <TransactionName>
-                      {transaction.merchantName || transaction.memo || "거래"}
-                    </TransactionName>
-                    {transaction.memo ? (
-                      <TransactionMemo title={transaction.memo}>
-                        {transaction.memo}
-                      </TransactionMemo>
-                    ) : null}
-                  </TransactionBody>
-                  <TransactionFooter>
-                    <AuditInfo>
-                      <span>거래 {actor}</span>
-                      <span>등록 {registrant}</span>
-                      <time dateTime={transaction.createdAt}>
-                        {new Date(transaction.createdAt).toLocaleString(
-                          "ko-KR",
-                          {
-                            dateStyle: "short",
-                            timeStyle: "short",
-                          },
-                        )}
-                      </time>
-                    </AuditInfo>
-                    <ActionCluster>
-                      {canCopyTransaction(transaction) ? (
-                        <CompactAction
-                          title="복사하여 신규 등록"
-                          onClick={() => openCopy(transaction)}
-                        >
-                          <Copy size={14} />
-                        </CompactAction>
-                      ) : null}
-                      <CompactAction
-                        title="수정"
-                        onClick={() => openEdit(transaction)}
-                      >
-                        <Pencil size={14} />
-                      </CompactAction>
-                      <CompactAction
-                        $variant="danger"
-                        title={
-                          transaction.recurringType === "fixed"
-                            ? "이번 달부터 고정비 제거"
-                            : "삭제"
-                        }
-                        onClick={() =>
-                          transaction.recurringType === "fixed" &&
-                          transaction.recurringRuleId
-                            ? void store.deactivateFixedRule(
-                                transaction.recurringRuleId,
-                              )
-                            : void store.softDeleteTransaction(transaction.id)
-                        }
-                      >
-                        <Trash2 size={14} />
-                      </CompactAction>
-                    </ActionCluster>
-                  </TransactionFooter>
-                </TransactionItem>
-              )
-            })}
+        {recurrenceGroups.map((recurrenceGroup) => (
+          <TransactionGroup key={recurrenceGroup.key}>
+            <RecurrenceGroupHeader
+              $recurring={recurrenceGroup.key === "recurring"}
+            >
+              <span>{recurrenceGroup.label}</span>
+              <small>{recurrenceGroup.transactions.length}건</small>
+            </RecurrenceGroupHeader>
+            {recurrenceGroup.userGroups.map((group) => (
+              <UserGroup key={`${recurrenceGroup.key}-${group.key}`}>
+                {store.transactionGrouping !== "none" ? (
+                  <TransactionGroupHeader>
+                    <span>{group.label}</span>
+                    <small>{group.transactions.length}건</small>
+                  </TransactionGroupHeader>
+                ) : null}
+                {group.transactions.map((transaction) => {
+                  const category = store.data.categories.find(
+                    (item) => item.id === transaction.categoryId,
+                  )
+                  const paymentMethod = store.data.paymentMethods.find(
+                    (item) => item.id === transaction.paymentMethodId,
+                  )
+                  const registrant =
+                    store.currentMembers.find(
+                      (member) => member.userId === transaction.createdBy,
+                    )?.nickname ?? "알 수 없음"
+                  const actor = transaction.actorUserId
+                    ? (store.currentMembers.find(
+                        (member) => member.userId === transaction.actorUserId,
+                      )?.nickname ?? registrant)
+                    : "공통"
+                  return (
+                    <TransactionItem
+                      key={transaction.id}
+                      $excluded={transaction.status === "excluded"}
+                    >
+                      <TransactionTop>
+                        <TransactionMetadataChips
+                          transaction={transaction}
+                          category={category}
+                          paymentMethod={paymentMethod}
+                        />
+                        <Amount $type={transaction.type}>
+                          {formatKrw(transaction.amount)}
+                        </Amount>
+                      </TransactionTop>
+                      <TransactionBody>
+                        <TransactionName>
+                          {transaction.merchantName ||
+                            transaction.memo ||
+                            "거래"}
+                        </TransactionName>
+                        {transaction.memo ? (
+                          <TransactionMemo title={transaction.memo}>
+                            {transaction.memo}
+                          </TransactionMemo>
+                        ) : null}
+                      </TransactionBody>
+                      <TransactionFooter>
+                        <AuditInfo>
+                          <span>거래 {actor}</span>
+                          <span>등록 {registrant}</span>
+                          <time dateTime={transaction.createdAt}>
+                            {new Date(transaction.createdAt).toLocaleString(
+                              "ko-KR",
+                              {
+                                dateStyle: "short",
+                                timeStyle: "short",
+                              },
+                            )}
+                          </time>
+                        </AuditInfo>
+                        <ActionCluster>
+                          {canCopyTransaction(transaction) ? (
+                            <CompactAction
+                              title="복사하여 신규 등록"
+                              onClick={() => openCopy(transaction)}
+                            >
+                              <Copy size={14} />
+                            </CompactAction>
+                          ) : null}
+                          <CompactAction
+                            title="수정"
+                            onClick={() => openEdit(transaction)}
+                          >
+                            <Pencil size={14} />
+                          </CompactAction>
+                          <CompactAction
+                            $variant="danger"
+                            title={
+                              transaction.recurringType === "fixed"
+                                ? "이번 달부터 고정비 제거"
+                                : "삭제"
+                            }
+                            onClick={() =>
+                              transaction.recurringType === "fixed" &&
+                              transaction.recurringRuleId
+                                ? void store.deactivateFixedRule(
+                                    transaction.recurringRuleId,
+                                  )
+                                : void store.softDeleteTransaction(
+                                    transaction.id,
+                                  )
+                            }
+                          >
+                            <Trash2 size={14} />
+                          </CompactAction>
+                        </ActionCluster>
+                      </TransactionFooter>
+                    </TransactionItem>
+                  )
+                })}
+              </UserGroup>
+            ))}
           </TransactionGroup>
         ))}
       </TransactionList>
@@ -944,25 +981,37 @@ const HeaderActions = styled.div`
   gap: 7px;
 `
 
-const GroupToggle = styled.label<{ $active: boolean }>`
+const GroupingControl = styled.label`
   min-height: 34px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid ${({ $active }) => ($active ? colors.focus : colors.border)};
+  border: 1px solid ${colors.border};
   border-radius: ${radii.sm};
-  background: ${({ $active }) => ($active ? colors.tealSoft : "#fff")};
-  color: ${({ $active }) => ($active ? colors.teal : colors.muted)};
-  padding: 0 9px;
+  background: #fff;
+  color: ${colors.muted};
+  padding: 0 5px 0 9px;
   font-size: 11px;
   font-weight: 650;
+
+  svg {
+    color: ${colors.teal};
+  }
+`
+
+const GroupingSelect = styled.select`
+  height: 26px;
+  border: 0;
+  border-radius: ${radii.sm};
+  background: ${colors.panelSubtle};
+  color: ${colors.ink};
+  padding: 0 5px;
+  font: inherit;
   cursor: pointer;
 
-  input {
-    width: 13px;
-    height: 13px;
-    margin: 0;
-    accent-color: ${colors.teal};
+  &:focus-visible {
+    outline: 2px solid ${colors.focus};
+    outline-offset: 1px;
   }
 `
 
@@ -1086,14 +1135,37 @@ const TransactionGroup = styled.section`
   display: grid;
 `
 
+const UserGroup = styled.div`
+  display: grid;
+`
+
+const RecurrenceGroupHeader = styled.div<{ $recurring: boolean }>`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid ${colors.borderStrong};
+  background: ${({ $recurring }) =>
+    $recurring ? colors.tealSoft : colors.panelSubtle};
+  color: ${({ $recurring }) => ($recurring ? colors.teal : colors.ink)};
+  padding: 9px;
+  font-size: 12px;
+  font-weight: 750;
+
+  small {
+    color: ${colors.muted};
+    font-size: 10px;
+    font-weight: 600;
+  }
+`
+
 const TransactionGroupHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid ${colors.borderStrong};
-  background: ${colors.panelSubtle};
+  background: #fff;
   color: ${colors.ink};
-  padding: 8px 9px;
+  padding: 7px 9px 7px 18px;
   font-size: 11px;
   font-weight: 700;
 
