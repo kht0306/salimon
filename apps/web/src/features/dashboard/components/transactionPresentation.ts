@@ -6,6 +6,12 @@ export interface TransactionActorGroup {
   transactions: Transaction[]
 }
 
+export interface TransactionRecurrenceGroup {
+  key: "recurring" | "general"
+  label: string
+  transactions: Transaction[]
+}
+
 export function groupTransactionsByActor(
   transactions: Transaction[],
   members: LedgerMember[],
@@ -33,6 +39,53 @@ export function groupTransactionsByActor(
           "알 수 없음"),
     transactions: grouped.get(key) ?? [],
   }))
+}
+
+export function groupTransactionsByRegistrant(
+  transactions: Transaction[],
+  members: LedgerMember[],
+): TransactionActorGroup[] {
+  const grouped = new Map<string, Transaction[]>()
+  for (const transaction of transactions) {
+    const key = transaction.createdBy
+    grouped.set(key, [...(grouped.get(key) ?? []), transaction])
+  }
+
+  const orderedKeys = [
+    ...members.map((member) => member.userId),
+    ...grouped.keys(),
+  ].filter(
+    (key, index, keys) => keys.indexOf(key) === index && grouped.has(key),
+  )
+
+  return orderedKeys.map((key) => ({
+    key,
+    label:
+      members.find((member) => member.userId === key)?.nickname ?? "알 수 없음",
+    transactions: grouped.get(key) ?? [],
+  }))
+}
+
+export function groupTransactionsByRecurrence(
+  transactions: Transaction[],
+): TransactionRecurrenceGroup[] {
+  const recurring = transactions.filter(
+    (transaction) =>
+      transaction.recurringType === "fixed" ||
+      transaction.recurringType === "installment",
+  )
+  const general = transactions.filter(
+    (transaction) =>
+      transaction.recurringType !== "fixed" &&
+      transaction.recurringType !== "installment",
+  )
+
+  return [
+    { key: "recurring", label: "반복 결제", transactions: recurring },
+    { key: "general", label: "일반 거래", transactions: general },
+  ].filter(
+    (group) => group.transactions.length > 0,
+  ) as TransactionRecurrenceGroup[]
 }
 
 export function getPaymentLabel(

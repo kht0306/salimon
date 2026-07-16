@@ -64,6 +64,8 @@ export interface LedgerCreationInput {
   ledgerVisibleInstrumentIds: string[]
 }
 
+export type TransactionGrouping = "actor" | "registrant" | "none"
+
 export class AppStore {
   private repository: SupabaseFinanceRepository
   private toastTimer?: ReturnType<typeof setTimeout>
@@ -77,7 +79,7 @@ export class AppStore {
   selectedMonth: string
   selectedDate: string
   calendarRegistrantId = ""
-  separateTransactionsByUser = true
+  transactionGrouping: TransactionGrouping = "actor"
   transactionEditorOpen = false
   transactionEditorDirty = false
   activeView:
@@ -348,8 +350,8 @@ export class AppStore {
     this.calendarRegistrantId = registrantId
   }
 
-  setSeparateTransactionsByUser(enabled: boolean): void {
-    this.separateTransactionsByUser = enabled
+  setTransactionGrouping(grouping: TransactionGrouping): void {
+    this.transactionGrouping = grouping
   }
 
   notify(
