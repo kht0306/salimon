@@ -51,6 +51,12 @@ describe("getPaymentLabel", () => {
     expect(getPaymentLabel({ ...transaction, type: "income" })).toBeUndefined()
   })
 
+  it("shows the selected account for a saving transaction", () => {
+    expect(getPaymentLabel({ ...transaction, type: "saving" }, account)).toBe(
+      "계좌 · 국민은행 · 급여 계좌",
+    )
+  })
+
   it("formats installment progress as a separate label", () => {
     expect(
       getInstallmentLabel({

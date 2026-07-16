@@ -61,7 +61,7 @@ export function createCopiedTransactionDraft(input: {
       : (input.fallbackActorUserId ?? "")
     : ""
   const paymentMethodId =
-    transaction.type === "expense"
+    transaction.type === "expense" || transaction.type === "saving"
       ? transaction.paymentMethodId &&
         input.activePaymentMethodIds.has(transaction.paymentMethodId)
         ? transaction.paymentMethodId

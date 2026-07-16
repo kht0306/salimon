@@ -113,12 +113,16 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const selectableCategories = store.currentCategories.filter((category) =>
     category.usageTypes.includes(draft.type as CategoryUsageType),
   )
+  const savingAccountIsValid =
+    draft.type !== "saving" ||
+    store.currentAccounts.some((account) => account.id === draft.paymentMethodId)
   const canSave =
     Number.isSafeInteger(amount) &&
     amount > 0 &&
     isValidDateInput(transactionDate) &&
     /^\d{2}:\d{2}$/.test(transactionTime) &&
     Boolean(store.selectedLedgerId) &&
+    savingAccountIsValid &&
     (draft.recurringType !== "installment" ||
       (Number.isSafeInteger(installmentMonths) &&
         installmentMonths >= 2 &&
@@ -250,7 +254,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
             : (draft.recurringType as "fixed" | "installment"),
         recurringRuleId: draft.recurringRuleId,
         paymentMethodId:
-          draft.type === "expense"
+          draft.type === "expense" || draft.type === "saving"
             ? draft.paymentMethodId || undefined
             : undefined,
         installmentMonths:
@@ -276,7 +280,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
       <PanelTop>
         <div>
           <PanelTitle>{formatKoreanDate(store.selectedDate)}</PanelTitle>
-          <Subtle>{store.selectedDateTransactions.length}건</Subtle>
+          <Subtle>{store.calendarSelectedDateTransactions.length}건</Subtle>
         </div>
         <IconButton
           $variant="primary"
@@ -341,6 +345,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
                         ? draft.paymentMethodId ||
                           store.currentUserPrimaryCard?.id ||
                           ""
+                        : type === "saving"
+                          ? store.currentAccounts.some(
+                              (account) => account.id === draft.paymentMethodId,
+                            )
+                            ? draft.paymentMethodId
+                            : store.currentAccounts[0]?.id || ""
                         : "",
                   })
                 }}
@@ -442,16 +452,20 @@ export const TransactionPanel = observer(function TransactionPanel() {
             </EditPolicyNotice>
           ) : null}
 
-          {draft.type === "expense" ? (
+          {draft.type === "expense" || draft.type === "saving" ? (
             <Field>
               <span>
-                결제 수단
-                {draft.recurringType === "installment" ? (
+                {draft.type === "saving" ? "거래 수단" : "결제 수단"}
+                {draft.type === "saving" ||
+                draft.recurringType === "installment" ? (
                   <RequiredMark>*</RequiredMark>
                 ) : null}
               </span>
               <Select
-                required={draft.recurringType === "installment"}
+                required={
+                  draft.type === "saving" ||
+                  draft.recurringType === "installment"
+                }
                 value={draft.paymentMethodId}
                 disabled={isEditingInstallment}
                 onChange={(event) =>
@@ -459,13 +473,17 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 }
               >
                 <option value="">
-                  {draft.recurringType === "installment"
+                  {draft.type === "saving"
+                    ? "계좌를 선택해 주세요"
+                    : draft.recurringType === "installment"
                     ? "카드를 선택해 주세요"
                     : "현금"}
                 </option>
                 {store.currentMembers.map((member) => {
                   const memberMethods = (
-                    draft.recurringType === "installment"
+                    draft.type === "saving"
+                      ? store.currentAccounts
+                      : draft.recurringType === "installment"
                       ? store.currentCards
                       : store.currentPaymentMethods
                   )
@@ -495,6 +513,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
               store.currentCards.length === 0 ? (
                 <CardRequired role="alert">
                   카드 관리 메뉴에서 카드를 먼저 등록해 주세요.
+                </CardRequired>
+              ) : null}
+              {draft.type === "saving" &&
+              store.currentAccounts.length === 0 ? (
+                <CardRequired role="alert">
+                  계좌 관리 메뉴에서 계좌를 먼저 등록해 주세요.
                 </CardRequired>
               ) : null}
             </Field>
@@ -646,7 +670,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
       ) : null}
 
       <TransactionList>
-        {store.selectedDateTransactions.map((transaction) => {
+        {store.calendarSelectedDateTransactions.map((transaction) => {
           const category = store.data.categories.find(
             (item) => item.id === transaction.categoryId,
           )
@@ -685,6 +709,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
                   ) : null}
                   {installmentLabel ? (
                     <InstallmentChip>{installmentLabel}</InstallmentChip>
+                  ) : null}
+                  {transaction.recurringType === "fixed" ? (
+                    <FixedChip>고정비</FixedChip>
                   ) : null}
                   <CategoryTag $color={category?.color ?? colors.subtle}>
                     {category?.name ?? "기타"}
@@ -732,9 +759,18 @@ export const TransactionPanel = observer(function TransactionPanel() {
                   </CompactAction>
                   <CompactAction
                     $variant="danger"
-                    title="삭제"
+                    title={
+                      transaction.recurringType === "fixed"
+                        ? "이번 달부터 고정비 제거"
+                        : "삭제"
+                    }
                     onClick={() =>
-                      void store.softDeleteTransaction(transaction.id)
+                      transaction.recurringType === "fixed" &&
+                      transaction.recurringRuleId
+                        ? void store.deactivateFixedRule(
+                            transaction.recurringRuleId,
+                          )
+                        : void store.softDeleteTransaction(transaction.id)
                     }
                   >
                     <Trash2 size={14} />
@@ -746,7 +782,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
         })}
       </TransactionList>
 
-      {store.selectedDateTransactions.length === 0 ? (
+      {store.calendarSelectedDateTransactions.length === 0 ? (
         <Empty>
           <Check size={20} />
           <span>등록된 거래 없음</span>
@@ -759,7 +795,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           <SummaryAmount $tone="expense">
             -
             {formatKrw(
-              store.selectedDateTransactions
+              store.calendarSelectedDateTransactions
                 .filter(
                   (item) =>
                     item.type === "expense" && item.status !== "excluded",
@@ -773,7 +809,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           <SummaryAmount $tone="income">
             +
             {formatKrw(
-              store.selectedDateTransactions
+              store.calendarSelectedDateTransactions
                 .filter(
                   (item) =>
                     item.type === "income" && item.status !== "excluded",
@@ -786,7 +822,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           <span>저축 합계</span>
           <SummaryAmount $tone="saving">
             {formatKrw(
-              store.selectedDateTransactions
+              store.calendarSelectedDateTransactions
                 .filter(
                   (item) =>
                     item.type === "saving" && item.status !== "excluded",
@@ -799,7 +835,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           <span>정산 합계</span>
           <strong>
             {formatKrw(
-              store.selectedDateTransactions
+              store.calendarSelectedDateTransactions
                 .filter((item) => item.status !== "excluded")
                 .reduce(
                   (sum, item) =>
@@ -985,6 +1021,13 @@ const PaymentChip = styled(MetadataChip)`
 
 const InstallmentChip = styled(MetadataChip)`
   color: ${colors.muted};
+`
+
+const FixedChip = styled(MetadataChip)`
+  border-color: ${colors.focus};
+  background: ${colors.tealSoft};
+  color: ${colors.teal};
+  font-weight: 700;
 `
 
 const CategoryTag = styled(MetadataChip)<{ $color: string }>`

@@ -12,7 +12,14 @@ import { CalendarCheck2, ChevronLeft, ChevronRight } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useMemo } from "react"
 import { useAppStore } from "../StoreProvider"
-import { Button, IconButton, Panel, PanelHeader, PanelTitle } from "../styles"
+import {
+  Button,
+  IconButton,
+  Panel,
+  PanelHeader,
+  PanelTitle,
+  Select,
+} from "../styles"
 
 export const CalendarGrid = observer(function CalendarGrid() {
   const store = useAppStore()
@@ -85,14 +92,33 @@ export const CalendarGrid = observer(function CalendarGrid() {
               <ChevronRight size={18} />
             </IconButton>
           </MonthControls>
-          <Button
-            $variant="primary"
-            onClick={() => {
-              selectDate(toDateKey(new Date()))
-            }}
-          >
-            <CalendarCheck2 size={15} /> 오늘
-          </Button>
+          <CalendarActions>
+            <RegistrantFilter>
+              <span>등록자</span>
+              <Select
+                aria-label="캘린더 등록자 필터"
+                value={store.calendarRegistrantId}
+                onChange={(event) =>
+                  store.setCalendarRegistrant(event.target.value)
+                }
+              >
+                <option value="">전체</option>
+                {store.currentMembers.map((member) => (
+                  <option key={member.userId} value={member.userId}>
+                    {member.nickname}
+                  </option>
+                ))}
+              </Select>
+            </RegistrantFilter>
+            <Button
+              $variant="primary"
+              onClick={() => {
+                selectDate(toDateKey(new Date()))
+              }}
+            >
+              <CalendarCheck2 size={15} /> 오늘
+            </Button>
+          </CalendarActions>
         </PanelHeader>
 
         <CalendarViewport>
@@ -104,7 +130,7 @@ export const CalendarGrid = observer(function CalendarGrid() {
             </WeekHeader>
             <Grid>
               {days.map((day) => {
-                const transactions = store.monthTransactions.filter(
+                const transactions = store.calendarMonthTransactions.filter(
                   (transaction) =>
                     toDateKey(new Date(transaction.transactionAt)) === day.date,
                 )
@@ -219,6 +245,27 @@ const MonthControls = styled.div`
   h2 {
     min-width: 104px;
     text-align: center;
+  }
+`
+
+const CalendarActions = styled.div`
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+`
+
+const RegistrantFilter = styled.label`
+  display: grid;
+  gap: 3px;
+  color: ${colors.muted};
+  font-size: 10px;
+  font-weight: 600;
+
+  select {
+    min-width: 112px;
+    padding: 7px 28px 7px 9px;
+    font-size: 12px;
   }
 `
 
