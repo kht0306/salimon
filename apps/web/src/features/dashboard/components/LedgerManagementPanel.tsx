@@ -1,6 +1,7 @@
 "use client"
 
 import styled from "@emotion/styled"
+import type { CreatedLedgerInvitation } from "@salimon/api-client"
 import type { LedgerType } from "@salimon/types"
 import { colors, radii, spacing } from "@salimon/ui-tokens"
 import { Copy, Link, Pencil, Plus, Share2 } from "lucide-react"
@@ -40,6 +41,11 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
   const [newType, setNewType] = useState<LedgerType>("personal")
   const [setAsDefault, setSetAsDefault] = useState(false)
   const [inviteCode, setInviteCode] = useState("")
+  const [createdInvitation, setCreatedInvitation] =
+    useState<CreatedLedgerInvitation | null>(null)
+  const [sharedPaymentMethodIds, setSharedPaymentMethodIds] = useState<
+    string[]
+  >([])
   const invitations = store.data.invitations.filter(
     (invite) => invite.ledgerId === store.selectedLedgerId,
   )
@@ -171,9 +177,9 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
             <Input
               required
               value={inviteCode}
-              maxLength={6}
+              maxLength={8}
               autoCapitalize="characters"
-              placeholder="6자리 코드 입력"
+              placeholder="8자리 코드 입력"
               onChange={(event) =>
                 setInviteCode(
                   event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""),
@@ -184,7 +190,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
           <Button
             type="button"
             $variant="primary"
-            disabled={inviteCode.length !== 6 || !store.authUser}
+            disabled={inviteCode.length !== 8 || !store.authUser}
             onClick={async () => {
               if (await store.acceptInvite(inviteCode)) setInviteCode("")
             }}
@@ -203,9 +209,36 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
             <div>
               <strong>현재 개인 가계부를 함께 사용하기</strong>
               <p>
-                거래, 카테고리, 카드와 계좌를 유지한 채 공동 가계부로
-                전환합니다. 전환 후에는 개인 가계부로 되돌릴 수 없습니다.
+                거래와 카테고리는 그대로 유지됩니다. 아래에서 선택한 카드와
+                계좌만 공동 멤버에게 공개되며, 선택하지 않은 결제수단은 나만 볼
+                수 있습니다.
               </p>
+              <PaymentMethodChoices>
+                {[
+                  ...store.currentLedgerCards,
+                  ...store.currentLedgerAccounts,
+                ].map((method) => (
+                  <label key={method.id}>
+                    <input
+                      type="checkbox"
+                      checked={sharedPaymentMethodIds.includes(method.id)}
+                      onChange={(event) =>
+                        setSharedPaymentMethodIds((current) =>
+                          event.target.checked
+                            ? [...current, method.id]
+                            : current.filter((id) => id !== method.id),
+                        )
+                      }
+                    />
+                    {method.type === "card" ? "카드" : "계좌"} · {method.name}
+                    {method.last4 ? ` (•••• ${method.last4})` : ""}
+                  </label>
+                ))}
+                {store.currentLedgerCards.length === 0 &&
+                store.currentLedgerAccounts.length === 0 ? (
+                  <span>등록된 카드와 계좌가 없습니다.</span>
+                ) : null}
+              </PaymentMethodChoices>
             </div>
             <Button
               type="button"
@@ -217,7 +250,9 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
                     "현재 개인 가계부를 공동 가계부로 전환하시겠습니까? 기존 데이터는 모두 유지되며 개인 가계부로 되돌릴 수 없습니다.",
                   )
                 ) {
-                  void store.convertCurrentLedgerToShared()
+                  void store.convertCurrentLedgerToShared(
+                    sharedPaymentMethodIds,
+                  )
                 }
               }}
             >
@@ -234,7 +269,10 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
             <Button
               type="button"
               $variant="primary"
-              onClick={() => void store.createInvite()}
+              onClick={async () => {
+                const invitation = await store.createInvite()
+                if (invitation) setCreatedInvitation(invitation)
+              }}
               disabled={!store.authUser || !canManageShared}
               title={
                 canManageShared
@@ -245,6 +283,27 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
               <Link size={16} /> 초대 생성
             </Button>
           </PanelHeader>
+
+          {createdInvitation ? (
+            <OneTimeInvite>
+              <div>
+                <strong>새 초대 코드: {createdInvitation.inviteCode}</strong>
+                <p>
+                  이 코드는 지금 한 번만 표시됩니다. 참여할 사람에게 안전하게
+                  전달해 주세요.
+                </p>
+              </div>
+              <Button
+                type="button"
+                $variant="soft"
+                onClick={() =>
+                  navigator.clipboard?.writeText(createdInvitation.inviteCode)
+                }
+              >
+                <Copy size={15} /> 복사
+              </Button>
+            </OneTimeInvite>
+          ) : null}
 
           <Section>
             <SectionTitle>멤버</SectionTitle>
@@ -266,7 +325,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
             <Rows>
               {invitations.map((invitation) => (
                 <InviteRow key={invitation.id}>
-                  <Code>{invitation.inviteCode}</Code>
+                  <Code>{invitation.inviteCode ?? "보안 저장됨"}</Code>
                   <div>
                     <strong>{invitationLabels[invitation.status]}</strong>
                     <Meta>
@@ -276,14 +335,16 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
                       만료
                     </Meta>
                   </div>
-                  <Button
-                    type="button"
-                    onClick={() =>
-                      navigator.clipboard?.writeText(invitation.inviteCode)
-                    }
-                  >
-                    <Copy size={15} /> 복사
-                  </Button>
+                  {invitation.inviteCode ? (
+                    <Button
+                      type="button"
+                      onClick={() =>
+                        navigator.clipboard?.writeText(invitation.inviteCode!)
+                      }
+                    >
+                      <Copy size={15} /> 복사
+                    </Button>
+                  ) : null}
                 </InviteRow>
               ))}
               {invitations.length === 0 ? <Empty>초대 없음</Empty> : null}
@@ -380,6 +441,42 @@ const ConversionNotice = styled.div`
 
   @media (max-width: 640px) {
     grid-template-columns: 1fr;
+  }
+`
+
+const PaymentMethodChoices = styled.div`
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+  }
+
+  span {
+    color: ${colors.muted};
+    font-size: 12px;
+  }
+`
+
+const OneTimeInvite = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 18px 0;
+  padding: 14px;
+  border: 1px solid ${colors.teal};
+  border-radius: ${radii.md};
+  background: ${colors.tealSoft};
+
+  p {
+    margin: 4px 0 0;
+    color: ${colors.muted};
+    font-size: 12px;
   }
 `
 

@@ -54,7 +54,7 @@ export interface LedgerInvitation {
   id: string
   ledgerId: string
   invitedBy: string
-  inviteCode: string
+  inviteCode?: string
   roleToGrant: Exclude<LedgerRole, "owner">
   status: "active" | "accepted" | "expired" | "revoked"
   expiresAt: string

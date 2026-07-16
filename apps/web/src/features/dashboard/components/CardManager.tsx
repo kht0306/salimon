@@ -50,13 +50,20 @@ export const CardManager = observer(function CardManager() {
   const [endOffset, setEndOffset] = useState<"-1" | "0">("-1")
   const [isPrimary, setPrimary] = useState(false)
   const [isDebit, setDebit] = useState(false)
+  const [visibility, setVisibility] = useState<"ledger" | "private">("private")
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const isFirstCard = !store.currentLedgerCards.some(
-    (card) =>
-      card.id !== selectedCardId && card.ownerUserId === ownerUserId,
+    (card) => card.id !== selectedCardId && card.ownerUserId === ownerUserId,
   )
   const paymentDayNumber = Number(paymentDay)
   const endDayNumber = Number(endDay)
+  const canKeepPrivate = ownerUserId === store.authUser?.id
+  const effectiveVisibility =
+    store.currentLedger?.type === "personal"
+      ? "private"
+      : canKeepPrivate
+        ? visibility
+        : "ledger"
   const canSave =
     Boolean(ownerUserId && issuer.trim() && name.trim()) &&
     (!last4 || last4.length === 4) &&
@@ -77,9 +84,12 @@ export const CardManager = observer(function CardManager() {
         last4: last4 || undefined,
         paymentDay: isDebit ? 31 : Number(paymentDay),
         billingPeriodEndDay: isDebit ? 31 : Number(endDay),
-        billingPeriodEndMonthOffset: isDebit ? -1 : Number(endOffset) as -1 | 0,
+        billingPeriodEndMonthOffset: isDebit
+          ? -1
+          : (Number(endOffset) as -1 | 0),
         isPrimary: isFirstCard || isPrimary,
         isDebit,
+        visibility: effectiveVisibility,
       })
     ) {
       resetForm()
@@ -97,6 +107,7 @@ export const CardManager = observer(function CardManager() {
     setEndOffset("-1")
     setPrimary(false)
     setDebit(false)
+    setVisibility("private")
   }
 
   function selectCard(card: (typeof store.currentLedgerCards)[number]) {
@@ -114,6 +125,7 @@ export const CardManager = observer(function CardManager() {
     setEndOffset(String(card.billingPeriodEndMonthOffset ?? -1) as "-1" | "0")
     setPrimary(Boolean(card.isPrimary))
     setDebit(Boolean(card.isDebit))
+    setVisibility(card.visibility)
   }
 
   async function save() {
@@ -129,9 +141,12 @@ export const CardManager = observer(function CardManager() {
         last4: last4 || undefined,
         paymentDay: isDebit ? 31 : Number(paymentDay),
         billingPeriodEndDay: isDebit ? 31 : Number(endDay),
-        billingPeriodEndMonthOffset: isDebit ? -1 : Number(endOffset) as -1 | 0,
+        billingPeriodEndMonthOffset: isDebit
+          ? -1
+          : (Number(endOffset) as -1 | 0),
         isPrimary: isFirstCard || isPrimary,
         isDebit,
+        visibility: effectiveVisibility,
       })
     ) {
       resetForm()
@@ -153,7 +168,9 @@ export const CardManager = observer(function CardManager() {
       </PanelHeader>
       <Composer>
         <Field>
-          <span>카드 소유자<RequiredMark>*</RequiredMark></span>
+          <span>
+            카드 소유자<RequiredMark>*</RequiredMark>
+          </span>
           <Select
             required
             value={ownerUserId}
@@ -167,7 +184,9 @@ export const CardManager = observer(function CardManager() {
           </Select>
         </Field>
         <Field>
-          <span>카드사<RequiredMark>*</RequiredMark></span>
+          <span>
+            카드사<RequiredMark>*</RequiredMark>
+          </span>
           <Select
             required
             value={issuer}
@@ -179,7 +198,9 @@ export const CardManager = observer(function CardManager() {
           </Select>
         </Field>
         <Field>
-          <span>카드 별칭<RequiredMark>*</RequiredMark></span>
+          <span>
+            카드 별칭<RequiredMark>*</RequiredMark>
+          </span>
           <Input
             required
             value={name}
@@ -207,39 +228,53 @@ export const CardManager = observer(function CardManager() {
           체크카드
           <small>결제일과 이용기간은 자동 설정됩니다.</small>
         </PrimaryField>
-        {!isDebit ? <Field>
-          <span>매월 결제일<RequiredMark>*</RequiredMark></span>
-          <Input
-            required
-            type="number"
-            min="1"
-            max="31"
-            value={paymentDay}
-            onChange={(event) => setPaymentDay(event.target.value)}
-          />
-        </Field> : null}
-        {!isDebit ? <Field>
-          <span>이용기간 종료월<RequiredMark>*</RequiredMark></span>
-          <Select
-            required
-            value={endOffset}
-            onChange={(event) => setEndOffset(event.target.value as "-1" | "0")}
-          >
-            <option value="-1">결제일의 전월</option>
-            <option value="0">결제일의 당월</option>
-          </Select>
-        </Field> : null}
-        {!isDebit ? <Field>
-          <span>이용기간 종료일<RequiredMark>*</RequiredMark></span>
-          <Input
-            required
-            type="number"
-            min="1"
-            max="31"
-            value={endDay}
-            onChange={(event) => setEndDay(event.target.value)}
-          />
-        </Field> : null}
+        {!isDebit ? (
+          <Field>
+            <span>
+              매월 결제일<RequiredMark>*</RequiredMark>
+            </span>
+            <Input
+              required
+              type="number"
+              min="1"
+              max="31"
+              value={paymentDay}
+              onChange={(event) => setPaymentDay(event.target.value)}
+            />
+          </Field>
+        ) : null}
+        {!isDebit ? (
+          <Field>
+            <span>
+              이용기간 종료월<RequiredMark>*</RequiredMark>
+            </span>
+            <Select
+              required
+              value={endOffset}
+              onChange={(event) =>
+                setEndOffset(event.target.value as "-1" | "0")
+              }
+            >
+              <option value="-1">결제일의 전월</option>
+              <option value="0">결제일의 당월</option>
+            </Select>
+          </Field>
+        ) : null}
+        {!isDebit ? (
+          <Field>
+            <span>
+              이용기간 종료일<RequiredMark>*</RequiredMark>
+            </span>
+            <Input
+              required
+              type="number"
+              min="1"
+              max="31"
+              value={endDay}
+              onChange={(event) => setEndDay(event.target.value)}
+            />
+          </Field>
+        ) : null}
         <PrimaryField>
           <input
             type="checkbox"
@@ -249,6 +284,24 @@ export const CardManager = observer(function CardManager() {
           />
           주 카드
           {isFirstCard ? <small>최초 카드는 자동 지정됩니다.</small> : null}
+        </PrimaryField>
+        <PrimaryField>
+          <input
+            type="checkbox"
+            checked={effectiveVisibility === "ledger"}
+            disabled={store.currentLedger?.type !== "shared" || !canKeepPrivate}
+            onChange={(event) =>
+              setVisibility(event.target.checked ? "ledger" : "private")
+            }
+          />
+          공동 멤버에게 공개
+          <small>
+            {store.currentLedger?.type === "personal"
+              ? "개인 가계부에서는 나만 볼 수 있습니다."
+              : canKeepPrivate
+                ? "선택하지 않으면 나만 볼 수 있습니다."
+                : "다른 멤버 소유 카드는 공동으로 등록됩니다."}
+          </small>
         </PrimaryField>
       </Composer>
       <Hint>
@@ -300,9 +353,12 @@ export const CardManager = observer(function CardManager() {
                       <Meta>
                         {card.issuer}
                         {card.last4 ? ` · •••• ${card.last4}` : ""}
-                        {card.isDebit ? " · 체크카드" : ` · 매월 ${card.paymentDay}일`}
+                        {card.isDebit
+                          ? " · 체크카드"
+                          : ` · 매월 ${card.paymentDay}일`}
                         {!card.isActive ? " · 비활성" : ""}
                         {card.isPrimary ? " · 주 카드" : ""}
+                        {card.visibility === "private" ? " · 나만 보기" : ""}
                       </Meta>
                     </div>
                     <Actions onClick={(event) => event.stopPropagation()}>

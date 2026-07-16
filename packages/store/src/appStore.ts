@@ -9,6 +9,7 @@ import {
   SupabaseFinanceRepository,
   type AuthSessionInfo,
   type AuthUserInfo,
+  type CreatedLedgerInvitation,
   type FinanceData,
   type SupabaseConnectionCheck,
 } from "@salimon/api-client"
@@ -26,7 +27,6 @@ import type {
   Category,
   CategoryUsageType,
   Ledger,
-  LedgerInvitation,
   LedgerType,
   LocalSmsCandidate,
   Transaction,
@@ -766,6 +766,7 @@ export class AppStore {
     billingPeriodEndMonthOffset: -1 | 0
     isPrimary: boolean
     isDebit: boolean
+    visibility: "ledger" | "private"
   }): Promise<boolean> {
     if (!this.selectedLedgerId || !input.name.trim() || !input.issuer.trim()) {
       this.notify("카드사와 카드 별칭을 입력해 주세요.", "error")
@@ -814,6 +815,7 @@ export class AppStore {
       billingPeriodEndMonthOffset: -1 | 0
       isPrimary: boolean
       isDebit: boolean
+      visibility: "ledger" | "private"
     },
   ): Promise<boolean> {
     const card = this.currentLedgerCards.find((item) => item.id === cardId)
@@ -888,6 +890,7 @@ export class AppStore {
     name: string
     bank: string
     last4?: string
+    visibility: "ledger" | "private"
   }): Promise<boolean> {
     if (
       !this.selectedLedgerId ||
@@ -923,6 +926,7 @@ export class AppStore {
       name: string
       bank: string
       last4?: string
+      visibility: "ledger" | "private"
     },
   ): Promise<boolean> {
     const account = this.currentLedgerAccounts.find(
@@ -1090,7 +1094,9 @@ export class AppStore {
     }
   }
 
-  async convertCurrentLedgerToShared(): Promise<boolean> {
+  async convertCurrentLedgerToShared(
+    sharedPaymentMethodIds: string[],
+  ): Promise<boolean> {
     if (
       !this.authUser ||
       !this.currentLedger ||
@@ -1101,7 +1107,10 @@ export class AppStore {
     }
 
     try {
-      await this.repository.convertPersonalLedgerToShared(this.currentLedger.id)
+      await this.repository.convertPersonalLedgerToShared(
+        this.currentLedger.id,
+        sharedPaymentMethodIds,
+      )
       await this.refreshFinanceData()
       this.notify("개인 가계부를 공동 가계부로 전환했습니다.")
       return this.dataState === "ready"
@@ -1111,7 +1120,7 @@ export class AppStore {
     }
   }
 
-  async createInvite(): Promise<LedgerInvitation | null> {
+  async createInvite(): Promise<CreatedLedgerInvitation | null> {
     if (
       !this.authUser ||
       !this.selectedLedgerId ||
@@ -1119,21 +1128,13 @@ export class AppStore {
     )
       return null
 
-    const inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase()
     try {
-      await this.repository.createInvite({
-        ledgerId: this.selectedLedgerId,
-        userId: this.authUser.id,
-        inviteCode,
-        inviteTokenHash: createId("invite-token"),
-      })
+      const invitation = await this.repository.createInvite(
+        this.selectedLedgerId,
+      )
       await this.refreshFinanceData()
       this.notify("초대 코드를 만들었습니다.")
-      return (
-        this.data.invitations.find(
-          (invitation) => invitation.inviteCode === inviteCode,
-        ) ?? null
-      )
+      return invitation
     } catch (error) {
       this.setDataError(error)
       return null
