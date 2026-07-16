@@ -55,6 +55,10 @@ export function getPaymentLabel(
       .join(" · ")
   }
 
+  if (transaction.paymentMethodId) {
+    return "개인 결제수단"
+  }
+
   return transaction.type === "expense" ? "현금" : undefined
 }
 

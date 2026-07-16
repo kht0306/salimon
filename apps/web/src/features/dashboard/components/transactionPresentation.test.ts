@@ -43,6 +43,9 @@ const account: PaymentMethod = {
 describe("getPaymentLabel", () => {
   it("formats cash, card, installment and bank account labels", () => {
     expect(getPaymentLabel(transaction)).toBe("현금")
+    expect(
+      getPaymentLabel({ ...transaction, paymentMethodId: "private-card" }),
+    ).toBe("개인 결제수단")
     expect(getPaymentLabel(transaction, card)).toBe("현대(생활비)")
     expect(
       getPaymentLabel({ ...transaction, recurringType: "installment" }, card),

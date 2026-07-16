@@ -51,6 +51,12 @@ export interface RemoteSampleInput {
   parseResult?: object
 }
 
+export interface CreatedLedgerInvitation {
+  id: string
+  inviteCode: string
+  expiresAt: string
+}
+
 export class SupabaseFinanceRepository {
   async load(userId: string): Promise<FinanceData> {
     const client = requireSupabaseClient()
@@ -309,16 +315,12 @@ export class SupabaseFinanceRepository {
     userId: string
   }): Promise<void> {
     const client = requireSupabaseClient()
-    const { error } = await client.from("category_budgets").upsert(
-      {
-        ledger_id: input.ledgerId,
-        category_id: input.categoryId,
-        effective_month: `${input.month}-01`,
-        amount: input.amount,
-        created_by: input.userId,
-      },
-      { onConflict: "category_id,effective_month" },
-    )
+    const { error } = await client.rpc("set_secure_category_budget", {
+      p_ledger_id: input.ledgerId,
+      p_category_id: input.categoryId,
+      p_effective_month: `${input.month}-01`,
+      p_amount: input.amount,
+    })
     throwIfError(error)
   }
 
@@ -333,6 +335,7 @@ export class SupabaseFinanceRepository {
     billingPeriodEndMonthOffset: -1 | 0
     isPrimary: boolean
     isDebit: boolean
+    visibility: "ledger" | "private"
   }): Promise<void> {
     const client = requireSupabaseClient()
     const { data, error } = await client
@@ -344,7 +347,7 @@ export class SupabaseFinanceRepository {
         type: "card",
         last4: input.last4 || null,
         issuer: input.issuer,
-        visibility: "ledger",
+        visibility: input.visibility,
         payment_day: input.isDebit ? 31 : input.paymentDay,
         billing_period_end_day: input.isDebit ? 31 : input.billingPeriodEndDay,
         billing_period_end_month_offset: input.isDebit
@@ -365,6 +368,7 @@ export class SupabaseFinanceRepository {
     name: string
     bank: string
     last4?: string
+    visibility: "ledger" | "private"
   }): Promise<void> {
     const client = requireSupabaseClient()
     const { error } = await client.from("payment_methods").insert({
@@ -374,7 +378,7 @@ export class SupabaseFinanceRepository {
       type: "bank",
       last4: input.last4 || null,
       issuer: input.bank,
-      visibility: "ledger",
+      visibility: input.visibility,
       is_active: true,
       is_primary: false,
       is_debit: false,
@@ -389,6 +393,7 @@ export class SupabaseFinanceRepository {
       name: string
       bank: string
       last4?: string
+      visibility: "ledger" | "private"
     },
   ): Promise<void> {
     const client = requireSupabaseClient()
@@ -399,6 +404,7 @@ export class SupabaseFinanceRepository {
         name: input.name,
         issuer: input.bank,
         last4: input.last4 || null,
+        visibility: input.visibility,
         updated_at: new Date().toISOString(),
       })
       .eq("id", accountId)
@@ -446,6 +452,7 @@ export class SupabaseFinanceRepository {
       billingPeriodEndMonthOffset: -1 | 0
       isPrimary: boolean
       isDebit: boolean
+      visibility: "ledger" | "private"
     },
   ): Promise<void> {
     const client = requireSupabaseClient()
@@ -462,6 +469,7 @@ export class SupabaseFinanceRepository {
           ? -1
           : input.billingPeriodEndMonthOffset,
         is_debit: input.isDebit,
+        visibility: input.visibility,
         is_primary: false,
         updated_at: new Date().toISOString(),
       })
@@ -671,34 +679,40 @@ export class SupabaseFinanceRepository {
     throwIfError(error)
   }
 
-  async convertPersonalLedgerToShared(ledgerId: string): Promise<void> {
+  async convertPersonalLedgerToShared(
+    ledgerId: string,
+    sharedPaymentMethodIds: string[],
+  ): Promise<void> {
     const client = requireSupabaseClient()
     const { error } = await client.rpc("convert_personal_ledger_to_shared", {
       p_ledger_id: ledgerId,
+      p_shared_payment_method_ids: sharedPaymentMethodIds,
     })
     throwIfError(error)
   }
 
-  async createInvite(input: {
-    ledgerId: string
-    userId: string
-    inviteCode: string
-    inviteTokenHash: string
-  }): Promise<void> {
+  async createInvite(ledgerId: string): Promise<CreatedLedgerInvitation> {
     const client = requireSupabaseClient()
-    const now = new Date()
-    const { error } = await client.from("ledger_invitations").insert({
-      ledger_id: input.ledgerId,
-      invited_by: input.userId,
-      invite_code: input.inviteCode,
-      invite_token_hash: input.inviteTokenHash,
-      role_to_grant: "member",
-      status: "active",
-      expires_at: new Date(
-        now.getTime() + 7 * 24 * 60 * 60 * 1000,
-      ).toISOString(),
+    const { data, error } = await client.rpc("create_ledger_invite", {
+      p_ledger_id: ledgerId,
     })
     throwIfError(error)
+    if (!data || typeof data !== "object") {
+      throw new Error("초대 코드 생성 결과를 확인할 수 없습니다.")
+    }
+    const result = data as Record<string, unknown>
+    if (
+      typeof result.id !== "string" ||
+      typeof result.inviteCode !== "string" ||
+      typeof result.expiresAt !== "string"
+    ) {
+      throw new Error("초대 코드 생성 결과가 올바르지 않습니다.")
+    }
+    return {
+      id: result.id,
+      inviteCode: result.inviteCode,
+      expiresAt: result.expiresAt,
+    }
   }
 
   async acceptInvite(inviteCode: string): Promise<string> {
@@ -708,7 +722,7 @@ export class SupabaseFinanceRepository {
     })
     throwIfError(error)
     if (typeof data !== "string") {
-      throw new Error("초대 수락 결과를 확인할 수 없습니다.")
+      throw new Error("유효하지 않거나 만료된 초대 코드입니다.")
     }
 
     return data
@@ -803,7 +817,7 @@ function mapInvitation(row: Row): LedgerInvitation {
     id: stringValue(row.id),
     ledgerId: stringValue(row.ledger_id),
     invitedBy: stringValue(row.invited_by),
-    inviteCode: stringValue(row.invite_code),
+    inviteCode: optionalString(row.invite_code),
     roleToGrant: mapInvitationRole(row.role_to_grant),
     status: mapInvitationStatus(row.status),
     expiresAt: stringValue(row.expires_at),

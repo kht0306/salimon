@@ -46,12 +46,20 @@ export const AccountManager = observer(function AccountManager() {
   const [bank, setBank] = useState(banks[0])
   const [name, setName] = useState("")
   const [last4, setLast4] = useState("")
+  const [visibility, setVisibility] = useState<"ledger" | "private">("private")
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
     null,
   )
   const canSave =
     Boolean(ownerUserId && bank.trim() && name.trim()) &&
     (!last4 || last4.length === 4)
+  const canKeepPrivate = ownerUserId === store.authUser?.id
+  const effectiveVisibility =
+    store.currentLedger?.type === "personal"
+      ? "private"
+      : canKeepPrivate
+        ? visibility
+        : "ledger"
 
   function resetForm() {
     setSelectedAccountId(null)
@@ -59,6 +67,7 @@ export const AccountManager = observer(function AccountManager() {
     setBank(banks[0])
     setName("")
     setLast4("")
+    setVisibility("private")
   }
 
   function selectAccount(
@@ -73,6 +82,7 @@ export const AccountManager = observer(function AccountManager() {
     setBank(account.issuer ?? banks[0])
     setName(account.name)
     setLast4(account.last4 ?? "")
+    setVisibility(account.visibility)
   }
 
   async function save() {
@@ -81,6 +91,7 @@ export const AccountManager = observer(function AccountManager() {
       bank,
       name,
       last4: last4 || undefined,
+      visibility: effectiveVisibility,
     }
     const saved = selectedAccountId
       ? await store.updateAccount(selectedAccountId, input)
@@ -119,6 +130,24 @@ export const AccountManager = observer(function AccountManager() {
             ))}
           </Select>
         </Field>
+        <VisibilityField>
+          <input
+            type="checkbox"
+            checked={effectiveVisibility === "ledger"}
+            disabled={store.currentLedger?.type !== "shared" || !canKeepPrivate}
+            onChange={(event) =>
+              setVisibility(event.target.checked ? "ledger" : "private")
+            }
+          />
+          공동 멤버에게 공개
+          <small>
+            {store.currentLedger?.type === "personal"
+              ? "개인 가계부에서는 나만 볼 수 있습니다."
+              : canKeepPrivate
+                ? "선택하지 않으면 나만 볼 수 있습니다."
+                : "다른 멤버 소유 계좌는 공동으로 등록됩니다."}
+          </small>
+        </VisibilityField>
         <Field>
           <span>
             은행<RequiredMark>*</RequiredMark>
@@ -202,6 +231,7 @@ export const AccountManager = observer(function AccountManager() {
                         {account.issuer}
                         {account.last4 ? ` · •••• ${account.last4}` : ""}
                         {!account.isActive ? " · 비활성" : ""}
+                        {account.visibility === "private" ? " · 나만 보기" : ""}
                       </Meta>
                     </div>
                     <Actions onClick={(event) => event.stopPropagation()}>
@@ -271,6 +301,22 @@ const Hint = styled.p`
   color: ${colors.muted};
   border-bottom: 1px solid ${colors.border};
   font-size: 12px;
+`
+
+const VisibilityField = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  color: ${colors.ink};
+  font-size: 13px;
+  font-weight: 600;
+
+  small {
+    color: ${colors.muted};
+    font-size: 11px;
+    font-weight: 400;
+  }
 `
 
 const MemberGroups = styled.div`
