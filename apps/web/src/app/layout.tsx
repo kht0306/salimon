@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Salimon · 살림온도",
+  title: "Salimon · 살림온",
   description: "월간 캘린더 중심 가계부",
 }
 
