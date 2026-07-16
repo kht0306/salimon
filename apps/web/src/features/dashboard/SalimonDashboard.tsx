@@ -95,12 +95,12 @@ const DashboardContent = observer(function DashboardContent() {
               value={store.selectedLedgerId}
               onChange={(event) => store.switchLedger(event.target.value)}
               aria-label="가계부 선택"
-              disabled={store.data.ledgers.length === 0}
+              disabled={store.activeLedgers.length === 0}
             >
-              {store.data.ledgers.length === 0 ? (
+              {store.activeLedgers.length === 0 ? (
                 <option value="">로그인 후 불러오기</option>
               ) : null}
-              {store.data.ledgers.map((ledger) => (
+              {store.activeLedgers.map((ledger) => (
                 <option key={ledger.id} value={ledger.id}>
                   {ledger.name} · {ledger.type === "shared" ? "공동" : "개인"}
                 </option>

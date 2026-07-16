@@ -37,6 +37,8 @@ export interface Ledger {
   type: LedgerType
   currency: Currency
   role: LedgerRole
+  archivedAt?: string
+  purgeAfter?: string
 }
 
 export interface LedgerMember {
@@ -111,6 +113,7 @@ export interface RecurringRule {
 
 export interface PaymentMethod {
   id: string
+  instrumentId: string
   ledgerId: string
   ownerUserId?: string
   name: string
@@ -124,6 +127,21 @@ export interface PaymentMethod {
   isActive: boolean
   isDeleted?: boolean
   isPrimary?: boolean
+  isDebit?: boolean
+}
+
+export interface PaymentInstrument {
+  id: string
+  ownerUserId: string
+  name: string
+  type: "cash" | "card" | "bank" | "pay" | "etc"
+  last4?: string
+  issuer?: string
+  paymentDay?: number
+  billingPeriodEndDay?: number
+  billingPeriodEndMonthOffset?: -1 | 0
+  isActive: boolean
+  isDeleted?: boolean
   isDebit?: boolean
 }
 
