@@ -94,3 +94,14 @@ export function isInstallmentEditLocked(
 ): boolean {
   return transaction?.recurringType === "installment"
 }
+
+export function getInstallmentPaymentMethodId(input: {
+  currentPaymentMethodId: string
+  activeCardIds: ReadonlySet<string>
+  primaryCardId?: string
+}): string {
+  return input.currentPaymentMethodId &&
+    input.activeCardIds.has(input.currentPaymentMethodId)
+    ? input.currentPaymentMethodId
+    : (input.primaryCardId ?? "")
+}

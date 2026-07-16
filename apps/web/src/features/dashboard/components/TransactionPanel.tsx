@@ -40,6 +40,7 @@ import {
   canCopyTransaction,
   createCopiedTransactionDraft,
   createNewTransactionDraft,
+  getInstallmentPaymentMethodId,
   isInstallmentEditLocked,
   type TransactionEditorDraft,
 } from "./transactionEditorDraft"
@@ -384,7 +385,13 @@ export const TransactionPanel = observer(function TransactionPanel() {
                     recurringType,
                     paymentMethodId:
                       recurringType === "installment"
-                        ? (store.currentUserPrimaryCard?.id ?? "")
+                        ? getInstallmentPaymentMethodId({
+                            currentPaymentMethodId: draft.paymentMethodId,
+                            activeCardIds: new Set(
+                              store.currentCards.map((card) => card.id),
+                            ),
+                            primaryCardId: store.currentUserPrimaryCard?.id,
+                          })
                         : draft.paymentMethodId,
                   })
                 }}
@@ -426,7 +433,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           {isEditingInstallment ? (
             <EditPolicyNotice role="status">
               할부 거래는 거래 유형, 반복 유형, 결제 수단을 변경할 수
-              없습니다. 금액은 수정할 수 있습니다.
+              없습니다.
             </EditPolicyNotice>
           ) : editing &&
             draft.recurringType !== (editing.recurringType ?? "none") ? (
@@ -503,6 +510,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 <Select
                   aria-label="할부 금액 입력 방식"
                   value={draft.installmentAmountType}
+                  disabled={isEditingInstallment}
                   onChange={(event) =>
                     setDraft({
                       ...draft,

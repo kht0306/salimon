@@ -4,6 +4,7 @@ import {
   canCopyTransaction,
   createCopiedTransactionDraft,
   createNewTransactionDraft,
+  getInstallmentPaymentMethodId,
   isInstallmentEditLocked,
 } from "./transactionEditorDraft"
 
@@ -86,7 +87,7 @@ describe("transaction editor drafts", () => {
     ).toBe(false)
   })
 
-  it("locks recurrence and payment fields only for existing installments", () => {
+  it("locks recurrence, payment, and amount mode for existing installments", () => {
     expect(isInstallmentEditLocked(null)).toBe(false)
     expect(isInstallmentEditLocked(transaction)).toBe(false)
     expect(
@@ -95,5 +96,25 @@ describe("transaction editor drafts", () => {
     expect(
       isInstallmentEditLocked({ recurringType: "installment" }),
     ).toBe(true)
+  })
+
+  it("keeps an existing card when converting an ordinary transaction", () => {
+    expect(
+      getInstallmentPaymentMethodId({
+        currentPaymentMethodId: "card-2",
+        activeCardIds: new Set(["card-1", "card-2"]),
+        primaryCardId: "card-1",
+      }),
+    ).toBe("card-2")
+  })
+
+  it("uses the primary card when converting a cash transaction", () => {
+    expect(
+      getInstallmentPaymentMethodId({
+        currentPaymentMethodId: "cash",
+        activeCardIds: new Set(["card-1"]),
+        primaryCardId: "card-1",
+      }),
+    ).toBe("card-1")
   })
 })
