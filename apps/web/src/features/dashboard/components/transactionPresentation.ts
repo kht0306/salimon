@@ -71,3 +71,17 @@ export function getInstallmentLabel(
 
   return "할부"
 }
+
+export function matchesPaymentMethodFilter(
+  transaction: Transaction,
+  selectedPaymentMethodIds: string[],
+): boolean {
+  if (selectedPaymentMethodIds.length === 0) return true
+
+  const paymentMethodId =
+    transaction.paymentMethodId ??
+    (transaction.type === "expense" ? "cash" : undefined)
+  return Boolean(
+    paymentMethodId && selectedPaymentMethodIds.includes(paymentMethodId),
+  )
+}

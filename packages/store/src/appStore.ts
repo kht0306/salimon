@@ -75,6 +75,7 @@ export class AppStore {
   selectedMonth: string
   selectedDate: string
   calendarRegistrantId = ""
+  separateTransactionsByUser = true
   transactionEditorOpen = false
   transactionEditorDirty = false
   activeView:
@@ -326,6 +327,10 @@ export class AppStore {
 
   setCalendarRegistrant(registrantId: string): void {
     this.calendarRegistrantId = registrantId
+  }
+
+  setSeparateTransactionsByUser(enabled: boolean): void {
+    this.separateTransactionsByUser = enabled
   }
 
   notify(

@@ -12,16 +12,11 @@ import type { CategoryUsageType, Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import {
   Check,
-  CalendarRange,
   Copy,
-  CreditCard,
-  Landmark,
   Pencil,
   Plus,
-  Repeat2,
   Save,
   Trash2,
-  Wallet,
   UsersRound,
   X,
 } from "lucide-react"
@@ -47,11 +42,8 @@ import {
   isInstallmentEditLocked,
   type TransactionEditorDraft,
 } from "./transactionEditorDraft"
-import {
-  getInstallmentLabel,
-  getPaymentLabel,
-  groupTransactionsByActor,
-} from "./transactionPresentation"
+import { TransactionMetadataChips } from "./TransactionMetadataChips"
+import { groupTransactionsByActor } from "./transactionPresentation"
 
 export const TransactionPanel = observer(function TransactionPanel() {
   const store = useAppStore()
@@ -59,7 +51,6 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const [copySource, setCopySource] = useState<Transaction | null>(null)
   const [isAdding, setAdding] = useState(false)
   const [isSaving, setSaving] = useState(false)
-  const [groupByActor, setGroupByActor] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
   const savingRef = useRef(false)
   const selectedDate = store.selectedDate
@@ -142,7 +133,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
         (isEditingInstallment ||
           draft.installmentAmountType !== "principal" ||
           amount >= installmentMonths)))
-  const transactionGroups = groupByActor
+  const transactionGroups = store.separateTransactionsByUser
     ? groupTransactionsByActor(
         store.calendarSelectedDateTransactions,
         store.currentMembers,
@@ -304,13 +295,15 @@ export const TransactionPanel = observer(function TransactionPanel() {
           <Subtle>{store.calendarSelectedDateTransactions.length}건</Subtle>
         </div>
         <HeaderActions>
-          <GroupToggle $active={groupByActor}>
+          <GroupToggle $active={store.separateTransactionsByUser}>
             <input
               type="checkbox"
-              checked={groupByActor}
-              onChange={(event) => setGroupByActor(event.target.checked)}
+              checked={store.separateTransactionsByUser}
+              onChange={(event) =>
+                store.setSeparateTransactionsByUser(event.target.checked)
+              }
             />
-            <UsersRound size={14} /> 사용자별 묶기
+            <UsersRound size={14} /> 사용자 구분
           </GroupToggle>
           <IconButton
             $variant="primary"
@@ -738,7 +731,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
       <TransactionList>
         {transactionGroups.map((group) => (
           <TransactionGroup key={group.key}>
-            {groupByActor ? (
+            {store.separateTransactionsByUser ? (
               <TransactionGroupHeader>
                 <span>{group.label}</span>
                 <small>{group.transactions.length}건</small>
@@ -760,41 +753,17 @@ export const TransactionPanel = observer(function TransactionPanel() {
                     (member) => member.userId === transaction.actorUserId,
                   )?.nickname ?? registrant)
                 : "공통"
-              const paymentLabel = getPaymentLabel(transaction, paymentMethod)
-              const installmentLabel = getInstallmentLabel(transaction)
               return (
                 <TransactionItem
                   key={transaction.id}
                   $excluded={transaction.status === "excluded"}
                 >
                   <TransactionTop>
-                    <MetadataChips>
-                      {transaction.recurringType === "fixed" ? (
-                        <FixedChip>
-                          <Repeat2 size={13} /> 고정비
-                        </FixedChip>
-                      ) : null}
-                      <CategoryTag $color={category?.color ?? colors.subtle}>
-                        {category?.name ?? "기타"}
-                      </CategoryTag>
-                      {paymentLabel ? (
-                        <PaymentChip title={paymentLabel}>
-                          {paymentMethod?.type === "card" ? (
-                            <CreditCard size={13} />
-                          ) : paymentMethod?.type === "bank" ? (
-                            <Landmark size={13} />
-                          ) : (
-                            <Wallet size={13} />
-                          )}
-                          {paymentLabel}
-                        </PaymentChip>
-                      ) : null}
-                      {installmentLabel ? (
-                        <InstallmentChip>
-                          <CalendarRange size={13} /> {installmentLabel}
-                        </InstallmentChip>
-                      ) : null}
-                    </MetadataChips>
+                    <TransactionMetadataChips
+                      transaction={transaction}
+                      category={category}
+                      paymentMethod={paymentMethod}
+                    />
                     <Amount $type={transaction.type}>
                       {formatKrw(transaction.amount)}
                     </Amount>
@@ -1154,49 +1123,6 @@ const TransactionTop = styled.div`
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
-`
-
-const MetadataChips = styled.div`
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-`
-
-const MetadataChip = styled.span`
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: 1px solid ${colors.border};
-  border-radius: ${radii.sm};
-  background: #fff;
-  color: ${colors.ink};
-  padding: 4px 7px 4px 10px;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.2;
-  white-space: nowrap;
-`
-
-const PaymentChip = styled(MetadataChip)`
-  font-weight: 650;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  box-shadow: inset 3px 0 0 ${colors.blue};
-`
-
-const InstallmentChip = styled(MetadataChip)`
-  box-shadow: inset 3px 0 0 ${colors.violet};
-`
-
-const FixedChip = styled(MetadataChip)`
-  font-weight: 700;
-  box-shadow: inset 3px 0 0 ${colors.teal};
-`
-
-const CategoryTag = styled(MetadataChip)<{ $color: string }>`
-  box-shadow: inset 3px 0 0 ${({ $color }) => $color};
 `
 
 const TransactionBody = styled.div`
