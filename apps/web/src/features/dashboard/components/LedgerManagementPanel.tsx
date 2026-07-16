@@ -2,7 +2,7 @@
 
 import styled from "@emotion/styled"
 import type { CreatedLedgerInvitation } from "@salimon/api-client"
-import type { LedgerType } from "@salimon/types"
+import type { LedgerType, PaymentInstrument } from "@salimon/types"
 import { colors, radii, spacing } from "@salimon/ui-tokens"
 import {
   Archive,
@@ -14,7 +14,7 @@ import {
   Share2,
 } from "lucide-react"
 import { observer } from "mobx-react-lite"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useAppStore } from "../StoreProvider"
 import {
   Button,
@@ -55,6 +55,13 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
     string[]
   >([])
   const [inviteCode, setInviteCode] = useState("")
+  const [showJoinedSetup, setShowJoinedSetup] = useState(false)
+  const [connectedPaymentMethodIds, setConnectedPaymentMethodIds] = useState<
+    string[]
+  >([])
+  const [visiblePaymentMethodIds, setVisiblePaymentMethodIds] = useState<
+    string[]
+  >([])
   const [createdInvitation, setCreatedInvitation] =
     useState<CreatedLedgerInvitation | null>(null)
   const [sharedPaymentMethodIds, setSharedPaymentMethodIds] = useState<
@@ -71,6 +78,35 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
   )
   const canManageShared = ledger?.role === "owner" || ledger?.role === "admin"
   const isMutating = store.ledgerMutationState !== "idle"
+  const conversionPaymentMethods = [
+    ...store.currentLedgerCards,
+    ...store.currentLedgerAccounts,
+  ]
+  const allConversionMethodsSelected =
+    conversionPaymentMethods.length > 0 &&
+    conversionPaymentMethods.every((method) =>
+      sharedPaymentMethodIds.includes(method.id),
+    )
+
+  useEffect(() => {
+    setRenameName(ledger?.name ?? "")
+    const ownedLinks = store.data.paymentMethods.filter(
+      (method) =>
+        method.ledgerId === ledger?.id &&
+        (method.type === "card" || method.type === "bank") &&
+        !method.isDeleted &&
+        method.ownerUserId === store.authUser?.id &&
+        method.isActive,
+    )
+    setConnectedPaymentMethodIds(
+      ownedLinks.map((method) => method.instrumentId),
+    )
+    setVisiblePaymentMethodIds(
+      ownedLinks
+        .filter((method) => method.visibility === "ledger")
+        .map((method) => method.instrumentId),
+    )
+  }, [ledger?.id, ledger?.name, store.authUser?.id, store.data.paymentMethods])
 
   return (
     <PanelStack>
@@ -105,7 +141,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
               </FieldHelp>
             ) : null}
           </Field>
-          <Button
+          <FormAction
             type="button"
             $variant="primary"
             disabled={
@@ -117,8 +153,10 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
             onClick={() => void store.renameCurrentLedger(renameName)}
           >
             <Pencil size={15} />
-            {store.ledgerMutationState === "renaming" ? "변경 중" : "변경"}
-          </Button>
+            {store.ledgerMutationState === "renaming"
+              ? "이름 변경 중"
+              : "가계부 이름 변경"}
+          </FormAction>
         </FormRow>
 
         {!canRename && ledger ? (
@@ -231,64 +269,18 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
                 선택하지 않아도 가계부를 만들 수 있습니다. 공동 공개는 별도로
                 선택합니다.
               </span>
-              {store.myPaymentInstruments.map((method) => {
-                const isConnected = newLedgerPaymentMethodIds.includes(
-                  method.id,
-                )
-                return (
-                  <PaymentMethodOption key={method.id}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={isConnected}
-                        disabled={isMutating}
-                        onChange={(event) => {
-                          setNewLedgerPaymentMethodIds((current) =>
-                            event.target.checked
-                              ? [...current, method.id]
-                              : current.filter(
-                                  (id) => id !== method.id,
-                                ),
-                          )
-                          if (!event.target.checked) {
-                            setNewLedgerVisibleMethodIds((current) =>
-                              current.filter(
-                                (id) => id !== method.id,
-                              ),
-                            )
-                          }
-                        }}
-                      />
-                      {method.type === "card" ? "카드" : "계좌"} · {method.name}
-                      {method.last4 ? ` (•••• ${method.last4})` : ""}
-                    </label>
-                    {newType === "shared" && isConnected ? (
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={newLedgerVisibleMethodIds.includes(
-                            method.id,
-                          )}
-                          disabled={isMutating}
-                          onChange={(event) =>
-                            setNewLedgerVisibleMethodIds((current) =>
-                              event.target.checked
-                                ? [...current, method.id]
-                                : current.filter(
-                                    (id) => id !== method.id,
-                                  ),
-                            )
-                          }
-                        />
-                        공동 멤버에게 공개
-                      </label>
-                    ) : null}
-                  </PaymentMethodOption>
-                )
-              })}
+              <PaymentInstrumentSelector
+                instruments={store.myPaymentInstruments}
+                selectedIds={newLedgerPaymentMethodIds}
+                visibleIds={newLedgerVisibleMethodIds}
+                allowVisibility={newType === "shared"}
+                disabled={isMutating}
+                onSelectedIdsChange={setNewLedgerPaymentMethodIds}
+                onVisibleIdsChange={setNewLedgerVisibleMethodIds}
+              />
             </NewLedgerPaymentMethods>
           ) : null}
-          <Button
+          <CreateButton
             type="button"
             $variant="soft"
             disabled={!newName.trim() || isMutating || !store.authUser}
@@ -305,7 +297,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
           >
             <Plus size={16} />
             {store.ledgerMutationState === "creating" ? "생성 중" : "생성"}
-          </Button>
+          </CreateButton>
         </CreateGrid>
 
         <JoinRow>
@@ -326,18 +318,83 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
               }
             />
           </Field>
-          <Button
+          <FormAction
             type="button"
             $variant="primary"
             disabled={inviteCode.length !== 8 || !store.authUser}
             onClick={async () => {
-              if (await store.acceptInvite(inviteCode)) setInviteCode("")
+              const result = await store.acceptInvite(inviteCode)
+              if (result?.status === "accepted") {
+                setInviteCode("")
+                setShowJoinedSetup(true)
+              } else if (result?.status === "already_member") {
+                setInviteCode("")
+              }
             }}
           >
             <Link size={16} /> 참여하기
-          </Button>
+          </FormAction>
         </JoinRow>
       </Panel>
+
+      {ledger?.type === "shared" ? (
+        <Panel>
+          <PanelHeader>
+            <PanelTitle>
+              {showJoinedSetup
+                ? "참여 완료 · 내 카드·계좌 연결"
+                : "내 카드·계좌 연결"}
+            </PanelTitle>
+          </PanelHeader>
+          <PaymentSetupBody>
+            <p>
+              이 가계부에서 사용할 내 카드·계좌를 선택하세요. 연결을 해제해도
+              카드·계좌 원본과 기존 거래는 삭제되지 않습니다.
+            </p>
+            {store.myPaymentInstruments.length > 0 ? (
+              <PaymentInstrumentSelector
+                instruments={store.myPaymentInstruments}
+                selectedIds={connectedPaymentMethodIds}
+                visibleIds={visiblePaymentMethodIds}
+                allowVisibility
+                disabled={isMutating}
+                onSelectedIdsChange={setConnectedPaymentMethodIds}
+                onVisibleIdsChange={setVisiblePaymentMethodIds}
+              />
+            ) : (
+              <EmptyPaymentMethods>
+                먼저 카드 또는 계좌 메뉴에서 내 결제수단을 등록해 주세요.
+              </EmptyPaymentMethods>
+            )}
+            <PaymentSetupActions>
+              {showJoinedSetup ? (
+                <Button type="button" onClick={() => setShowJoinedSetup(false)}>
+                  나중에 하기
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                $variant="primary"
+                disabled={isMutating || store.myPaymentInstruments.length === 0}
+                onClick={async () => {
+                  if (
+                    await store.syncMyLedgerPaymentMethods(
+                      connectedPaymentMethodIds,
+                      visiblePaymentMethodIds,
+                    )
+                  ) {
+                    setShowJoinedSetup(false)
+                  }
+                }}
+              >
+                {store.ledgerMutationState === "syncing-payment-methods"
+                  ? "저장 중"
+                  : "연결 저장"}
+              </Button>
+            </PaymentSetupActions>
+          </PaymentSetupBody>
+        </Panel>
+      ) : null}
 
       {ledger?.type === "personal" ? (
         <Panel>
@@ -353,10 +410,25 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
                 수 있습니다.
               </p>
               <PaymentMethodChoices>
-                {[
-                  ...store.currentLedgerCards,
-                  ...store.currentLedgerAccounts,
-                ].map((method) => (
+                {conversionPaymentMethods.length > 0 ? (
+                  <SelectAllChoice>
+                    <input
+                      type="checkbox"
+                      checked={allConversionMethodsSelected}
+                      onChange={(event) =>
+                        setSharedPaymentMethodIds(
+                          event.target.checked
+                            ? conversionPaymentMethods.map(
+                                (method) => method.id,
+                              )
+                            : [],
+                        )
+                      }
+                    />
+                    전체 선택
+                  </SelectAllChoice>
+                ) : null}
+                {conversionPaymentMethods.map((method) => (
                   <label key={method.id}>
                     <input
                       type="checkbox"
@@ -373,8 +445,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
                     {method.last4 ? ` (•••• ${method.last4})` : ""}
                   </label>
                 ))}
-                {store.currentLedgerCards.length === 0 &&
-                store.currentLedgerAccounts.length === 0 ? (
+                {conversionPaymentMethods.length === 0 ? (
                   <span>등록된 카드와 계좌가 없습니다.</span>
                 ) : null}
               </PaymentMethodChoices>
@@ -419,7 +490,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
                   : "소유자와 관리자만 초대할 수 있습니다."
               }
             >
-              <Link size={16} /> 초대 생성
+              <Link size={16} /> 초대 코드 생성
             </Button>
           </PanelHeader>
 
@@ -495,6 +566,103 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
   )
 })
 
+interface PaymentInstrumentSelectorProps {
+  instruments: PaymentInstrument[]
+  selectedIds: string[]
+  visibleIds: string[]
+  allowVisibility: boolean
+  disabled: boolean
+  onSelectedIdsChange: (ids: string[]) => void
+  onVisibleIdsChange: (ids: string[]) => void
+}
+
+function PaymentInstrumentSelector({
+  instruments,
+  selectedIds,
+  visibleIds,
+  allowVisibility,
+  disabled,
+  onSelectedIdsChange,
+  onVisibleIdsChange,
+}: PaymentInstrumentSelectorProps) {
+  const selectAllRef = useRef<HTMLInputElement>(null)
+  const allIds = instruments.map((method) => method.id)
+  const selectedCount = allIds.filter((id) => selectedIds.includes(id)).length
+  const allSelected =
+    instruments.length > 0 && selectedCount === instruments.length
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = selectedCount > 0 && !allSelected
+    }
+  }, [allSelected, selectedCount])
+
+  return (
+    <PaymentMethodOptions>
+      <SelectAllOption>
+        <label>
+          <input
+            ref={selectAllRef}
+            type="checkbox"
+            checked={allSelected}
+            disabled={disabled}
+            onChange={(event) => {
+              onSelectedIdsChange(event.target.checked ? allIds : [])
+              if (!event.target.checked) onVisibleIdsChange([])
+            }}
+          />
+          전체 선택
+        </label>
+      </SelectAllOption>
+      {instruments.map((method) => {
+        const isConnected = selectedIds.includes(method.id)
+        return (
+          <PaymentMethodOption key={method.id}>
+            <label>
+              <input
+                type="checkbox"
+                checked={isConnected}
+                disabled={disabled}
+                onChange={(event) => {
+                  onSelectedIdsChange(
+                    event.target.checked
+                      ? [...selectedIds, method.id]
+                      : selectedIds.filter((id) => id !== method.id),
+                  )
+                  if (!event.target.checked) {
+                    onVisibleIdsChange(
+                      visibleIds.filter((id) => id !== method.id),
+                    )
+                  }
+                }}
+              />
+              {method.type === "card" ? "카드" : "계좌"} · {method.name}
+              {method.last4 ? ` (•••• ${method.last4})` : ""}
+            </label>
+            {allowVisibility && isConnected ? (
+              <label>
+                <input
+                  type="checkbox"
+                  checked={visibleIds.includes(method.id)}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    onVisibleIdsChange(
+                      event.target.checked
+                        ? [...visibleIds, method.id]
+                        : visibleIds.filter((id) => id !== method.id),
+                    )
+                  }
+                />
+                공동 멤버에게 공개
+              </label>
+            ) : null}
+          </PaymentMethodOption>
+        )
+      })}
+    </PaymentMethodOptions>
+  )
+}
+
 const PanelStack = styled.div`
   display: grid;
   gap: ${spacing[4]};
@@ -509,7 +677,7 @@ const FormRow = styled.div`
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
-  align-items: end;
+  align-items: start;
   padding: 16px 18px;
 
   @media (max-width: 640px) {
@@ -517,9 +685,20 @@ const FormRow = styled.div`
   }
 `
 
+const FormAction = styled(Button)`
+  align-self: start;
+  margin-top: 21px;
+
+  @media (max-width: 640px) {
+    width: 100%;
+    justify-content: center;
+    margin-top: 0;
+  }
+`
+
 const CreateGrid = styled.div`
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.45fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.45fr) auto;
   gap: 12px;
   align-items: end;
   padding: 16px 18px;
@@ -529,6 +708,12 @@ const CreateGrid = styled.div`
   @media (max-width: 820px) {
     grid-template-columns: 1fr;
   }
+`
+
+const CreateButton = styled(Button)`
+  grid-column: 1 / -1;
+  width: 100%;
+  justify-content: center;
 `
 
 const JoinRow = styled(FormRow)`
@@ -567,6 +752,43 @@ const PaymentMethodOption = styled.div`
     height: 16px;
     accent-color: ${colors.teal};
   }
+`
+
+const PaymentMethodOptions = styled.div`
+  display: grid;
+  gap: 8px;
+`
+
+const SelectAllOption = styled(PaymentMethodOption)`
+  padding-bottom: 8px;
+  border-bottom: 1px solid ${colors.border};
+  font-weight: 650;
+`
+
+const PaymentSetupBody = styled.div`
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+
+  > p {
+    margin: 0;
+    color: ${colors.muted};
+    font-size: 12px;
+  }
+`
+
+const PaymentSetupActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+`
+
+const EmptyPaymentMethods = styled.div`
+  padding: 12px;
+  border: 1px dashed ${colors.border};
+  border-radius: ${radii.md};
+  color: ${colors.muted};
+  font-size: 12px;
 `
 
 const CheckboxField = styled.label`
@@ -656,6 +878,12 @@ const PaymentMethodChoices = styled.div`
     color: ${colors.muted};
     font-size: 12px;
   }
+`
+
+const SelectAllChoice = styled.label`
+  padding-bottom: 7px;
+  border-bottom: 1px solid ${colors.border};
+  font-weight: 650;
 `
 
 const OneTimeInvite = styled.div`

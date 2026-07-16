@@ -58,6 +58,11 @@ export interface CreatedLedgerInvitation {
   expiresAt: string
 }
 
+export type AcceptLedgerInviteResult =
+  | { status: "accepted"; ledgerId: string }
+  | { status: "already_member"; ledgerId: string }
+  | { status: "invalid_or_expired" }
+
 export class SupabaseFinanceRepository {
   async load(userId: string): Promise<FinanceData> {
     const client = requireSupabaseClient()
@@ -83,9 +88,7 @@ export class SupabaseFinanceRepository {
         .single(),
       client
         .from("ledgers")
-        .select(
-          "id, owner_id, name, type, currency, archived_at, purge_after",
-        )
+        .select("id, owner_id, name, type, currency, archived_at, purge_after")
         .order("created_at"),
       client
         .from("ledger_members")
@@ -199,9 +202,9 @@ export class SupabaseFinanceRepository {
       paymentMethods: ((paymentMethodsResult.data ?? []) as Row[]).map(
         mapPaymentMethod,
       ),
-      paymentInstruments: (
-        (paymentInstrumentsResult.data ?? []) as Row[]
-      ).map(mapPaymentInstrument),
+      paymentInstruments: ((paymentInstrumentsResult.data ?? []) as Row[]).map(
+        mapPaymentInstrument,
+      ),
       transactions: ((transactionsResult.data ?? []) as Row[]).map(
         mapTransaction,
       ),
@@ -752,17 +755,40 @@ export class SupabaseFinanceRepository {
     }
   }
 
-  async acceptInvite(inviteCode: string): Promise<string> {
+  async acceptInvite(inviteCode: string): Promise<AcceptLedgerInviteResult> {
     const client = requireSupabaseClient()
     const { data, error } = await client.rpc("accept_ledger_invite", {
       submitted_code: inviteCode,
     })
     throwIfError(error)
-    if (typeof data !== "string") {
-      throw new Error("유효하지 않거나 만료된 초대 코드입니다.")
+    if (!data || typeof data !== "object" || !("status" in data)) {
+      throw new Error("초대 코드 확인 결과를 읽을 수 없습니다.")
     }
+    const result = data as Record<string, unknown>
+    if (result.status === "invalid_or_expired") {
+      return { status: "invalid_or_expired" }
+    }
+    if (
+      (result.status === "accepted" || result.status === "already_member") &&
+      typeof result.ledgerId === "string"
+    ) {
+      return { status: result.status, ledgerId: result.ledgerId }
+    }
+    throw new Error("초대 코드 확인 결과를 읽을 수 없습니다.")
+  }
 
-    return data
+  async syncMyLedgerPaymentMethods(
+    ledgerId: string,
+    paymentInstrumentIds: string[],
+    ledgerVisibleInstrumentIds: string[],
+  ): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("sync_my_ledger_payment_methods", {
+      p_ledger_id: ledgerId,
+      p_payment_instrument_ids: paymentInstrumentIds,
+      p_ledger_visible_instrument_ids: ledgerVisibleInstrumentIds,
+    })
+    throwIfError(error)
   }
 
   async revokeInvite(invitationId: string): Promise<void> {
