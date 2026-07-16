@@ -4,6 +4,7 @@
   "packageManager": "pnpm@11.7.0",
   "scripts": {
     "dev:web": "pnpm --filter @salimon/web dev",
+    "dev:seoulsys": "set \"PATH=%LOCALAPPDATA%\\Volta\\tools\\image\\node\\24.15.0;%PATH%\" && %LOCALAPPDATA%\\pnpm\\bin\\pnpm.CMD --filter @salimon/web dev",
     "build:web": "pnpm --filter @salimon/web build",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "pnpm -r --if-present lint",
@@ -15,5 +16,8 @@
     "prettier": "latest",
     "typescript": "latest",
     "vitest": "latest"
+  },
+  "volta": {
+    "node": "24.15.0"
   }
 }
