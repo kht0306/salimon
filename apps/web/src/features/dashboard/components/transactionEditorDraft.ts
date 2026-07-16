@@ -15,6 +15,7 @@ export interface TransactionEditorDraft {
   installmentAmountType: "monthly" | "principal"
   paymentMethodId: string
   transactionAt: string
+  applyAmountToFuture: boolean
 }
 
 export function createNewTransactionDraft(input: {
@@ -37,6 +38,7 @@ export function createNewTransactionDraft(input: {
     installmentAmountType: "monthly",
     paymentMethodId: input.primaryPaymentMethodId ?? "",
     transactionAt: `${input.selectedDate}T12:00`,
+    applyAmountToFuture: true,
   }
 }
 
@@ -82,6 +84,7 @@ export function createCopiedTransactionDraft(input: {
     installmentAmountType: "monthly",
     paymentMethodId,
     transactionAt: getDateTimeLocalValue(transaction.transactionAt),
+    applyAmountToFuture: true,
   }
 }
 

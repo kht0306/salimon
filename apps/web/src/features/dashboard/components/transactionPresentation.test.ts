@@ -1,6 +1,10 @@
 import type { PaymentMethod, Transaction } from "@salimon/types"
 import { describe, expect, it } from "vitest"
-import { getInstallmentLabel, getPaymentLabel } from "./transactionPresentation"
+import {
+  getInstallmentLabel,
+  getPaymentLabel,
+  groupTransactionsByActor,
+} from "./transactionPresentation"
 
 const transaction: Transaction = {
   id: "transaction-1",
@@ -67,5 +71,45 @@ describe("getPaymentLabel", () => {
       }),
     ).toBe("할부 2/6회")
     expect(getInstallmentLabel(transaction)).toBeUndefined()
+  })
+})
+
+describe("groupTransactionsByActor", () => {
+  it("groups common transactions first and follows member order", () => {
+    const groups = groupTransactionsByActor(
+      [
+        { ...transaction, id: "member-2", actorUserId: "user-2" },
+        { ...transaction, id: "common", actorUserId: undefined },
+        { ...transaction, id: "member-1", actorUserId: "user-1" },
+      ],
+      [
+        {
+          id: "member-1",
+          ledgerId: "ledger-1",
+          userId: "user-1",
+          nickname: "민호",
+          role: "owner",
+          status: "active",
+          isDefault: true,
+          joinedAt: "2026-07-01T00:00:00.000Z",
+        },
+        {
+          id: "member-2",
+          ledgerId: "ledger-1",
+          userId: "user-2",
+          nickname: "수진",
+          role: "member",
+          status: "active",
+          isDefault: false,
+          joinedAt: "2026-07-01T00:00:00.000Z",
+        },
+      ],
+    )
+
+    expect(groups.map(({ key, label }) => ({ key, label }))).toEqual([
+      { key: "common", label: "공통" },
+      { key: "user-1", label: "민호" },
+      { key: "user-2", label: "수진" },
+    ])
   })
 })

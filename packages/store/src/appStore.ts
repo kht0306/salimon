@@ -53,6 +53,7 @@ export interface TransactionDraft {
   installmentMonths?: number
   installmentAmountType?: "monthly" | "principal"
   paymentMethodId?: string
+  applyAmountToFuture?: boolean
 }
 
 export interface LedgerCreationInput {
@@ -483,6 +484,7 @@ export class AppStore {
     }
     if (
       draft.recurringType === "installment" &&
+      !draft.id &&
       draft.installmentAmountType === "principal" &&
       draft.amount < (draft.installmentMonths ?? 0)
     ) {

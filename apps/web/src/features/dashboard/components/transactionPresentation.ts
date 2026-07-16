@@ -1,4 +1,39 @@
-import type { PaymentMethod, Transaction } from "@salimon/types"
+import type { LedgerMember, PaymentMethod, Transaction } from "@salimon/types"
+
+export interface TransactionActorGroup {
+  key: string
+  label: string
+  transactions: Transaction[]
+}
+
+export function groupTransactionsByActor(
+  transactions: Transaction[],
+  members: LedgerMember[],
+): TransactionActorGroup[] {
+  const grouped = new Map<string, Transaction[]>()
+  for (const transaction of transactions) {
+    const key = transaction.actorUserId ?? "common"
+    grouped.set(key, [...(grouped.get(key) ?? []), transaction])
+  }
+
+  const orderedKeys = [
+    "common",
+    ...members.map((member) => member.userId),
+    ...grouped.keys(),
+  ].filter(
+    (key, index, keys) => keys.indexOf(key) === index && grouped.has(key),
+  )
+
+  return orderedKeys.map((key) => ({
+    key,
+    label:
+      key === "common"
+        ? "공통"
+        : (members.find((member) => member.userId === key)?.nickname ??
+          "알 수 없음"),
+    transactions: grouped.get(key) ?? [],
+  }))
+}
 
 export function getPaymentLabel(
   transaction: Transaction,

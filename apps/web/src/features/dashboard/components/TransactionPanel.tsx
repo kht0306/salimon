@@ -12,14 +12,17 @@ import type { CategoryUsageType, Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import {
   Check,
+  CalendarRange,
   Copy,
   CreditCard,
   Landmark,
   Pencil,
   Plus,
+  Repeat2,
   Save,
   Trash2,
   Wallet,
+  UsersRound,
   X,
 } from "lucide-react"
 import { observer } from "mobx-react-lite"
@@ -44,7 +47,11 @@ import {
   isInstallmentEditLocked,
   type TransactionEditorDraft,
 } from "./transactionEditorDraft"
-import { getInstallmentLabel, getPaymentLabel } from "./transactionPresentation"
+import {
+  getInstallmentLabel,
+  getPaymentLabel,
+  groupTransactionsByActor,
+} from "./transactionPresentation"
 
 export const TransactionPanel = observer(function TransactionPanel() {
   const store = useAppStore()
@@ -52,6 +59,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const [copySource, setCopySource] = useState<Transaction | null>(null)
   const [isAdding, setAdding] = useState(false)
   const [isSaving, setSaving] = useState(false)
+  const [groupByActor, setGroupByActor] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
   const savingRef = useRef(false)
   const selectedDate = store.selectedDate
@@ -115,7 +123,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
   )
   const savingAccountIsValid =
     draft.type !== "saving" ||
-    store.currentAccounts.some((account) => account.id === draft.paymentMethodId)
+    store.currentAccounts.some(
+      (account) => account.id === draft.paymentMethodId,
+    )
   const canSave =
     Number.isSafeInteger(amount) &&
     amount > 0 &&
@@ -129,8 +139,21 @@ export const TransactionPanel = observer(function TransactionPanel() {
         installmentMonths <= 120 &&
         Boolean(draft.paymentMethodId) &&
         store.currentCards.length > 0 &&
-        (draft.installmentAmountType !== "principal" ||
+        (isEditingInstallment ||
+          draft.installmentAmountType !== "principal" ||
           amount >= installmentMonths)))
+  const transactionGroups = groupByActor
+    ? groupTransactionsByActor(
+        store.calendarSelectedDateTransactions,
+        store.currentMembers,
+      )
+    : [
+        {
+          key: "all",
+          label: "",
+          transactions: store.calendarSelectedDateTransactions,
+        },
+      ]
 
   function openNew() {
     initialDraftRef.current = initialDraft
@@ -157,11 +180,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
         )
       : undefined
     const editDraft: TransactionEditorDraft = {
-      amount: String(
-        recurringRule?.installmentAmountType === "principal"
-          ? (recurringRule.installmentPrincipal ?? transaction.amount)
-          : transaction.amount,
-      ),
+      amount: String(transaction.amount),
       merchantName: transaction.merchantName ?? "",
       memo: transaction.memo ?? "",
       type: transaction.type,
@@ -179,6 +198,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           firstInstallment?.transactionAt ??
           transaction.transactionAt,
       ),
+      applyAmountToFuture: true,
     }
     initialDraftRef.current = editDraft
     setEditing(transaction)
@@ -265,6 +285,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           draft.recurringType === "installment"
             ? draft.installmentAmountType
             : undefined,
+        applyAmountToFuture: draft.applyAmountToFuture,
       })
       if (saved) {
         closeForm()
@@ -282,14 +303,24 @@ export const TransactionPanel = observer(function TransactionPanel() {
           <PanelTitle>{formatKoreanDate(store.selectedDate)}</PanelTitle>
           <Subtle>{store.calendarSelectedDateTransactions.length}건</Subtle>
         </div>
-        <IconButton
-          $variant="primary"
-          title="거래 추가"
-          onClick={openNew}
-          disabled={!store.authUser || !store.selectedLedgerId}
-        >
-          <Plus size={17} />
-        </IconButton>
+        <HeaderActions>
+          <GroupToggle $active={groupByActor}>
+            <input
+              type="checkbox"
+              checked={groupByActor}
+              onChange={(event) => setGroupByActor(event.target.checked)}
+            />
+            <UsersRound size={14} /> 사용자별 묶기
+          </GroupToggle>
+          <IconButton
+            $variant="primary"
+            title="거래 추가"
+            onClick={openNew}
+            disabled={!store.authUser || !store.selectedLedgerId}
+          >
+            <Plus size={17} />
+          </IconButton>
+        </HeaderActions>
       </PanelTop>
 
       {isAdding && store.transactionEditorOpen ? (
@@ -351,7 +382,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                             )
                             ? draft.paymentMethodId
                             : store.currentAccounts[0]?.id || ""
-                        : "",
+                          : "",
                   })
                 }}
               >
@@ -426,6 +457,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                   type="number"
                   min="2"
                   max="120"
+                  disabled={isEditingInstallment}
                   value={draft.installmentMonths}
                   onChange={(event) =>
                     setDraft({
@@ -442,8 +474,8 @@ export const TransactionPanel = observer(function TransactionPanel() {
 
           {isEditingInstallment ? (
             <EditPolicyNotice role="status">
-              할부 거래는 거래 유형, 반복 유형, 결제 수단을 변경할 수
-              없습니다.
+              할부 거래는 거래 유형, 반복 유형, 할부 개월, 결제 수단, 거래일시를
+              변경할 수 없습니다. 금액은 선택한 회차 기준으로 수정됩니다.
             </EditPolicyNotice>
           ) : editing &&
             draft.recurringType !== (editing.recurringType ?? "none") ? (
@@ -476,16 +508,16 @@ export const TransactionPanel = observer(function TransactionPanel() {
                   {draft.type === "saving"
                     ? "계좌를 선택해 주세요"
                     : draft.recurringType === "installment"
-                    ? "카드를 선택해 주세요"
-                    : "현금"}
+                      ? "카드를 선택해 주세요"
+                      : "현금"}
                 </option>
                 {store.currentMembers.map((member) => {
                   const memberMethods = (
                     draft.type === "saving"
                       ? store.currentAccounts
                       : draft.recurringType === "installment"
-                      ? store.currentCards
-                      : store.currentPaymentMethods
+                        ? store.currentCards
+                        : store.currentPaymentMethods
                   )
                     .filter((method) => method.ownerUserId === member.userId)
                     .sort(
@@ -515,8 +547,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                   카드 관리 메뉴에서 카드를 먼저 등록해 주세요.
                 </CardRequired>
               ) : null}
-              {draft.type === "saving" &&
-              store.currentAccounts.length === 0 ? (
+              {draft.type === "saving" && store.currentAccounts.length === 0 ? (
                 <CardRequired role="alert">
                   계좌 관리 메뉴에서 계좌를 먼저 등록해 주세요.
                 </CardRequired>
@@ -529,8 +560,13 @@ export const TransactionPanel = observer(function TransactionPanel() {
               금액
               <RequiredMark>*</RequiredMark>
             </span>
-            <AmountControl $withType={draft.recurringType === "installment"}>
-              {draft.recurringType === "installment" ? (
+            <AmountControl
+              $withType={
+                draft.recurringType === "installment" && !isEditingInstallment
+              }
+            >
+              {draft.recurringType === "installment" &&
+              !isEditingInstallment ? (
                 <Select
                   aria-label="할부 금액 입력 방식"
                   value={draft.installmentAmountType}
@@ -539,7 +575,8 @@ export const TransactionPanel = observer(function TransactionPanel() {
                     setDraft({
                       ...draft,
                       installmentAmountType: event.target.value as
-                        "monthly" | "principal",
+                        | "monthly"
+                        | "principal",
                     })
                   }
                 >
@@ -562,15 +599,42 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 }
               />
             </AmountControl>
-            {draft.recurringType === "installment" &&
-            draft.installmentAmountType === "principal" &&
-            installmentMonthlyAmount > 0 ? (
+            {isEditingInstallment ? (
+              <InstallmentPreview>
+                선택한 {editing?.installmentNumber ?? 1}회차 거래 금액
+              </InstallmentPreview>
+            ) : draft.recurringType === "installment" &&
+              draft.installmentAmountType === "principal" &&
+              installmentMonthlyAmount > 0 ? (
               <InstallmentPreview>
                 월 {formatKrw(installmentMonthlyAmount)} · 마지막 회차에 잔액
                 반영
               </InstallmentPreview>
             ) : null}
           </Field>
+
+          {editing?.recurringType === "fixed" || isEditingInstallment ? (
+            <FutureAmountScope $checked={draft.applyAmountToFuture}>
+              <input
+                type="checkbox"
+                checked={draft.applyAmountToFuture}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    applyAmountToFuture: event.target.checked,
+                  })
+                }
+              />
+              <span>
+                <strong>변경 금액을 이 달 이후 거래에도 적용</strong>
+                <small>
+                  {draft.applyAmountToFuture
+                    ? "이전 달 거래는 유지하고 선택한 달부터 반영합니다."
+                    : "선택한 달의 거래 금액만 수정합니다."}
+                </small>
+              </span>
+            </FutureAmountScope>
+          ) : null}
 
           <Field>
             <span>
@@ -581,6 +645,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 required
                 type="date"
                 aria-label="거래 날짜"
+                disabled={isEditingInstallment}
                 value={transactionDate}
                 onChange={(event) => {
                   setDraft({
@@ -593,6 +658,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 required
                 type="time"
                 aria-label="거래 시간"
+                disabled={isEditingInstallment}
                 value={transactionTime}
                 onChange={(event) =>
                   setDraft({
@@ -670,116 +736,133 @@ export const TransactionPanel = observer(function TransactionPanel() {
       ) : null}
 
       <TransactionList>
-        {store.calendarSelectedDateTransactions.map((transaction) => {
-          const category = store.data.categories.find(
-            (item) => item.id === transaction.categoryId,
-          )
-          const paymentMethod = store.data.paymentMethods.find(
-            (item) => item.id === transaction.paymentMethodId,
-          )
-          const registrant =
-            store.currentMembers.find(
-              (member) => member.userId === transaction.createdBy,
-            )?.nickname ?? "알 수 없음"
-          const actor = transaction.actorUserId
-            ? (store.currentMembers.find(
-                (member) => member.userId === transaction.actorUserId,
-              )?.nickname ?? registrant)
-            : "공통"
-          const paymentLabel = getPaymentLabel(transaction, paymentMethod)
-          const installmentLabel = getInstallmentLabel(transaction)
-          return (
-            <TransactionItem
-              key={transaction.id}
-              $excluded={transaction.status === "excluded"}
-            >
-              <TransactionTop>
-                <MetadataChips>
-                  {paymentLabel ? (
-                    <PaymentChip title={paymentLabel}>
-                      {paymentMethod?.type === "card" ? (
-                        <CreditCard size={13} />
-                      ) : paymentMethod?.type === "bank" ? (
-                        <Landmark size={13} />
-                      ) : (
-                        <Wallet size={13} />
-                      )}
-                      {paymentLabel}
-                    </PaymentChip>
-                  ) : null}
-                  {installmentLabel ? (
-                    <InstallmentChip>{installmentLabel}</InstallmentChip>
-                  ) : null}
-                  {transaction.recurringType === "fixed" ? (
-                    <FixedChip>고정비</FixedChip>
-                  ) : null}
-                  <CategoryTag $color={category?.color ?? colors.subtle}>
-                    {category?.name ?? "기타"}
-                  </CategoryTag>
-                </MetadataChips>
-                <Amount $type={transaction.type}>
-                  {formatKrw(transaction.amount)}
-                </Amount>
-              </TransactionTop>
-              <TransactionBody>
-                <TransactionName>
-                  {transaction.merchantName || transaction.memo || "거래"}
-                </TransactionName>
-                {transaction.memo ? (
-                  <TransactionMemo title={transaction.memo}>
-                    {transaction.memo}
-                  </TransactionMemo>
-                ) : null}
-              </TransactionBody>
-              <TransactionFooter>
-                <AuditInfo>
-                  <span>거래 {actor}</span>
-                  <span>등록 {registrant}</span>
-                  <time dateTime={transaction.createdAt}>
-                    {new Date(transaction.createdAt).toLocaleString("ko-KR", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    })}
-                  </time>
-                </AuditInfo>
-                <ActionCluster>
-                  {canCopyTransaction(transaction) ? (
-                    <CompactAction
-                      title="복사하여 신규 등록"
-                      onClick={() => openCopy(transaction)}
-                    >
-                      <Copy size={14} />
-                    </CompactAction>
-                  ) : null}
-                  <CompactAction
-                    title="수정"
-                    onClick={() => openEdit(transaction)}
-                  >
-                    <Pencil size={14} />
-                  </CompactAction>
-                  <CompactAction
-                    $variant="danger"
-                    title={
-                      transaction.recurringType === "fixed"
-                        ? "이번 달부터 고정비 제거"
-                        : "삭제"
-                    }
-                    onClick={() =>
-                      transaction.recurringType === "fixed" &&
-                      transaction.recurringRuleId
-                        ? void store.deactivateFixedRule(
-                            transaction.recurringRuleId,
-                          )
-                        : void store.softDeleteTransaction(transaction.id)
-                    }
-                  >
-                    <Trash2 size={14} />
-                  </CompactAction>
-                </ActionCluster>
-              </TransactionFooter>
-            </TransactionItem>
-          )
-        })}
+        {transactionGroups.map((group) => (
+          <TransactionGroup key={group.key}>
+            {groupByActor ? (
+              <TransactionGroupHeader>
+                <span>{group.label}</span>
+                <small>{group.transactions.length}건</small>
+              </TransactionGroupHeader>
+            ) : null}
+            {group.transactions.map((transaction) => {
+              const category = store.data.categories.find(
+                (item) => item.id === transaction.categoryId,
+              )
+              const paymentMethod = store.data.paymentMethods.find(
+                (item) => item.id === transaction.paymentMethodId,
+              )
+              const registrant =
+                store.currentMembers.find(
+                  (member) => member.userId === transaction.createdBy,
+                )?.nickname ?? "알 수 없음"
+              const actor = transaction.actorUserId
+                ? (store.currentMembers.find(
+                    (member) => member.userId === transaction.actorUserId,
+                  )?.nickname ?? registrant)
+                : "공통"
+              const paymentLabel = getPaymentLabel(transaction, paymentMethod)
+              const installmentLabel = getInstallmentLabel(transaction)
+              return (
+                <TransactionItem
+                  key={transaction.id}
+                  $excluded={transaction.status === "excluded"}
+                >
+                  <TransactionTop>
+                    <MetadataChips>
+                      {transaction.recurringType === "fixed" ? (
+                        <FixedChip>
+                          <Repeat2 size={13} /> 고정비
+                        </FixedChip>
+                      ) : null}
+                      <CategoryTag $color={category?.color ?? colors.subtle}>
+                        {category?.name ?? "기타"}
+                      </CategoryTag>
+                      {paymentLabel ? (
+                        <PaymentChip title={paymentLabel}>
+                          {paymentMethod?.type === "card" ? (
+                            <CreditCard size={13} />
+                          ) : paymentMethod?.type === "bank" ? (
+                            <Landmark size={13} />
+                          ) : (
+                            <Wallet size={13} />
+                          )}
+                          {paymentLabel}
+                        </PaymentChip>
+                      ) : null}
+                      {installmentLabel ? (
+                        <InstallmentChip>
+                          <CalendarRange size={13} /> {installmentLabel}
+                        </InstallmentChip>
+                      ) : null}
+                    </MetadataChips>
+                    <Amount $type={transaction.type}>
+                      {formatKrw(transaction.amount)}
+                    </Amount>
+                  </TransactionTop>
+                  <TransactionBody>
+                    <TransactionName>
+                      {transaction.merchantName || transaction.memo || "거래"}
+                    </TransactionName>
+                    {transaction.memo ? (
+                      <TransactionMemo title={transaction.memo}>
+                        {transaction.memo}
+                      </TransactionMemo>
+                    ) : null}
+                  </TransactionBody>
+                  <TransactionFooter>
+                    <AuditInfo>
+                      <span>거래 {actor}</span>
+                      <span>등록 {registrant}</span>
+                      <time dateTime={transaction.createdAt}>
+                        {new Date(transaction.createdAt).toLocaleString(
+                          "ko-KR",
+                          {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          },
+                        )}
+                      </time>
+                    </AuditInfo>
+                    <ActionCluster>
+                      {canCopyTransaction(transaction) ? (
+                        <CompactAction
+                          title="복사하여 신규 등록"
+                          onClick={() => openCopy(transaction)}
+                        >
+                          <Copy size={14} />
+                        </CompactAction>
+                      ) : null}
+                      <CompactAction
+                        title="수정"
+                        onClick={() => openEdit(transaction)}
+                      >
+                        <Pencil size={14} />
+                      </CompactAction>
+                      <CompactAction
+                        $variant="danger"
+                        title={
+                          transaction.recurringType === "fixed"
+                            ? "이번 달부터 고정비 제거"
+                            : "삭제"
+                        }
+                        onClick={() =>
+                          transaction.recurringType === "fixed" &&
+                          transaction.recurringRuleId
+                            ? void store.deactivateFixedRule(
+                                transaction.recurringRuleId,
+                              )
+                            : void store.softDeleteTransaction(transaction.id)
+                        }
+                      >
+                        <Trash2 size={14} />
+                      </CompactAction>
+                    </ActionCluster>
+                  </TransactionFooter>
+                </TransactionItem>
+              )
+            })}
+          </TransactionGroup>
+        ))}
       </TransactionList>
 
       {store.calendarSelectedDateTransactions.length === 0 ? (
@@ -886,6 +969,34 @@ const Subtle = styled.div`
   margin-top: 4px;
 `
 
+const HeaderActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 7px;
+`
+
+const GroupToggle = styled.label<{ $active: boolean }>`
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid ${({ $active }) => ($active ? colors.focus : colors.border)};
+  border-radius: ${radii.sm};
+  background: ${({ $active }) => ($active ? colors.tealSoft : "#fff")};
+  color: ${({ $active }) => ($active ? colors.teal : colors.muted)};
+  padding: 0 9px;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+
+  input {
+    width: 13px;
+    height: 13px;
+    margin: 0;
+    accent-color: ${colors.teal};
+  }
+`
+
 const Editor = styled.div`
   display: grid;
   gap: 12px;
@@ -963,8 +1074,65 @@ const InstallmentPreview = styled.small`
   font-weight: 400;
 `
 
+const FutureAmountScope = styled.label<{ $checked: boolean }>`
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid
+    ${({ $checked }) => ($checked ? colors.focus : colors.border)};
+  border-radius: ${radii.sm};
+  background: ${({ $checked }) => ($checked ? colors.tealSoft : "#fff")};
+  color: ${colors.ink};
+  padding: 10px 11px;
+  cursor: pointer;
+
+  input {
+    width: 15px;
+    height: 15px;
+    margin: 1px 0 0;
+    accent-color: ${colors.teal};
+  }
+
+  span {
+    display: grid;
+    gap: 3px;
+  }
+
+  strong {
+    font-size: 12px;
+  }
+
+  small {
+    color: ${colors.muted};
+    font-size: 10px;
+    font-weight: 400;
+  }
+`
+
 const TransactionList = styled.div`
   display: grid;
+`
+
+const TransactionGroup = styled.section`
+  display: grid;
+`
+
+const TransactionGroupHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid ${colors.borderStrong};
+  background: ${colors.panelSubtle};
+  color: ${colors.ink};
+  padding: 8px 9px;
+  font-size: 11px;
+  font-weight: 700;
+
+  small {
+    color: ${colors.muted};
+    font-size: 10px;
+    font-weight: 600;
+  }
 `
 
 const TransactionItem = styled.article<{ $excluded: boolean }>`
@@ -1002,9 +1170,9 @@ const MetadataChip = styled.span`
   gap: 5px;
   border: 1px solid ${colors.border};
   border-radius: ${radii.sm};
-  background: ${colors.panelSubtle};
-  color: ${colors.muted};
-  padding: 4px 7px;
+  background: #fff;
+  color: ${colors.ink};
+  padding: 4px 7px 4px 10px;
   font-size: 10px;
   font-weight: 600;
   line-height: 1.2;
@@ -1012,27 +1180,22 @@ const MetadataChip = styled.span`
 `
 
 const PaymentChip = styled(MetadataChip)`
-  background: #fff;
-  color: ${colors.ink};
   font-weight: 650;
   overflow: hidden;
   text-overflow: ellipsis;
+  box-shadow: inset 3px 0 0 ${colors.blue};
 `
 
 const InstallmentChip = styled(MetadataChip)`
-  color: ${colors.muted};
+  box-shadow: inset 3px 0 0 ${colors.violet};
 `
 
 const FixedChip = styled(MetadataChip)`
-  border-color: ${colors.focus};
-  background: ${colors.tealSoft};
-  color: ${colors.teal};
   font-weight: 700;
+  box-shadow: inset 3px 0 0 ${colors.teal};
 `
 
 const CategoryTag = styled(MetadataChip)<{ $color: string }>`
-  color: ${colors.ink};
-  padding-left: 10px;
   box-shadow: inset 3px 0 0 ${({ $color }) => $color};
 `
 
