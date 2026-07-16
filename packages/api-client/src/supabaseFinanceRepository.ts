@@ -548,12 +548,6 @@ export class SupabaseFinanceRepository {
     throwIfError(error)
   }
 
-  async resetMyFinanceData(): Promise<void> {
-    const client = requireSupabaseClient()
-    const { error } = await client.rpc("reset_my_finance_data")
-    throwIfError(error)
-  }
-
   async deactivateFixedRule(ruleId: string, month: string): Promise<void> {
     const client = requireSupabaseClient()
     const { error } = await client.rpc("deactivate_fixed_rule_from_month", {

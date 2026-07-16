@@ -999,22 +999,6 @@ export class AppStore {
     }
   }
 
-  async resetMyFinanceData(): Promise<boolean> {
-    try {
-      await this.repository.resetMyFinanceData()
-      this.initializedWorkspaceUserId = null
-      await this.ensureWorkspace(this.authUser?.id ?? "")
-      await this.refreshFinanceData()
-      this.notify(
-        "카테고리, 카드와 계좌는 유지하고 테스트 데이터를 초기화했습니다.",
-      )
-      return true
-    } catch (error) {
-      this.setDataError(error)
-      return false
-    }
-  }
-
   async deactivateFixedRule(ruleId: string): Promise<void> {
     try {
       await this.repository.deactivateFixedRule(ruleId, this.selectedMonth)

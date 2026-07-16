@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Database,
   RefreshCw,
-  RotateCcw,
   ShieldCheck,
   TriangleAlert,
   Wifi,
@@ -80,28 +79,6 @@ export const ConnectionPanel = observer(function ConnectionPanel() {
             ? `${store.authUser?.nickname ?? "사용자"}님의 Supabase 세션이 연결되어 있습니다.`
             : "현재는 로그인 전 상태입니다. 사이드바에서 카카오 로그인을 진행해 주세요."}
         </Note>
-        <DangerZone>
-          <div>
-            <strong>테스트 데이터 초기화</strong>
-            <p>
-              거래와 고정비·할부 규칙 등 테스트 데이터를 삭제합니다. 가계부,
-              카테고리, 예산, 카드와 계좌 설정은 유지됩니다.
-            </p>
-          </div>
-          <Button
-            $variant="danger"
-            onClick={() => {
-              if (
-                window.confirm(
-                  "거래와 고정비·할부 규칙을 초기화하시겠습니까? 카테고리, 카드와 계좌 설정은 유지되며, 삭제한 거래 데이터는 되돌릴 수 없습니다.",
-                )
-              )
-                void store.resetMyFinanceData()
-            }}
-          >
-            <RotateCcw size={14} /> 초기화
-          </Button>
-        </DangerZone>
       </Content>
     </Panel>
   )
@@ -180,19 +157,4 @@ const Note = styled.div`
   color: ${colors.muted};
   padding: 12px;
   font-size: 12px;
-`
-
-const DangerZone = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  border-top: 1px solid ${colors.border};
-  padding: 18px;
-
-  p {
-    margin: 3px 0 0;
-    color: ${colors.muted};
-    font-size: 12px;
-  }
 `
