@@ -138,3 +138,49 @@ describe("setDefaultLedger", () => {
     })
   })
 })
+
+describe("acceptInvite", () => {
+  it("returns a structured already-member result", async () => {
+    rpc.mockResolvedValue({
+      data: { status: "already_member", ledgerId: "ledger-2" },
+      error: null,
+    })
+    const repository = new SupabaseFinanceRepository()
+
+    await expect(repository.acceptInvite("ABCDEFGH")).resolves.toEqual({
+      status: "already_member",
+      ledgerId: "ledger-2",
+    })
+  })
+
+  it("keeps invalid and expired codes indistinguishable", async () => {
+    rpc.mockResolvedValue({
+      data: { status: "invalid_or_expired" },
+      error: null,
+    })
+    const repository = new SupabaseFinanceRepository()
+
+    await expect(repository.acceptInvite("ABCDEFGH")).resolves.toEqual({
+      status: "invalid_or_expired",
+    })
+  })
+})
+
+describe("syncMyLedgerPaymentMethods", () => {
+  it("passes connected and shared instruments separately", async () => {
+    rpc.mockResolvedValue({ data: null, error: null })
+    const repository = new SupabaseFinanceRepository()
+
+    await repository.syncMyLedgerPaymentMethods(
+      "ledger-2",
+      ["instrument-1", "instrument-2"],
+      ["instrument-2"],
+    )
+
+    expect(rpc).toHaveBeenCalledWith("sync_my_ledger_payment_methods", {
+      p_ledger_id: "ledger-2",
+      p_payment_instrument_ids: ["instrument-1", "instrument-2"],
+      p_ledger_visible_instrument_ids: ["instrument-2"],
+    })
+  })
+})

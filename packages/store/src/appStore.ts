@@ -9,6 +9,7 @@ import {
   SupabaseFinanceRepository,
   type AuthSessionInfo,
   type AuthUserInfo,
+  type AcceptLedgerInviteResult,
   type CreatedLedgerInvitation,
   type FinanceData,
   type SupabaseConnectionCheck,
@@ -99,8 +100,12 @@ export class AppStore {
   authError: string | null = null
   dataState: "idle" | "loading" | "ready" | "error" = "idle"
   dataError: string | null = null
-  ledgerMutationState: "idle" | "creating" | "renaming" | "setting-default" =
-    "idle"
+  ledgerMutationState:
+    | "idle"
+    | "creating"
+    | "renaming"
+    | "setting-default"
+    | "syncing-payment-methods" = "idle"
   private initializedWorkspaceUserId: string | null = null
   private workspaceInitialization: Promise<void> | null = null
   supabaseConnection: SupabaseConnectionCheck = {
@@ -1219,21 +1224,59 @@ export class AppStore {
     }
   }
 
-  async acceptInvite(inviteCode: string): Promise<boolean> {
+  async acceptInvite(
+    inviteCode: string,
+  ): Promise<AcceptLedgerInviteResult | null> {
     const normalizedCode = inviteCode.trim().toUpperCase()
-    if (!this.authUser || !normalizedCode) return false
+    if (!this.authUser || !normalizedCode) return null
 
     try {
-      const ledgerId = await this.repository.acceptInvite(normalizedCode)
+      const result = await this.repository.acceptInvite(normalizedCode)
+      if (result.status === "invalid_or_expired") {
+        this.notify("유효하지 않거나 만료된 초대 코드입니다.", "error")
+        return result
+      }
       await this.refreshFinanceData()
       runInAction(() => {
-        this.selectedLedgerId = ledgerId
+        this.selectedLedgerId = result.ledgerId
       })
-      this.notify("공동 가계부에 참여했습니다.")
+      this.notify(
+        result.status === "already_member"
+          ? "이미 참여 중인 가계부입니다. 해당 가계부로 이동했습니다."
+          : "공동 가계부에 참여했습니다. 내 카드·계좌를 연결해 주세요.",
+        result.status === "already_member" ? "info" : "success",
+      )
+      return result
+    } catch (error) {
+      this.setDataError(error)
+      return null
+    }
+  }
+
+  async syncMyLedgerPaymentMethods(
+    paymentInstrumentIds: string[],
+    ledgerVisibleInstrumentIds: string[],
+  ): Promise<boolean> {
+    if (!this.currentLedger || this.currentLedger.type !== "shared")
+      return false
+    if (this.ledgerMutationState !== "idle") return false
+    this.ledgerMutationState = "syncing-payment-methods"
+    try {
+      await this.repository.syncMyLedgerPaymentMethods(
+        this.currentLedger.id,
+        paymentInstrumentIds,
+        ledgerVisibleInstrumentIds,
+      )
+      await this.refreshFinanceData()
+      this.notify("이 가계부에 연결할 내 카드·계좌를 저장했습니다.")
       return this.dataState === "ready"
     } catch (error) {
       this.setDataError(error)
       return false
+    } finally {
+      runInAction(() => {
+        this.ledgerMutationState = "idle"
+      })
     }
   }
 
