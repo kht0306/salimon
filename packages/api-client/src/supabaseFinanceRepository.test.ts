@@ -125,3 +125,16 @@ describe("createLedger", () => {
     })
   })
 })
+
+describe("setDefaultLedger", () => {
+  it("uses the atomic default-ledger RPC", async () => {
+    rpc.mockResolvedValue({ data: null, error: null })
+    const repository = new SupabaseFinanceRepository()
+
+    await repository.setDefaultLedger("ledger-2")
+
+    expect(rpc).toHaveBeenCalledWith("set_default_ledger", {
+      p_ledger_id: "ledger-2",
+    })
+  })
+})
