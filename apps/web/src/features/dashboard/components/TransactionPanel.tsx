@@ -40,6 +40,7 @@ import {
   canCopyTransaction,
   createCopiedTransactionDraft,
   createNewTransactionDraft,
+  isInstallmentEditLocked,
   type TransactionEditorDraft,
 } from "./transactionEditorDraft"
 import { getInstallmentLabel, getPaymentLabel } from "./transactionPresentation"
@@ -71,6 +72,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
 
   const [draft, setDraft] = useState(initialDraft)
   const initialDraftRef = useRef(initialDraft)
+  const isEditingInstallment = isInstallmentEditLocked(editing)
 
   useEffect(
     () => () => {
@@ -318,6 +320,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
               <Select
                 required
                 value={draft.type}
+                disabled={isEditingInstallment}
                 onChange={(event) => {
                   const type = event.target.value as Transaction["type"]
                   setDraft({
@@ -372,7 +375,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
               반복 유형
               <Select
                 value={draft.recurringType}
-                disabled={Boolean(editing)}
+                disabled={isEditingInstallment}
                 onChange={(event) => {
                   const recurringType = event.target
                     .value as TransactionEditorDraft["recurringType"]
@@ -420,6 +423,18 @@ export const TransactionPanel = observer(function TransactionPanel() {
             )}
           </TwoColumns>
 
+          {isEditingInstallment ? (
+            <EditPolicyNotice role="status">
+              할부 거래는 거래 유형, 반복 유형, 결제 수단을 변경할 수
+              없습니다. 금액은 수정할 수 있습니다.
+            </EditPolicyNotice>
+          ) : editing &&
+            draft.recurringType !== (editing.recurringType ?? "none") ? (
+            <EditPolicyNotice role="status">
+              반복 유형 변경은 선택한 거래부터 이후 거래에 적용됩니다.
+            </EditPolicyNotice>
+          ) : null}
+
           {draft.type === "expense" ? (
             <Field>
               <span>
@@ -431,6 +446,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
               <Select
                 required={draft.recurringType === "installment"}
                 value={draft.paymentMethodId}
+                disabled={isEditingInstallment}
                 onChange={(event) =>
                   setDraft({ ...draft, paymentMethodId: event.target.value })
                 }
@@ -840,6 +856,17 @@ const CardRequired = styled.span`
   color: ${colors.coral};
   font-size: 12px;
   font-weight: 600;
+`
+
+const EditPolicyNotice = styled.div`
+  border: 1px solid ${colors.border};
+  border-radius: ${radii.sm};
+  background: ${colors.panelSubtle};
+  color: ${colors.muted};
+  padding: 10px 11px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  line-height: 1.45;
 `
 
 const CopyNotice = styled.div`

@@ -88,3 +88,9 @@ export function createCopiedTransactionDraft(input: {
 export function canCopyTransaction(transaction: Transaction): boolean {
   return !transaction.recurringType
 }
+
+export function isInstallmentEditLocked(
+  transaction: Pick<Transaction, "recurringType"> | null,
+): boolean {
+  return transaction?.recurringType === "installment"
+}

@@ -4,6 +4,7 @@ import {
   canCopyTransaction,
   createCopiedTransactionDraft,
   createNewTransactionDraft,
+  isInstallmentEditLocked,
 } from "./transactionEditorDraft"
 
 const transaction: Transaction = {
@@ -83,5 +84,16 @@ describe("transaction editor drafts", () => {
     expect(
       canCopyTransaction({ ...transaction, recurringType: "installment" }),
     ).toBe(false)
+  })
+
+  it("locks recurrence and payment fields only for existing installments", () => {
+    expect(isInstallmentEditLocked(null)).toBe(false)
+    expect(isInstallmentEditLocked(transaction)).toBe(false)
+    expect(
+      isInstallmentEditLocked({ recurringType: "fixed" }),
+    ).toBe(false)
+    expect(
+      isInstallmentEditLocked({ recurringType: "installment" }),
+    ).toBe(true)
   })
 })
