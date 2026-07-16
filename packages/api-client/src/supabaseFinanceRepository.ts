@@ -39,6 +39,7 @@ export interface RemoteTransactionInput {
   installmentMonths?: number
   installmentAmountType?: "monthly" | "principal"
   paymentMethodId?: string
+  applyAmountToFuture?: boolean
 }
 
 export interface RemoteSampleInput {
@@ -213,7 +214,7 @@ export class SupabaseFinanceRepository {
 
     if (input.id) {
       const { data, error } = await client.rpc(
-        "update_transaction_with_recurrence",
+        "update_transaction_with_recurrence_v2",
         {
           p_transaction_id: input.id,
           p_ledger_id: input.ledgerId,
@@ -229,6 +230,7 @@ export class SupabaseFinanceRepository {
           p_recurring_type: input.recurringType ?? null,
           p_installment_months: input.installmentMonths ?? null,
           p_installment_amount_type: input.installmentAmountType ?? null,
+          p_apply_amount_to_future: input.applyAmountToFuture ?? true,
         },
       )
       throwIfError(error)

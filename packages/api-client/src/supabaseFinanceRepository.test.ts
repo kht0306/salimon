@@ -46,7 +46,7 @@ describe("saveTransaction", () => {
       paymentMethodId: "card-1",
     })
 
-    expect(rpc).toHaveBeenCalledWith("update_transaction_with_recurrence", {
+    expect(rpc).toHaveBeenCalledWith("update_transaction_with_recurrence_v2", {
       p_transaction_id: "transaction-1",
       p_ledger_id: "ledger-1",
       p_amount: 12000,
@@ -61,8 +61,30 @@ describe("saveTransaction", () => {
       p_recurring_type: "fixed",
       p_installment_months: null,
       p_installment_amount_type: null,
+      p_apply_amount_to_future: true,
     })
     expect(from).not.toHaveBeenCalled()
+  })
+
+  it("passes a current-month-only recurring amount scope", async () => {
+    rpc.mockResolvedValue({ data: "rule-1", error: null })
+    const repository = new SupabaseFinanceRepository()
+
+    await repository.saveTransaction("user-1", {
+      id: "transaction-1",
+      ledgerId: "ledger-1",
+      type: "expense",
+      status: "confirmed",
+      amount: 15000,
+      transactionAt: "2026-07-14T03:30:00.000Z",
+      recurringType: "fixed",
+      applyAmountToFuture: false,
+    })
+
+    expect(rpc).toHaveBeenCalledWith(
+      "update_transaction_with_recurrence_v2",
+      expect.objectContaining({ p_apply_amount_to_future: false }),
+    )
   })
 })
 
