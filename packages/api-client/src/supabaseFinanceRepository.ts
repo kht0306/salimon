@@ -211,6 +211,30 @@ export class SupabaseFinanceRepository {
       updated_at: new Date().toISOString(),
     }
 
+    if (input.id) {
+      const { data, error } = await client.rpc(
+        "update_transaction_with_recurrence",
+        {
+          p_transaction_id: input.id,
+          p_ledger_id: input.ledgerId,
+          p_amount: input.amount,
+          p_transaction_at: input.transactionAt,
+          p_category_id: input.categoryId ?? null,
+          p_merchant_name: input.merchantName ?? null,
+          p_memo: input.memo ?? null,
+          p_actor_user_id: input.actorUserId ?? null,
+          p_status: input.status,
+          p_type: input.type,
+          p_payment_method_id: input.paymentMethodId ?? null,
+          p_recurring_type: input.recurringType ?? null,
+          p_installment_months: input.installmentMonths ?? null,
+          p_installment_amount_type: input.installmentAmountType ?? null,
+        },
+      )
+      throwIfError(error)
+      return typeof data === "string" ? data : undefined
+    }
+
     if (input.recurringType === "installment") {
       const { data, error } = await client.rpc(
         "save_card_installment_series_v2",
@@ -248,6 +272,7 @@ export class SupabaseFinanceRepository {
         end_month: null,
         installment_months: null,
         category_id: input.categoryId ?? null,
+        payment_method_id: input.paymentMethodId ?? null,
         merchant_name: input.merchantName ?? null,
         memo: input.memo ?? null,
         transaction_type: input.type,
@@ -259,11 +284,9 @@ export class SupabaseFinanceRepository {
       return undefined
     }
 
-    const result = input.id
-      ? await client.from("transactions").update(payload).eq("id", input.id)
-      : await client
-          .from("transactions")
-          .insert({ ...payload, created_by: userId })
+    const result = await client
+      .from("transactions")
+      .insert({ ...payload, created_by: userId })
     throwIfError(result.error)
     return undefined
   }
