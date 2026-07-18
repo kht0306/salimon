@@ -139,6 +139,23 @@ describe("setDefaultLedger", () => {
   })
 })
 
+describe("convertPersonalLedgerToShared", () => {
+  it("passes user payment-instrument ids to the conversion RPC", async () => {
+    rpc.mockResolvedValue({ data: null, error: null })
+    const repository = new SupabaseFinanceRepository()
+
+    await repository.convertPersonalLedgerToShared("ledger-1", [
+      "instrument-card",
+      "instrument-account",
+    ])
+
+    expect(rpc).toHaveBeenCalledWith("convert_personal_ledger_to_shared", {
+      p_ledger_id: "ledger-1",
+      p_shared_payment_method_ids: ["instrument-card", "instrument-account"],
+    })
+  })
+})
+
 describe("acceptInvite", () => {
   it("returns a structured already-member result", async () => {
     rpc.mockResolvedValue({

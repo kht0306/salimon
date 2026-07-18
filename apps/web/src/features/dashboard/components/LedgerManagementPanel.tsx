@@ -83,10 +83,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
   )
   const canManageShared = ledger?.role === "owner" || ledger?.role === "admin"
   const isMutating = store.ledgerMutationState !== "idle"
-  const conversionPaymentMethods = [
-    ...store.currentLedgerCards,
-    ...store.currentLedgerAccounts,
-  ]
+  const conversionPaymentMethods = store.myPaymentInstruments
   const allConversionMethodsSelected =
     conversionPaymentMethods.length > 0 &&
     conversionPaymentMethods.every((method) =>
@@ -407,98 +404,98 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
             <PanelTitle>공동 사용</PanelTitle>
           </PanelHeader>
           <ConversionNotice>
-            <div>
-              <strong>현재 개인 가계부를 함께 사용하기</strong>
-              <p>
-                거래와 카테고리는 그대로 유지됩니다. 아래에서 선택한 카드와
-                계좌만 공동 멤버에게 공개되며, 선택하지 않은 결제수단은 나만 볼
-                수 있습니다.
-              </p>
-              <PaymentMethodChoices>
-                {conversionPaymentMethods.length > 0 ? (
-                  <SelectAllChoice
-                    type="button"
-                    aria-pressed={allConversionMethodsSelected}
-                    $selected={allConversionMethodsSelected}
-                    onClick={() =>
-                      setSharedPaymentMethodIds(
-                        allConversionMethodsSelected
-                          ? []
-                          : conversionPaymentMethods.map((method) => method.id),
-                      )
-                    }
-                  >
+            <ConversionHeader>
+              <div>
+                <strong>현재 개인 가계부를 함께 사용하기</strong>
+                <p>
+                  거래와 카테고리는 그대로 유지됩니다. 아래에서 선택한 카드와
+                  계좌만 공동 멤버에게 공개되며, 선택하지 않은 결제수단은 나만
+                  볼 수 있습니다.
+                </p>
+              </div>
+              <Button
+                type="button"
+                $variant="primary"
+                disabled={ledger.ownerId !== store.authUser?.id}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "현재 개인 가계부를 공동 가계부로 전환하시겠습니까? 기존 데이터는 모두 유지되며 개인 가계부로 되돌릴 수 없습니다.",
+                    )
+                  ) {
+                    void store.convertCurrentLedgerToShared(
+                      sharedPaymentMethodIds,
+                    )
+                  }
+                }}
+              >
+                <Share2 size={15} /> 공동 가계부로 전환
+              </Button>
+            </ConversionHeader>
+            <PaymentMethodChoices>
+              {conversionPaymentMethods.length > 0 ? (
+                <SelectAllChoice
+                  type="button"
+                  aria-pressed={allConversionMethodsSelected}
+                  $selected={allConversionMethodsSelected}
+                  onClick={() =>
+                    setSharedPaymentMethodIds(
+                      allConversionMethodsSelected
+                        ? []
+                        : conversionPaymentMethods.map((method) => method.id),
+                    )
+                  }
+                >
+                  <span>
+                    {allConversionMethodsSelected ? <Check size={14} /> : null}
+                  </span>
+                  전체 결제수단 공개
+                </SelectAllChoice>
+              ) : null}
+              {conversionPaymentMethods.map((method) => (
+                <ConversionMethodChoice
+                  key={method.id}
+                  type="button"
+                  aria-pressed={sharedPaymentMethodIds.includes(method.id)}
+                  $selected={sharedPaymentMethodIds.includes(method.id)}
+                  onClick={() =>
+                    setSharedPaymentMethodIds((current) =>
+                      current.includes(method.id)
+                        ? current.filter((id) => id !== method.id)
+                        : [...current, method.id],
+                    )
+                  }
+                >
+                  <MethodIcon aria-hidden="true">
+                    {method.type === "card" ? (
+                      <CreditCard size={17} />
+                    ) : (
+                      <Landmark size={17} />
+                    )}
+                  </MethodIcon>
+                  <MethodDetails>
+                    <strong>{method.name}</strong>
                     <span>
-                      {allConversionMethodsSelected ? (
-                        <Check size={14} />
-                      ) : null}
+                      {getPaymentMethodTypeLabel(method)}
+                      {method.issuer ? ` · ${method.issuer}` : ""}
+                      {method.last4 ? ` · •••• ${method.last4}` : ""}
                     </span>
-                    전체 결제수단 공개
-                  </SelectAllChoice>
-                ) : null}
-                {conversionPaymentMethods.map((method) => (
-                  <ConversionMethodChoice
-                    key={method.id}
-                    type="button"
-                    aria-pressed={sharedPaymentMethodIds.includes(method.id)}
-                    $selected={sharedPaymentMethodIds.includes(method.id)}
-                    onClick={() =>
-                      setSharedPaymentMethodIds((current) =>
-                        current.includes(method.id)
-                          ? current.filter((id) => id !== method.id)
-                          : [...current, method.id],
-                      )
-                    }
-                  >
-                    <MethodIcon aria-hidden="true">
-                      {method.type === "card" ? (
-                        <CreditCard size={17} />
-                      ) : (
-                        <Landmark size={17} />
-                      )}
-                    </MethodIcon>
-                    <MethodDetails>
-                      <strong>{method.name}</strong>
-                      <span>
-                        {getPaymentMethodTypeLabel(method)}
-                        {method.issuer ? ` · ${method.issuer}` : ""}
-                        {method.last4 ? ` · •••• ${method.last4}` : ""}
-                      </span>
-                    </MethodDetails>
-                    <SelectionStatus>
-                      {sharedPaymentMethodIds.includes(method.id) ? (
-                        <>
-                          <Check size={14} /> 공개
-                        </>
-                      ) : (
-                        "나만 보기"
-                      )}
-                    </SelectionStatus>
-                  </ConversionMethodChoice>
-                ))}
-                {conversionPaymentMethods.length === 0 ? (
-                  <span>등록된 카드와 계좌가 없습니다.</span>
-                ) : null}
-              </PaymentMethodChoices>
-            </div>
-            <Button
-              type="button"
-              $variant="primary"
-              disabled={ledger.ownerId !== store.authUser?.id}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "현재 개인 가계부를 공동 가계부로 전환하시겠습니까? 기존 데이터는 모두 유지되며 개인 가계부로 되돌릴 수 없습니다.",
-                  )
-                ) {
-                  void store.convertCurrentLedgerToShared(
-                    sharedPaymentMethodIds,
-                  )
-                }
-              }}
-            >
-              <Share2 size={15} /> 공동 가계부로 전환
-            </Button>
+                  </MethodDetails>
+                  <SelectionStatus>
+                    {sharedPaymentMethodIds.includes(method.id) ? (
+                      <>
+                        <Check size={14} /> 공개
+                      </>
+                    ) : (
+                      "나만 보기"
+                    )}
+                  </SelectionStatus>
+                </ConversionMethodChoice>
+              ))}
+              {conversionPaymentMethods.length === 0 ? (
+                <span>등록된 카드와 계좌가 없습니다.</span>
+              ) : null}
+            </PaymentMethodChoices>
           </ConversionNotice>
         </Panel>
       ) : null}
@@ -1147,9 +1144,7 @@ const ArchivedLedgers = styled.div`
 
 const ConversionNotice = styled.div`
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
-  align-items: center;
   padding: 16px 18px;
   background: ${colors.tealSoft};
 
@@ -1158,9 +1153,29 @@ const ConversionNotice = styled.div`
     color: ${colors.muted};
     font-size: 12px;
   }
+`
+
+const ConversionHeader = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+
+  > div {
+    min-width: 0;
+  }
+
+  > button {
+    flex: 0 0 auto;
+  }
 
   @media (max-width: 640px) {
-    grid-template-columns: 1fr;
+    align-items: stretch;
+    flex-direction: column;
+
+    > button {
+      width: 100%;
+    }
   }
 `
 
