@@ -115,6 +115,16 @@ export function getPaymentLabel(
   return transaction.type === "expense" ? "현금" : undefined
 }
 
+export function getPaymentMethodTypeLabel(
+  paymentMethod: Pick<PaymentMethod, "type" | "isDebit">,
+): "신용" | "체크" | "계좌" | "결제수단" {
+  if (paymentMethod.type === "card") {
+    return paymentMethod.isDebit ? "체크" : "신용"
+  }
+  if (paymentMethod.type === "bank") return "계좌"
+  return "결제수단"
+}
+
 export function getInstallmentLabel(
   transaction: Transaction,
 ): string | undefined {

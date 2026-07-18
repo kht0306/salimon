@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   getInstallmentLabel,
   getPaymentLabel,
+  getPaymentMethodTypeLabel,
   groupTransactionsByActor,
   groupTransactionsByRecurrence,
   groupTransactionsByRegistrant,
@@ -42,6 +43,14 @@ const account: PaymentMethod = {
   type: "bank",
   issuer: "국민은행",
 }
+
+describe("getPaymentMethodTypeLabel", () => {
+  it("distinguishes credit cards, debit cards, and accounts", () => {
+    expect(getPaymentMethodTypeLabel(card)).toBe("신용")
+    expect(getPaymentMethodTypeLabel({ ...card, isDebit: true })).toBe("체크")
+    expect(getPaymentMethodTypeLabel(account)).toBe("계좌")
+  })
+})
 
 describe("getPaymentLabel", () => {
   it("formats cash, card, installment and bank account labels", () => {
