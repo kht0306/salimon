@@ -53,20 +53,22 @@ export function TransactionMetadataChips({
         {category?.name ?? "기타"}
       </CategoryChip>
       {paymentLabel ? (
-        <PaymentChip
-          $kind={paymentKind}
-          title={`${paymentTypeLabel} · ${paymentLabel}`}
-        >
-          {paymentKind === "credit" ? (
-            <CreditCard size={13} aria-hidden="true" />
-          ) : paymentKind === "debit" ? (
-            <WalletCards size={13} aria-hidden="true" />
-          ) : paymentMethod?.type === "bank" ? (
-            <Landmark size={13} aria-hidden="true" />
-          ) : (
-            <Wallet size={13} aria-hidden="true" />
-          )}
-          {paymentLabel}
+        <PaymentChip title={`${paymentTypeLabel} · ${paymentLabel}`}>
+          <PaymentTypeBadge $kind={paymentKind}>
+            {paymentTypeLabel}
+          </PaymentTypeBadge>
+          <PaymentDetails $kind={paymentKind}>
+            {paymentKind === "credit" ? (
+              <CreditCard size={13} aria-hidden="true" />
+            ) : paymentKind === "debit" ? (
+              <WalletCards size={13} aria-hidden="true" />
+            ) : paymentMethod?.type === "bank" ? (
+              <Landmark size={13} aria-hidden="true" />
+            ) : (
+              <Wallet size={13} aria-hidden="true" />
+            )}
+            <span>{paymentLabel}</span>
+          </PaymentDetails>
         </PaymentChip>
       ) : null}
       {installmentLabel ? (
@@ -101,20 +103,46 @@ const Chip = styled.span`
   white-space: nowrap;
 `
 
-const PaymentChip = styled(Chip)<{ $kind: PaymentChipKind }>`
+const PaymentChip = styled.span`
+  min-width: 0;
   max-width: 100%;
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid ${colors.border};
+  border-radius: ${radii.sm};
+  background: #fff;
+  color: ${colors.ink};
   font-weight: 650;
+  line-height: 1.2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  box-shadow: inset 3px 0 0
-    ${({ $kind }) =>
-      $kind === "debit"
-        ? colors.teal
-        : $kind === "bank"
-          ? colors.green
-          : $kind === "cash"
-            ? colors.amber
-            : colors.blue};
+  white-space: nowrap;
+`
+
+const PaymentTypeBadge = styled.span<{ $kind: PaymentChipKind }>`
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  background: ${({ $kind }) =>
+    $kind === "debit"
+      ? colors.teal
+      : $kind === "bank"
+        ? colors.green
+        : $kind === "cash"
+          ? colors.amber
+          : colors.blue};
+  color: ${({ $kind }) => ($kind === "cash" ? colors.ink : "#fff")};
+  padding: 4px 6px;
+  font-size: 9px;
+  font-weight: 750;
+`
+
+const PaymentDetails = styled.span<{ $kind: PaymentChipKind }>`
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px 4px 6px;
+  font-size: 10px;
 
   svg {
     flex: 0 0 auto;
@@ -126,6 +154,12 @@ const PaymentChip = styled(Chip)<{ $kind: PaymentChipKind }>`
           : $kind === "cash"
             ? colors.amber
             : colors.blue};
+  }
+
+  span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 `
 
