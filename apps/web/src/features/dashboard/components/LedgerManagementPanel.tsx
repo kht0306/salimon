@@ -6,15 +6,20 @@ import type { LedgerType, PaymentInstrument } from "@salimon/types"
 import { colors, radii, spacing } from "@salimon/ui-tokens"
 import {
   Archive,
+  Check,
   Copy,
+  CreditCard,
+  Landmark,
   Link,
+  Lock,
   Pencil,
   Plus,
   RotateCcw,
   Share2,
+  Users,
 } from "lucide-react"
 import { observer } from "mobx-react-lite"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useState } from "react"
 import { useAppStore } from "../StoreProvider"
 import {
   Button,
@@ -411,39 +416,65 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
               </p>
               <PaymentMethodChoices>
                 {conversionPaymentMethods.length > 0 ? (
-                  <SelectAllChoice>
-                    <input
-                      type="checkbox"
-                      checked={allConversionMethodsSelected}
-                      onChange={(event) =>
-                        setSharedPaymentMethodIds(
-                          event.target.checked
-                            ? conversionPaymentMethods.map(
-                                (method) => method.id,
-                              )
-                            : [],
-                        )
-                      }
-                    />
-                    전체 선택
+                  <SelectAllChoice
+                    type="button"
+                    aria-pressed={allConversionMethodsSelected}
+                    $selected={allConversionMethodsSelected}
+                    onClick={() =>
+                      setSharedPaymentMethodIds(
+                        allConversionMethodsSelected
+                          ? []
+                          : conversionPaymentMethods.map((method) => method.id),
+                      )
+                    }
+                  >
+                    <span>
+                      {allConversionMethodsSelected ? (
+                        <Check size={14} />
+                      ) : null}
+                    </span>
+                    전체 결제수단 공개
                   </SelectAllChoice>
                 ) : null}
                 {conversionPaymentMethods.map((method) => (
-                  <label key={method.id}>
-                    <input
-                      type="checkbox"
-                      checked={sharedPaymentMethodIds.includes(method.id)}
-                      onChange={(event) =>
-                        setSharedPaymentMethodIds((current) =>
-                          event.target.checked
-                            ? [...current, method.id]
-                            : current.filter((id) => id !== method.id),
-                        )
-                      }
-                    />
-                    {method.type === "card" ? "카드" : "계좌"} · {method.name}
-                    {method.last4 ? ` (•••• ${method.last4})` : ""}
-                  </label>
+                  <ConversionMethodChoice
+                    key={method.id}
+                    type="button"
+                    aria-pressed={sharedPaymentMethodIds.includes(method.id)}
+                    $selected={sharedPaymentMethodIds.includes(method.id)}
+                    onClick={() =>
+                      setSharedPaymentMethodIds((current) =>
+                        current.includes(method.id)
+                          ? current.filter((id) => id !== method.id)
+                          : [...current, method.id],
+                      )
+                    }
+                  >
+                    <MethodIcon aria-hidden="true">
+                      {method.type === "card" ? (
+                        <CreditCard size={17} />
+                      ) : (
+                        <Landmark size={17} />
+                      )}
+                    </MethodIcon>
+                    <MethodDetails>
+                      <strong>{method.name}</strong>
+                      <span>
+                        {getPaymentMethodTypeLabel(method)}
+                        {method.issuer ? ` · ${method.issuer}` : ""}
+                        {method.last4 ? ` · •••• ${method.last4}` : ""}
+                      </span>
+                    </MethodDetails>
+                    <SelectionStatus>
+                      {sharedPaymentMethodIds.includes(method.id) ? (
+                        <>
+                          <Check size={14} /> 공개
+                        </>
+                      ) : (
+                        "나만 보기"
+                      )}
+                    </SelectionStatus>
+                  </ConversionMethodChoice>
                 ))}
                 {conversionPaymentMethods.length === 0 ? (
                   <span>등록된 카드와 계좌가 없습니다.</span>
@@ -576,6 +607,16 @@ interface PaymentInstrumentSelectorProps {
   onVisibleIdsChange: (ids: string[]) => void
 }
 
+function getPaymentMethodTypeLabel(
+  method: Pick<PaymentInstrument, "type" | "isDebit">,
+) {
+  if (method.type === "card") {
+    return method.isDebit ? "체크카드" : "신용카드"
+  }
+  if (method.type === "bank") return "계좌"
+  return "결제수단"
+}
+
 function PaymentInstrumentSelector({
   instruments,
   selectedIds,
@@ -585,80 +626,153 @@ function PaymentInstrumentSelector({
   onSelectedIdsChange,
   onVisibleIdsChange,
 }: PaymentInstrumentSelectorProps) {
-  const selectAllRef = useRef<HTMLInputElement>(null)
+  const visibilityInputName = useId()
   const allIds = instruments.map((method) => method.id)
   const selectedCount = allIds.filter((id) => selectedIds.includes(id)).length
   const allSelected =
     instruments.length > 0 && selectedCount === instruments.length
+  const visibleSelectedCount = selectedIds.filter((id) =>
+    visibleIds.includes(id),
+  ).length
+  const visibilityMode =
+    selectedCount === 0 || visibleSelectedCount === 0
+      ? "private"
+      : visibleSelectedCount === selectedCount
+        ? "ledger"
+        : "mixed"
 
-  useEffect(() => {
-    if (selectAllRef.current) {
-      selectAllRef.current.indeterminate = selectedCount > 0 && !allSelected
+  function setConnected(methodId: string, connected: boolean) {
+    const nextSelectedIds = connected
+      ? [...selectedIds, methodId]
+      : selectedIds.filter((id) => id !== methodId)
+    onSelectedIdsChange(nextSelectedIds)
+    if (!connected) {
+      onVisibleIdsChange(visibleIds.filter((id) => id !== methodId))
+    } else if (visibilityMode === "ledger") {
+      onVisibleIdsChange([...visibleIds, methodId])
     }
-  }, [allSelected, selectedCount])
+  }
 
   return (
     <PaymentMethodOptions>
-      <SelectAllOption>
-        <label>
-          <input
-            ref={selectAllRef}
-            type="checkbox"
-            checked={allSelected}
-            disabled={disabled}
-            onChange={(event) => {
-              onSelectedIdsChange(event.target.checked ? allIds : [])
-              if (!event.target.checked) onVisibleIdsChange([])
-            }}
-          />
-          전체 선택
-        </label>
-      </SelectAllOption>
+      <SelectorToolbar>
+        <div>
+          <strong>연결할 결제수단</strong>
+          <span>
+            {selectedCount > 0
+              ? `${instruments.length}개 중 ${selectedCount}개 선택`
+              : "연결할 카드·계좌를 선택하세요"}
+          </span>
+        </div>
+        <SelectAllOption
+          type="button"
+          aria-pressed={allSelected}
+          disabled={disabled}
+          $selected={allSelected}
+          onClick={() => {
+            onSelectedIdsChange(allSelected ? [] : allIds)
+            if (allSelected) {
+              onVisibleIdsChange([])
+            } else if (visibilityMode === "ledger") {
+              onVisibleIdsChange(allIds)
+            }
+          }}
+        >
+          {allSelected ? <Check size={14} /> : null}
+          {allSelected ? "전체 선택됨" : "전체 선택"}
+        </SelectAllOption>
+      </SelectorToolbar>
       {instruments.map((method) => {
         const isConnected = selectedIds.includes(method.id)
         return (
-          <PaymentMethodOption key={method.id}>
-            <label>
-              <input
-                type="checkbox"
-                checked={isConnected}
-                disabled={disabled}
-                onChange={(event) => {
-                  onSelectedIdsChange(
-                    event.target.checked
-                      ? [...selectedIds, method.id]
-                      : selectedIds.filter((id) => id !== method.id),
-                  )
-                  if (!event.target.checked) {
-                    onVisibleIdsChange(
-                      visibleIds.filter((id) => id !== method.id),
-                    )
-                  }
-                }}
-              />
-              {method.type === "card" ? "카드" : "계좌"} · {method.name}
-              {method.last4 ? ` (•••• ${method.last4})` : ""}
-            </label>
-            {allowVisibility && isConnected ? (
-              <label>
-                <input
-                  type="checkbox"
-                  checked={visibleIds.includes(method.id)}
-                  disabled={disabled}
-                  onChange={(event) =>
-                    onVisibleIdsChange(
-                      event.target.checked
-                        ? [...visibleIds, method.id]
-                        : visibleIds.filter((id) => id !== method.id),
-                    )
-                  }
-                />
-                공동 멤버에게 공개
-              </label>
-            ) : null}
+          <PaymentMethodOption
+            key={method.id}
+            type="button"
+            aria-pressed={isConnected}
+            disabled={disabled}
+            $selected={isConnected}
+            onClick={() => setConnected(method.id, !isConnected)}
+          >
+            <MethodIcon aria-hidden="true">
+              {method.type === "card" ? (
+                <CreditCard size={18} />
+              ) : (
+                <Landmark size={18} />
+              )}
+            </MethodIcon>
+            <MethodDetails>
+              <strong>{method.name}</strong>
+              <span>
+                {getPaymentMethodTypeLabel(method)}
+                {method.issuer ? ` · ${method.issuer}` : ""}
+                {method.last4 ? ` · •••• ${method.last4}` : ""}
+              </span>
+            </MethodDetails>
+            <SelectionStatus>
+              {isConnected ? (
+                <>
+                  <Check size={14} /> 연결됨
+                </>
+              ) : (
+                "연결"
+              )}
+            </SelectionStatus>
           </PaymentMethodOption>
         )
       })}
+      {allowVisibility && selectedCount > 0 ? (
+        <VisibilityFieldset>
+          <legend>공개 범위</legend>
+          <VisibilityHelp>
+            {visibilityMode === "mixed"
+              ? "현재 결제수단별 공개 범위가 달라요. 아래 범위를 선택하면 연결된 전체 결제수단에 적용됩니다."
+              : "연결한 카드·계좌가 공동 멤버에게 보일지 선택하세요."}
+          </VisibilityHelp>
+          <VisibilityChoices>
+            <VisibilityChoice $selected={visibilityMode === "private"}>
+              <input
+                type="radio"
+                name={visibilityInputName}
+                checked={visibilityMode === "private"}
+                disabled={disabled}
+                onChange={() => onVisibleIdsChange([])}
+              />
+              <Lock size={19} aria-hidden="true" />
+              <span>
+                <strong>나만 보기</strong>
+                <small>연결한 자산은 내 화면에만 표시돼요.</small>
+              </span>
+              {visibilityMode === "private" ? (
+                <Check size={16} aria-hidden="true" />
+              ) : null}
+            </VisibilityChoice>
+            <VisibilityChoice $selected={visibilityMode === "ledger"}>
+              <input
+                type="radio"
+                name={visibilityInputName}
+                checked={visibilityMode === "ledger"}
+                disabled={disabled}
+                onChange={() => onVisibleIdsChange(selectedIds)}
+              />
+              <Users size={19} aria-hidden="true" />
+              <span>
+                <strong>공동 멤버와 보기</strong>
+                <small>멤버에게 카드·계좌와 연결된 거래가 보여요.</small>
+              </span>
+              {visibilityMode === "ledger" ? (
+                <Check size={16} aria-hidden="true" />
+              ) : null}
+            </VisibilityChoice>
+          </VisibilityChoices>
+          <VisibilityStatus $shared={visibilityMode === "ledger"}>
+            {visibilityMode === "ledger"
+              ? `선택한 ${selectedCount}개 결제수단을 공동 멤버와 공유합니다.`
+              : visibilityMode === "private"
+                ? `선택한 ${selectedCount}개 결제수단은 나만 볼 수 있습니다.`
+                : `${visibleSelectedCount}개는 공개, ${selectedCount - visibleSelectedCount}개는 나만 보기 상태입니다.`}
+          </VisibilityStatus>
+        </VisibilityFieldset>
+      ) : null}
     </PaymentMethodOptions>
   )
 }
@@ -735,34 +849,222 @@ const NewLedgerPaymentMethods = styled.div`
   }
 `
 
-const PaymentMethodOption = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
+const PaymentMethodOptions = styled.div`
+  display: grid;
+  gap: 10px;
+`
 
-  label {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
+const SelectorToolbar = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 2px;
+
+  > div {
+    display: grid;
+    gap: 2px;
+  }
+
+  strong {
     font-size: 12px;
   }
 
-  input {
-    width: 16px;
-    height: 16px;
-    accent-color: ${colors.teal};
+  span {
+    color: ${colors.muted};
+    font-size: 11px;
   }
 `
 
-const PaymentMethodOptions = styled.div`
-  display: grid;
-  gap: 8px;
+const SelectAllOption = styled.button<{ $selected: boolean }>`
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid
+    ${({ $selected }) => ($selected ? colors.teal : colors.borderStrong)};
+  border-radius: ${radii.sm};
+  background: ${({ $selected }) =>
+    $selected ? colors.tealSoft : colors.panel};
+  color: ${({ $selected }) => ($selected ? colors.teal : colors.ink)};
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 650;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
 `
 
-const SelectAllOption = styled(PaymentMethodOption)`
-  padding-bottom: 8px;
-  border-bottom: 1px solid ${colors.border};
+const PaymentMethodOption = styled.button<{ $selected: boolean }>`
+  width: 100%;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid
+    ${({ $selected }) => ($selected ? colors.teal : colors.border)};
+  border-radius: ${radii.md};
+  background: ${({ $selected }) =>
+    $selected ? colors.tealSoft : colors.panel};
+  color: ${colors.ink};
+  padding: 10px 12px;
+  text-align: left;
+
+  &:hover:not(:disabled) {
+    border-color: ${({ $selected }) =>
+      $selected ? colors.teal : colors.borderStrong};
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${colors.focus};
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+`
+
+const MethodIcon = styled.span`
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid ${colors.border};
+  border-radius: ${radii.sm};
+  background: ${colors.panel};
+  color: ${colors.teal};
+`
+
+const MethodDetails = styled.span`
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+
+  strong {
+    overflow: hidden;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    overflow: hidden;
+    color: ${colors.muted};
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+`
+
+const SelectionStatus = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: ${colors.teal};
+  font-size: 11px;
   font-weight: 650;
+`
+
+const VisibilityFieldset = styled.fieldset`
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 0;
+  border: 1px solid ${colors.border};
+  border-radius: ${radii.md};
+  padding: 12px;
+
+  legend {
+    padding: 0 5px;
+    color: ${colors.ink};
+    font-size: 12px;
+    font-weight: 700;
+  }
+`
+
+const VisibilityHelp = styled.p`
+  margin: 0;
+  color: ${colors.muted};
+  font-size: 11px;
+`
+
+const VisibilityChoices = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+`
+
+const VisibilityChoice = styled.label<{ $selected: boolean }>`
+  position: relative;
+  min-width: 0;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid
+    ${({ $selected }) => ($selected ? colors.teal : colors.border)};
+  border-radius: ${radii.md};
+  background: ${({ $selected }) =>
+    $selected ? colors.tealSoft : colors.panel};
+  color: ${({ $selected }) => ($selected ? colors.teal : colors.ink)};
+  padding: 11px 12px;
+  cursor: pointer;
+
+  &:has(input:focus-visible) {
+    outline: 2px solid ${colors.focus};
+    outline-offset: 2px;
+  }
+
+  &:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  > input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  > span {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+  }
+
+  strong {
+    color: ${colors.ink};
+    font-size: 12px;
+  }
+
+  small {
+    color: ${colors.muted};
+    font-size: 10px;
+    line-height: 1.4;
+  }
+`
+
+const VisibilityStatus = styled.div<{ $shared: boolean }>`
+  border-left: 3px solid
+    ${({ $shared }) => ($shared ? colors.teal : colors.borderStrong)};
+  background: ${({ $shared }) =>
+    $shared ? colors.tealSoft : colors.panelSubtle};
+  color: ${({ $shared }) => ($shared ? colors.teal : colors.muted)};
+  padding: 8px 10px;
+  font-size: 11px;
 `
 
 const PaymentSetupBody = styled.div`
@@ -864,26 +1166,45 @@ const ConversionNotice = styled.div`
 
 const PaymentMethodChoices = styled.div`
   display: grid;
-  gap: 7px;
+  gap: 8px;
   margin-top: 12px;
 
-  label {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 12px;
-  }
-
-  span {
+  > span {
     color: ${colors.muted};
     font-size: 12px;
   }
 `
 
-const SelectAllChoice = styled.label`
-  padding-bottom: 7px;
-  border-bottom: 1px solid ${colors.border};
+const SelectAllChoice = styled.button<{ $selected: boolean }>`
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid
+    ${({ $selected }) => ($selected ? colors.teal : colors.borderStrong)};
+  border-radius: ${radii.sm};
+  background: ${({ $selected }) =>
+    $selected ? colors.panel : "rgba(255, 255, 255, 0.6)"};
+  color: ${({ $selected }) => ($selected ? colors.teal : colors.ink)};
+  padding: 0 10px;
+  font-size: 11px;
   font-weight: 650;
+
+  > span {
+    width: 17px;
+    height: 17px;
+    display: grid;
+    place-items: center;
+    border: 1px solid
+      ${({ $selected }) => ($selected ? colors.teal : colors.borderStrong)};
+    border-radius: ${radii.xs};
+  }
+`
+
+const ConversionMethodChoice = styled(PaymentMethodOption)`
+  background: ${({ $selected }) =>
+    $selected ? colors.panel : "rgba(255, 255, 255, 0.6)"};
 `
 
 const OneTimeInvite = styled.div`

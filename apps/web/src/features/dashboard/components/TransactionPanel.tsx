@@ -46,6 +46,7 @@ import {
 } from "./transactionEditorDraft"
 import { TransactionMetadataChips } from "./TransactionMetadataChips"
 import {
+  getPaymentMethodTypeLabel,
   groupTransactionsByActor,
   groupTransactionsByRecurrence,
   groupTransactionsByRegistrant,
@@ -547,10 +548,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                     <optgroup key={member.userId} label={member.nickname}>
                       {memberMethods.map((method) => (
                         <option key={method.id} value={method.id}>
-                          {method.isPrimary ? "[주 카드] " : ""}
-                          {method.type === "bank" ? "계좌" : "카드"} ·{" "}
-                          {method.issuer} · {method.name}
-                          {method.last4 ? ` (${method.last4})` : ""}
+                          {`${method.isPrimary ? "[주 카드] " : ""}[${getPaymentMethodTypeLabel(method)}] ${method.issuer} · ${method.name}${method.last4 ? ` (${method.last4})` : ""}`}
                         </option>
                       ))}
                     </optgroup>

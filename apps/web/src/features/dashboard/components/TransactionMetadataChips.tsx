@@ -7,8 +7,15 @@ import {
   Landmark,
   Repeat2,
   Wallet,
+  WalletCards,
 } from "lucide-react"
-import { getInstallmentLabel, getPaymentLabel } from "./transactionPresentation"
+import {
+  getInstallmentLabel,
+  getPaymentLabel,
+  getPaymentMethodTypeLabel,
+} from "./transactionPresentation"
+
+type PaymentChipKind = "credit" | "debit" | "bank" | "cash"
 
 interface TransactionMetadataChipsProps {
   transaction: Transaction
@@ -23,6 +30,17 @@ export function TransactionMetadataChips({
 }: TransactionMetadataChipsProps) {
   const paymentLabel = getPaymentLabel(transaction, paymentMethod)
   const installmentLabel = getInstallmentLabel(transaction)
+  const paymentKind: PaymentChipKind =
+    paymentMethod?.type === "card"
+      ? paymentMethod.isDebit
+        ? "debit"
+        : "credit"
+      : paymentMethod?.type === "bank"
+        ? "bank"
+        : "cash"
+  const paymentTypeLabel = paymentMethod
+    ? getPaymentMethodTypeLabel(paymentMethod)
+    : "현금"
 
   return (
     <Chips>
@@ -35,13 +53,18 @@ export function TransactionMetadataChips({
         {category?.name ?? "기타"}
       </CategoryChip>
       {paymentLabel ? (
-        <PaymentChip title={paymentLabel}>
-          {paymentMethod?.type === "card" ? (
-            <CreditCard size={13} />
+        <PaymentChip
+          $kind={paymentKind}
+          title={`${paymentTypeLabel} · ${paymentLabel}`}
+        >
+          {paymentKind === "credit" ? (
+            <CreditCard size={13} aria-hidden="true" />
+          ) : paymentKind === "debit" ? (
+            <WalletCards size={13} aria-hidden="true" />
           ) : paymentMethod?.type === "bank" ? (
-            <Landmark size={13} />
+            <Landmark size={13} aria-hidden="true" />
           ) : (
-            <Wallet size={13} />
+            <Wallet size={13} aria-hidden="true" />
           )}
           {paymentLabel}
         </PaymentChip>
@@ -78,12 +101,32 @@ const Chip = styled.span`
   white-space: nowrap;
 `
 
-const PaymentChip = styled(Chip)`
+const PaymentChip = styled(Chip)<{ $kind: PaymentChipKind }>`
   max-width: 100%;
   font-weight: 650;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-shadow: inset 3px 0 0 ${colors.blue};
+  box-shadow: inset 3px 0 0
+    ${({ $kind }) =>
+      $kind === "debit"
+        ? colors.teal
+        : $kind === "bank"
+          ? colors.green
+          : $kind === "cash"
+            ? colors.amber
+            : colors.blue};
+
+  svg {
+    flex: 0 0 auto;
+    color: ${({ $kind }) =>
+      $kind === "debit"
+        ? colors.teal
+        : $kind === "bank"
+          ? colors.green
+          : $kind === "cash"
+            ? colors.amber
+            : colors.blue};
+  }
 `
 
 const InstallmentChip = styled(Chip)`
