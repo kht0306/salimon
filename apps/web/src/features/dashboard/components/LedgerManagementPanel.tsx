@@ -84,6 +84,9 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
   const canManageShared = ledger?.role === "owner" || ledger?.role === "admin"
   const isMutating = store.ledgerMutationState !== "idle"
   const conversionPaymentMethods = store.myPaymentInstruments
+  const conversionPaymentMethodGroups = getPaymentMethodGroups(
+    conversionPaymentMethods,
+  )
   const allConversionMethodsSelected =
     conversionPaymentMethods.length > 0 &&
     conversionPaymentMethods.every((method) =>
@@ -452,46 +455,67 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
                   전체 결제수단 공개
                 </SelectAllChoice>
               ) : null}
-              {conversionPaymentMethods.map((method) => (
-                <ConversionMethodChoice
-                  key={method.id}
-                  type="button"
-                  aria-pressed={sharedPaymentMethodIds.includes(method.id)}
-                  $selected={sharedPaymentMethodIds.includes(method.id)}
-                  onClick={() =>
-                    setSharedPaymentMethodIds((current) =>
-                      current.includes(method.id)
-                        ? current.filter((id) => id !== method.id)
-                        : [...current, method.id],
-                    )
-                  }
-                >
-                  <MethodIcon aria-hidden="true">
-                    {method.type === "card" ? (
-                      <CreditCard size={17} />
-                    ) : (
-                      <Landmark size={17} />
-                    )}
-                  </MethodIcon>
-                  <MethodDetails>
-                    <strong>{method.name}</strong>
-                    <span>
-                      {getPaymentMethodTypeLabel(method)}
-                      {method.issuer ? ` · ${method.issuer}` : ""}
-                      {method.last4 ? ` · •••• ${method.last4}` : ""}
-                    </span>
-                  </MethodDetails>
-                  <SelectionStatus>
-                    {sharedPaymentMethodIds.includes(method.id) ? (
-                      <>
-                        <Check size={14} /> 공개
-                      </>
-                    ) : (
-                      "나만 보기"
-                    )}
-                  </SelectionStatus>
-                </ConversionMethodChoice>
-              ))}
+              <PaymentMethodGroups>
+                {conversionPaymentMethodGroups.map((group) => (
+                  <PaymentMethodGroup key={group.type}>
+                    <PaymentMethodGroupHeader>
+                      <span>
+                        {group.type === "card" ? (
+                          <CreditCard size={15} />
+                        ) : (
+                          <Landmark size={15} />
+                        )}
+                        {group.label}
+                      </span>
+                      <small>{group.methods.length}개</small>
+                    </PaymentMethodGroupHeader>
+                    <PaymentMethodGroupItems>
+                      {group.methods.map((method) => (
+                        <ConversionMethodChoice
+                          key={method.id}
+                          type="button"
+                          aria-pressed={sharedPaymentMethodIds.includes(
+                            method.id,
+                          )}
+                          $selected={sharedPaymentMethodIds.includes(method.id)}
+                          onClick={() =>
+                            setSharedPaymentMethodIds((current) =>
+                              current.includes(method.id)
+                                ? current.filter((id) => id !== method.id)
+                                : [...current, method.id],
+                            )
+                          }
+                        >
+                          <MethodIcon aria-hidden="true">
+                            {method.type === "card" ? (
+                              <CreditCard size={17} />
+                            ) : (
+                              <Landmark size={17} />
+                            )}
+                          </MethodIcon>
+                          <MethodDetails>
+                            <strong>{method.name}</strong>
+                            <span>
+                              {getPaymentMethodTypeLabel(method)}
+                              {method.issuer ? ` · ${method.issuer}` : ""}
+                              {method.last4 ? ` · •••• ${method.last4}` : ""}
+                            </span>
+                          </MethodDetails>
+                          <SelectionStatus>
+                            {sharedPaymentMethodIds.includes(method.id) ? (
+                              <>
+                                <Check size={14} /> 공개
+                              </>
+                            ) : (
+                              "나만 보기"
+                            )}
+                          </SelectionStatus>
+                        </ConversionMethodChoice>
+                      ))}
+                    </PaymentMethodGroupItems>
+                  </PaymentMethodGroup>
+                ))}
+              </PaymentMethodGroups>
               {conversionPaymentMethods.length === 0 ? (
                 <span>등록된 카드와 계좌가 없습니다.</span>
               ) : null}
@@ -614,6 +638,23 @@ function getPaymentMethodTypeLabel(
   return "결제수단"
 }
 
+function getPaymentMethodGroups<T extends Pick<PaymentInstrument, "type">>(
+  methods: T[],
+) {
+  return [
+    {
+      type: "card" as const,
+      label: "카드",
+      methods: methods.filter((method) => method.type === "card"),
+    },
+    {
+      type: "bank" as const,
+      label: "계좌",
+      methods: methods.filter((method) => method.type === "bank"),
+    },
+  ].filter((group) => group.methods.length > 0)
+}
+
 function PaymentInstrumentSelector({
   instruments,
   selectedIds,
@@ -624,6 +665,7 @@ function PaymentInstrumentSelector({
   onVisibleIdsChange,
 }: PaymentInstrumentSelectorProps) {
   const visibilityInputName = useId()
+  const methodGroups = getPaymentMethodGroups(instruments)
   const allIds = instruments.map((method) => method.id)
   const selectedCount = allIds.filter((id) => selectedIds.includes(id)).length
   const allSelected =
@@ -679,44 +721,63 @@ function PaymentInstrumentSelector({
           {allSelected ? "전체 선택됨" : "전체 선택"}
         </SelectAllOption>
       </SelectorToolbar>
-      {instruments.map((method) => {
-        const isConnected = selectedIds.includes(method.id)
-        return (
-          <PaymentMethodOption
-            key={method.id}
-            type="button"
-            aria-pressed={isConnected}
-            disabled={disabled}
-            $selected={isConnected}
-            onClick={() => setConnected(method.id, !isConnected)}
-          >
-            <MethodIcon aria-hidden="true">
-              {method.type === "card" ? (
-                <CreditCard size={18} />
-              ) : (
-                <Landmark size={18} />
-              )}
-            </MethodIcon>
-            <MethodDetails>
-              <strong>{method.name}</strong>
+      <PaymentMethodGroups>
+        {methodGroups.map((group) => (
+          <PaymentMethodGroup key={group.type}>
+            <PaymentMethodGroupHeader>
               <span>
-                {getPaymentMethodTypeLabel(method)}
-                {method.issuer ? ` · ${method.issuer}` : ""}
-                {method.last4 ? ` · •••• ${method.last4}` : ""}
+                {group.type === "card" ? (
+                  <CreditCard size={15} />
+                ) : (
+                  <Landmark size={15} />
+                )}
+                {group.label}
               </span>
-            </MethodDetails>
-            <SelectionStatus>
-              {isConnected ? (
-                <>
-                  <Check size={14} /> 연결됨
-                </>
-              ) : (
-                "연결"
-              )}
-            </SelectionStatus>
-          </PaymentMethodOption>
-        )
-      })}
+              <small>{group.methods.length}개</small>
+            </PaymentMethodGroupHeader>
+            <PaymentMethodGroupItems>
+              {group.methods.map((method) => {
+                const isConnected = selectedIds.includes(method.id)
+                return (
+                  <PaymentMethodOption
+                    key={method.id}
+                    type="button"
+                    aria-pressed={isConnected}
+                    disabled={disabled}
+                    $selected={isConnected}
+                    onClick={() => setConnected(method.id, !isConnected)}
+                  >
+                    <MethodIcon aria-hidden="true">
+                      {method.type === "card" ? (
+                        <CreditCard size={18} />
+                      ) : (
+                        <Landmark size={18} />
+                      )}
+                    </MethodIcon>
+                    <MethodDetails>
+                      <strong>{method.name}</strong>
+                      <span>
+                        {getPaymentMethodTypeLabel(method)}
+                        {method.issuer ? ` · ${method.issuer}` : ""}
+                        {method.last4 ? ` · •••• ${method.last4}` : ""}
+                      </span>
+                    </MethodDetails>
+                    <SelectionStatus>
+                      {isConnected ? (
+                        <>
+                          <Check size={14} /> 연결됨
+                        </>
+                      ) : (
+                        "연결"
+                      )}
+                    </SelectionStatus>
+                  </PaymentMethodOption>
+                )
+              })}
+            </PaymentMethodGroupItems>
+          </PaymentMethodGroup>
+        ))}
+      </PaymentMethodGroups>
       {allowVisibility && selectedCount > 0 ? (
         <VisibilityFieldset>
           <legend>공개 범위</legend>
@@ -849,6 +910,45 @@ const NewLedgerPaymentMethods = styled.div`
 const PaymentMethodOptions = styled.div`
   display: grid;
   gap: 10px;
+`
+
+const PaymentMethodGroups = styled.div`
+  display: grid;
+  gap: 12px;
+`
+
+const PaymentMethodGroup = styled.div`
+  display: grid;
+  gap: 7px;
+`
+
+const PaymentMethodGroupHeader = styled.div`
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid ${colors.border};
+  color: ${colors.muted};
+  padding: 0 2px 6px;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: ${colors.ink};
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  small {
+    font-size: 10px;
+  }
+`
+
+const PaymentMethodGroupItems = styled.div`
+  display: grid;
+  gap: 8px;
 `
 
 const SelectorToolbar = styled.div`
