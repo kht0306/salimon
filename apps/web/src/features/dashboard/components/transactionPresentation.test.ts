@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   getInstallmentLabel,
   getPaymentLabel,
+  getPaymentMetadataLabel,
   getPaymentMethodTypeLabel,
   groupTransactionsByActor,
   groupTransactionsByRecurrence,
@@ -49,6 +50,18 @@ describe("getPaymentMethodTypeLabel", () => {
     expect(getPaymentMethodTypeLabel(card)).toBe("신용")
     expect(getPaymentMethodTypeLabel({ ...card, isDebit: true })).toBe("체크")
     expect(getPaymentMethodTypeLabel(account)).toBe("계좌")
+  })
+})
+
+describe("getPaymentMetadataLabel", () => {
+  it("shows card type and alias while preserving account details", () => {
+    expect(getPaymentMetadataLabel(transaction, card)).toBe("신용 · 생활비")
+    expect(
+      getPaymentMetadataLabel(transaction, { ...card, isDebit: true }),
+    ).toBe("체크 · 생활비")
+    expect(getPaymentMetadataLabel(transaction, account)).toBe(
+      "계좌 · 국민은행 · 급여 계좌",
+    )
   })
 })
 

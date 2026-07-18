@@ -125,6 +125,18 @@ export function getPaymentMethodTypeLabel(
   return "결제수단"
 }
 
+export function getPaymentMetadataLabel(
+  transaction: Transaction,
+  paymentMethod?: PaymentMethod,
+): string | undefined {
+  if (paymentMethod?.type === "card") {
+    const deletedLabel = paymentMethod.isDeleted ? " · 삭제" : ""
+    return `${getPaymentMethodTypeLabel(paymentMethod)} · ${paymentMethod.name}${deletedLabel}`
+  }
+
+  return getPaymentLabel(transaction, paymentMethod)
+}
+
 export function getInstallmentLabel(
   transaction: Transaction,
 ): string | undefined {
