@@ -54,13 +54,15 @@ describe("getPaymentMethodTypeLabel", () => {
 })
 
 describe("getPaymentMetadataLabel", () => {
-  it("shows card type and alias while preserving account details", () => {
-    expect(getPaymentMetadataLabel(transaction, card)).toBe("신용 · 생활비")
+  it("shows card type, issuer, and alias while keeping bank and account aliases", () => {
+    expect(getPaymentMetadataLabel(transaction, card)).toBe(
+      "신용 · 현대카드 · 생활비",
+    )
     expect(
       getPaymentMetadataLabel(transaction, { ...card, isDebit: true }),
-    ).toBe("체크 · 생활비")
+    ).toBe("체크 · 현대카드 · 생활비")
     expect(getPaymentMetadataLabel(transaction, account)).toBe(
-      "계좌 · 국민은행 · 급여 계좌",
+      "국민은행 · 급여 계좌",
     )
   })
 })

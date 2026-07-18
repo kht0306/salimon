@@ -324,8 +324,8 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 )
               }
             >
-              <option value="actor">거래자별</option>
-              <option value="registrant">등록자별</option>
+              <option value="actor">거래자 구분</option>
+              <option value="registrant">등록자 구분</option>
               <option value="none">구분 없음</option>
             </GroupingSelect>
           </GroupingControl>
@@ -894,7 +894,6 @@ export const TransactionPanel = observer(function TransactionPanel() {
         <SummaryRow>
           <span>지출 합계</span>
           <SummaryAmount $tone="expense">
-            -
             {formatKrw(
               store.calendarSelectedDateTransactions
                 .filter(
@@ -908,7 +907,6 @@ export const TransactionPanel = observer(function TransactionPanel() {
         <SummaryRow>
           <span>수입 합계</span>
           <SummaryAmount $tone="income">
-            +
             {formatKrw(
               store.calendarSelectedDateTransactions
                 .filter(

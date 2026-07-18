@@ -130,8 +130,18 @@ export function getPaymentMetadataLabel(
   paymentMethod?: PaymentMethod,
 ): string | undefined {
   if (paymentMethod?.type === "card") {
-    const deletedLabel = paymentMethod.isDeleted ? " · 삭제" : ""
-    return `${getPaymentMethodTypeLabel(paymentMethod)} · ${paymentMethod.name}${deletedLabel}`
+    return [
+      getPaymentMethodTypeLabel(paymentMethod),
+      paymentMethod.issuer || "카드사 미상",
+      `${paymentMethod.name}${paymentMethod.isDeleted ? " · 삭제" : ""}`,
+    ].join(" · ")
+  }
+
+  if (paymentMethod?.type === "bank") {
+    return [
+      paymentMethod.issuer || "은행 미상",
+      `${paymentMethod.name}${paymentMethod.isDeleted ? " · 삭제" : ""}`,
+    ].join(" · ")
   }
 
   return getPaymentLabel(transaction, paymentMethod)
