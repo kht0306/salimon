@@ -6,13 +6,14 @@ import type { Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import { ListFilter } from "lucide-react"
 import { observer } from "mobx-react-lite"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useAppStore } from "../StoreProvider"
 import { Field, Input, Panel, PanelHeader, PanelTitle, Select } from "../styles"
 import { TransactionMetadataChips } from "./TransactionMetadataChips"
 import { matchesPaymentMethodFilter } from "./transactionPresentation"
 
 type PeriodPreset = "3" | "7" | "14" | "21" | "28" | "custom" | "all"
+const PAGE_SIZE = 50
 
 export const TransactionListPanel = observer(function TransactionListPanel() {
   const store = useAppStore()
@@ -25,6 +26,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
   const [actorUserId, setActorUserId] = useState("")
   const [paymentMethodIds, setPaymentMethodIds] = useState<string[]>([])
   const [keyword, setKeyword] = useState("")
+  const [page, setPage] = useState(1)
 
   const paymentMethods = store.data.paymentMethods.filter(
     (method) => method.ledgerId === store.selectedLedgerId,
@@ -70,7 +72,15 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
       })
       .filter((item) => !type || item.type === type)
       .filter((item) => !status || item.status === status)
-      .filter((item) => !categoryId || item.categoryId === categoryId)
+      .filter((item) => {
+        if (!categoryId) return true
+        const splits = store.data.transactionSplits.filter(
+          (split) => split.transactionId === item.id,
+        )
+        return splits.length > 0
+          ? splits.some((split) => split.categoryId === categoryId)
+          : item.categoryId === categoryId
+      })
       .filter((item) => matchesPaymentMethodFilter(item, paymentMethodIds))
       .filter(
         (item) =>
@@ -82,7 +92,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
       .filter(
         (item) =>
           !query ||
-          `${item.merchantName ?? ""} ${item.memo ?? ""}`
+          `${item.merchantName ?? ""} ${item.memo ?? ""} ${(item.tags ?? []).join(" ")}`
             .toLowerCase()
             .includes(query),
       )
@@ -101,9 +111,32 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
     startDate,
     status,
     store.data.transactions,
+    store.data.transactionSplits,
     store.selectedLedgerId,
     type,
   ])
+
+  useEffect(() => {
+    setPage(1)
+  }, [
+    actorUserId,
+    categoryId,
+    endDate,
+    keyword,
+    paymentMethodIds,
+    period,
+    startDate,
+    status,
+    store.selectedLedgerId,
+    type,
+  ])
+
+  const pageCount = Math.max(1, Math.ceil(transactions.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const visibleTransactions = transactions.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  )
 
   const expense = sumByType(transactions, "expense")
   const income = sumByType(transactions, "income")
@@ -183,7 +216,6 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
           >
             <option value="">전체</option>
             <option value="confirmed">확정</option>
-            <option value="pending">대기</option>
             <option value="excluded">제외</option>
           </Select>
         </Field>
@@ -196,6 +228,9 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
             <option value="">전체</option>
             {store.currentCategories.map((category) => (
               <option key={category.id} value={category.id}>
+                {category.parentCategoryId
+                  ? `${store.currentCategories.find((item) => item.id === category.parentCategoryId)?.name ?? "상위"} › `
+                  : ""}
                 {category.name}
               </option>
             ))}
@@ -274,7 +309,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
         </span>
       </Totals>
       <Rows>
-        {transactions.map((transaction) => {
+        {visibleTransactions.map((transaction) => {
           const category = store.data.categories.find(
             (item) => item.id === transaction.categoryId,
           )
@@ -306,6 +341,11 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
                   transaction={transaction}
                   category={category}
                   paymentMethod={paymentMethod}
+                  splitCount={
+                    store.data.transactionSplits.filter(
+                      (split) => split.transactionId === transaction.id,
+                    ).length
+                  }
                 />
                 <strong>
                   {transaction.merchantName || transaction.memo || "거래"}
@@ -329,6 +369,27 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
           <Empty>조건에 맞는 거래가 없습니다.</Empty>
         ) : null}
       </Rows>
+      {transactions.length > PAGE_SIZE ? (
+        <Pagination aria-label="거래 목록 페이지">
+          <button
+            type="button"
+            disabled={currentPage === 1}
+            onClick={() => setPage((value) => Math.max(1, value - 1))}
+          >
+            이전
+          </button>
+          <span>
+            {currentPage} / {pageCount} · 페이지당 {PAGE_SIZE}건
+          </span>
+          <button
+            type="button"
+            disabled={currentPage === pageCount}
+            onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
+          >
+            다음
+          </button>
+        </Pagination>
+      ) : null}
     </Panel>
   )
 })
@@ -366,7 +427,7 @@ function resolveTransactionRange(
 
 function sumByType(transactions: Transaction[], type: Transaction["type"]) {
   return transactions
-    .filter((item) => item.type === type && item.status !== "excluded")
+    .filter((item) => item.type === type && item.status === "confirmed")
     .reduce((sum, item) => sum + item.amount, 0)
 }
 
@@ -391,6 +452,29 @@ const ResultCount = styled.span`
   color: ${colors.muted};
   font-size: 12px;
 `
+const Pagination = styled.nav`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-top: 1px solid ${colors.border};
+  padding: 12px;
+  color: ${colors.muted};
+  font-size: 11px;
+
+  button {
+    min-height: 32px;
+    border: 1px solid ${colors.border};
+    border-radius: ${radii.sm};
+    background: ${colors.panel};
+    color: ${colors.ink};
+    padding: 0 12px;
+  }
+
+  button:disabled {
+    color: ${colors.subtle};
+  }
+`
 const PaymentFilter = styled.details`
   position: relative;
 
@@ -400,7 +484,7 @@ const PaymentFilter = styled.details`
     align-items: center;
     border: 1px solid ${colors.border};
     border-radius: ${radii.md};
-    background: #fff;
+    background: ${colors.panel};
     color: ${colors.ink};
     padding: 0 12px;
     font-size: 13px;
@@ -420,7 +504,7 @@ const PaymentOptions = styled.div`
   overflow-y: auto;
   border: 1px solid ${colors.border};
   border-radius: ${radii.md};
-  background: #fff;
+  background: ${colors.panel};
   padding: 6px;
   box-shadow: 0 10px 28px rgb(15 23 42 / 12%);
 
@@ -484,7 +568,7 @@ const Row = styled.article<{ $excluded: boolean }>`
   padding: 12px;
   border: 1px solid ${colors.border};
   border-radius: ${radii.md};
-  background: #fff;
+  background: ${colors.panel};
   opacity: ${({ $excluded }) => ($excluded ? 0.52 : 1)};
   @media (max-width: 680px) {
     grid-template-columns: 1fr auto;

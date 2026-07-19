@@ -83,7 +83,7 @@ const Account = styled.div`
   gap: 9px;
   border: 1px solid ${colors.border};
   border-radius: ${radii.sm};
-  background: #fff;
+  background: ${colors.panel};
   padding: 7px;
 `
 

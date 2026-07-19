@@ -8,6 +8,7 @@ import {
   ListFilter,
   Plus,
   Settings2,
+  ShieldCheck,
   Star,
   Tags,
   WalletCards,
@@ -24,6 +25,9 @@ import { LedgerManagementPanel } from "./components/LedgerManagementPanel"
 import { TransactionPanel } from "./components/TransactionPanel"
 import { TransactionListPanel } from "./components/TransactionListPanel"
 import { SettlementPanel } from "./components/SettlementPanel"
+import { TrustCenter } from "./components/TrustCenter"
+import { OnboardingChecklist } from "./components/OnboardingChecklist"
+import { LegalConsentGate } from "./components/LegalConsentGate"
 import {
   Metric,
   MetricLabel,
@@ -38,6 +42,10 @@ import styled from "@emotion/styled"
 import { colors, radii, spacing } from "@salimon/ui-tokens"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
+import {
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+} from "@salimon/types"
 
 const isLocalDevelopment = process.env.NODE_ENV === "development"
 
@@ -72,6 +80,14 @@ const DashboardContent = observer(function DashboardContent() {
           : "로그인 페이지로 이동합니다."}
       </AuthLoading>
     )
+  }
+
+  if (
+    store.dataState === "ready" &&
+    (store.data.legalConsent?.termsVersion !== CURRENT_TERMS_VERSION ||
+      store.data.legalConsent?.privacyVersion !== CURRENT_PRIVACY_VERSION)
+  ) {
+    return <LegalConsentGate />
   }
 
   return (
@@ -216,6 +232,13 @@ const DashboardContent = observer(function DashboardContent() {
             <Landmark size={17} /> 계좌 관리
           </NavButton>
           <NavButton
+            $active={store.activeView === "trust"}
+            aria-current={store.activeView === "trust" ? "page" : undefined}
+            onClick={() => store.setView("trust")}
+          >
+            <ShieldCheck size={17} /> 개인정보·데이터
+          </NavButton>
+          <NavButton
             $active={store.activeView === "ledger"}
             aria-current={store.activeView === "ledger" ? "page" : undefined}
             onClick={() => store.setView("ledger")}
@@ -249,7 +272,12 @@ const DashboardContent = observer(function DashboardContent() {
             </Eyebrow>
             <PageTitle>{store.currentLedger?.name ?? "가계부"}</PageTitle>
           </div>
+          <MobileAuth>
+            <AuthControls />
+          </MobileAuth>
         </Topline>
+
+        <OnboardingChecklist />
 
         {store.activeView === "calendar" ? <CalendarGrid /> : null}
         {store.activeView === "transactions" ? <TransactionListPanel /> : null}
@@ -259,6 +287,7 @@ const DashboardContent = observer(function DashboardContent() {
           <AccountManager key={store.selectedLedgerId} />
         ) : null}
         {store.activeView === "settlement" ? <SettlementPanel /> : null}
+        {store.activeView === "trust" ? <TrustCenter /> : null}
         {store.activeView === "ledger" ? (
           <LedgerManagementPanel key={store.selectedLedgerId} />
         ) : null}
@@ -306,6 +335,10 @@ const Brand = styled.button`
   color: inherit;
   text-align: left;
   cursor: pointer;
+
+  @media (max-width: 820px) {
+    display: none;
+  }
 `
 
 const BrandMark = styled.div`
@@ -315,7 +348,7 @@ const BrandMark = styled.div`
   place-items: center;
   border-radius: ${radii.sm};
   background: ${colors.ink};
-  color: #fff;
+  color: ${colors.panel};
   font-size: 14px;
   font-weight: 700;
 `
@@ -344,8 +377,8 @@ const DefaultLedgerButton = styled.button<{ $active: boolean }>`
   place-items: center;
   border: 1px solid ${colors.borderStrong};
   border-radius: ${radii.sm};
-  background: ${({ $active }) => ($active ? "#fff7d6" : "#fff")};
-  color: ${({ $active }) => ($active ? "#b7791f" : colors.muted)};
+  background: ${({ $active }) => ($active ? colors.amberSoft : colors.panel)};
+  color: ${({ $active }) => ($active ? colors.amber : colors.muted)};
 
   &:disabled {
     cursor: default;
@@ -353,7 +386,7 @@ const DefaultLedgerButton = styled.button<{ $active: boolean }>`
 `
 
 const LedgerManageButton = styled(DefaultLedgerButton)`
-  background: #fff;
+  background: ${colors.panel};
   color: ${colors.muted};
 
   &:hover {
@@ -376,7 +409,7 @@ const LedgerSelect = styled.select`
   min-height: 36px;
   border: 1px solid ${colors.borderStrong};
   border-radius: ${radii.sm};
-  background: #fff;
+  background: ${colors.panel};
   color: ${colors.ink};
   padding: 8px 10px;
   font-size: 13px;
@@ -402,7 +435,7 @@ const NavButton = styled.button<{ $active: boolean }>`
   width: 100%;
   border: 1px solid transparent;
   border-radius: ${radii.sm};
-  background: ${({ $active }) => ($active ? "#f0f0f2" : "transparent")};
+  background: ${({ $active }) => ($active ? colors.panelSubtle : "transparent")};
   color: ${({ $active }) => ($active ? colors.ink : colors.muted)};
   padding: 0 10px;
   font-size: 13px;
@@ -431,7 +464,7 @@ const SidebarFooter = styled.div`
   }
 
   @media (max-width: 820px) {
-    max-width: 320px;
+    display: none;
   }
 `
 
@@ -441,6 +474,19 @@ const Topline = styled.div`
   justify-content: space-between;
   gap: 16px;
   margin-bottom: ${spacing[5]};
+
+  @media (max-width: 820px) {
+    margin-bottom: ${spacing[3]};
+  }
+`
+
+const MobileAuth = styled.div`
+  display: none;
+
+  @media (max-width: 820px) {
+    display: block;
+    width: min(210px, 48vw);
+  }
 `
 
 const Eyebrow = styled.div`
@@ -473,13 +519,17 @@ const Toast = styled.button<{ $tone: "success" | "error" | "info" }>`
   border: 1px solid
     ${({ $tone }) =>
       $tone === "error"
-        ? "#fecaca"
+        ? colors.coral
         : $tone === "success"
-          ? "#bbf7d0"
+          ? colors.green
           : colors.border};
   border-radius: ${radii.sm};
   background: ${({ $tone }) =>
-    $tone === "error" ? "#fff1f2" : $tone === "success" ? "#f0fdf4" : "#fff"};
+    $tone === "error"
+      ? colors.coralSoft
+      : $tone === "success"
+        ? colors.greenSoft
+        : colors.panel};
   color: ${({ $tone }) =>
     $tone === "error"
       ? colors.coral

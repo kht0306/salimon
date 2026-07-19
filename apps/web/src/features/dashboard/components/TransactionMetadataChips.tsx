@@ -5,7 +5,9 @@ import {
   CalendarRange,
   CreditCard,
   Landmark,
+  ListTree,
   Repeat2,
+  Tag,
   Wallet,
 } from "lucide-react"
 import {
@@ -19,12 +21,14 @@ interface TransactionMetadataChipsProps {
   transaction: Transaction
   category?: Category
   paymentMethod?: PaymentMethod
+  splitCount?: number
 }
 
 export function TransactionMetadataChips({
   transaction,
   category,
   paymentMethod,
+  splitCount = 0,
 }: TransactionMetadataChipsProps) {
   const paymentLabel = getPaymentMetadataLabel(transaction, paymentMethod)
   const installmentLabel = getInstallmentLabel(transaction)
@@ -47,6 +51,11 @@ export function TransactionMetadataChips({
       <CategoryChip $color={category?.color ?? colors.subtle}>
         {category?.name ?? "기타"}
       </CategoryChip>
+      {splitCount > 0 ? (
+        <SplitChip title={`${splitCount}개 카테고리로 분할`}>
+          <ListTree size={12} aria-hidden="true" /> 분할 {splitCount}
+        </SplitChip>
+      ) : null}
       {paymentLabel ? (
         <PaymentChip $kind={paymentKind} title={paymentLabel}>
           {paymentMethod?.type === "card" ? (
@@ -64,6 +73,11 @@ export function TransactionMetadataChips({
           <CalendarRange size={13} /> {installmentLabel}
         </InstallmentChip>
       ) : null}
+      {(transaction.tags ?? []).map((tag) => (
+        <TagChip key={tag} title={`태그: ${tag}`}>
+          <Tag size={11} aria-hidden="true" /> {tag}
+        </TagChip>
+      ))}
     </Chips>
   )
 }
@@ -82,7 +96,7 @@ const Chip = styled.span`
   gap: 5px;
   border: 1px solid ${colors.border};
   border-radius: ${radii.sm};
-  background: #fff;
+  background: ${colors.panel};
   color: ${colors.ink};
   padding: 4px 7px 4px 10px;
   font-size: 10px;
@@ -131,4 +145,13 @@ const FixedChip = styled(Chip)`
 
 const CategoryChip = styled(Chip)<{ $color: string }>`
   box-shadow: inset 3px 0 0 ${({ $color }) => $color};
+`
+
+const TagChip = styled(Chip)`
+  color: ${colors.muted};
+  padding-left: 7px;
+`
+
+const SplitChip = styled(Chip)`
+  box-shadow: inset 3px 0 0 ${colors.amber};
 `

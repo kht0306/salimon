@@ -255,6 +255,7 @@ const CategoryCreateForm = observer(function CategoryCreateForm() {
   const [color, setColor] = useState(colorOptions[0])
   const [budget, setBudget] = useState("")
   const [usageTypes, setUsageTypes] = useState<CategoryUsageType[]>(["expense"])
+  const [parentCategoryId, setParentCategoryId] = useState("")
 
   async function create() {
     if (
@@ -264,10 +265,12 @@ const CategoryCreateForm = observer(function CategoryCreateForm() {
         color,
         usageTypes,
         Number(budget || 0),
+        parentCategoryId || undefined,
       )
     ) {
       setName("")
       setBudget("")
+      setParentCategoryId("")
     }
   }
 
@@ -299,6 +302,26 @@ const CategoryCreateForm = observer(function CategoryCreateForm() {
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
+        </Field>
+        <Field>
+          상위 카테고리 (선택)
+          <Select
+            value={parentCategoryId}
+            onChange={(event) => setParentCategoryId(event.target.value)}
+          >
+            <option value="">최상위 카테고리</option>
+            {store.currentCategories
+              .filter(
+                (category) =>
+                  !category.parentCategoryId &&
+                  category.usageTypes.some((type) => usageTypes.includes(type)),
+              )
+              .map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+          </Select>
         </Field>
         <Field>
           <span>
@@ -355,6 +378,7 @@ export const CategoryManager = observer(function CategoryManager() {
   const [editIcon, setEditIcon] = useState(iconOptions[0].value)
   const [editColor, setEditColor] = useState(colorOptions[0])
   const [editUsageTypes, setEditUsageTypes] = useState<CategoryUsageType[]>([])
+  const [editParentCategoryId, setEditParentCategoryId] = useState("")
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [savingOrder, setSavingOrder] = useState(false)
@@ -412,6 +436,7 @@ export const CategoryManager = observer(function CategoryManager() {
     setEditIcon(category.icon)
     setEditColor(category.color)
     setEditUsageTypes(category.usageTypes)
+    setEditParentCategoryId(category.parentCategoryId ?? "")
   }
 
   async function saveEditing() {
@@ -422,6 +447,7 @@ export const CategoryManager = observer(function CategoryManager() {
         icon: editIcon,
         color: editColor,
         usageTypes: editUsageTypes,
+        parentCategoryId: editParentCategoryId,
       })
     ) {
       setEditingId(null)
@@ -603,6 +629,29 @@ export const CategoryManager = observer(function CategoryManager() {
                   onChange={setEditUsageTypes}
                   label="적용 용도"
                 />
+                <Select
+                  aria-label={`${category.name} 상위 카테고리`}
+                  value={editParentCategoryId}
+                  onChange={(event) =>
+                    setEditParentCategoryId(event.target.value)
+                  }
+                >
+                  <option value="">최상위 카테고리</option>
+                  {store.currentCategories
+                    .filter(
+                      (parent) =>
+                        parent.id !== category.id &&
+                        !parent.parentCategoryId &&
+                        parent.usageTypes.some((type) =>
+                          editUsageTypes.includes(type),
+                        ),
+                    )
+                    .map((parent) => (
+                      <option key={parent.id} value={parent.id}>
+                        {parent.name}
+                      </option>
+                    ))}
+                </Select>
               </CategoryEditor>
             ) : (
               <CategorySummary>
@@ -610,6 +659,9 @@ export const CategoryManager = observer(function CategoryManager() {
                 <CategoryInfo>
                   <strong>{category.name}</strong>
                   <span>
+                    {category.parentCategoryId
+                      ? `${store.currentCategories.find((parent) => parent.id === category.parentCategoryId)?.name ?? "상위"} › `
+                      : ""}
                     {category.usageTypes
                       .map(
                         (usageType) =>
@@ -746,7 +798,7 @@ export const CategoryManager = observer(function CategoryManager() {
 
 const CategoryComposer = styled.div`
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) 140px minmax(210px, auto) 140px auto;
+  grid-template-columns: minmax(140px, 1fr) 140px 160px minmax(210px, auto) 140px auto;
   gap: 12px;
   padding: 16px 18px;
   align-items: end;
@@ -825,7 +877,7 @@ const NativeColorInput = styled.input`
   padding: 3px;
   border: 1px solid ${colors.borderStrong};
   border-radius: ${radii.sm};
-  background: #fff;
+  background: ${colors.panel};
   cursor: pointer;
 `
 
@@ -843,7 +895,8 @@ const Swatch = styled.button<{ $color: string; $selected: boolean }>`
   width: 24px;
   height: 24px;
   border-radius: ${radii.xs};
-  border: 2px solid ${({ $selected }) => ($selected ? colors.ink : "#fff")};
+  border: 2px solid ${({ $selected }) =>
+    $selected ? colors.ink : colors.panel};
   outline: 1px solid ${colors.border};
   background: ${({ $color }) => $color};
 `

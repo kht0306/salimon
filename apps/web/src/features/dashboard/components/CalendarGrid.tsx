@@ -208,7 +208,7 @@ const BudgetCard = styled.div<{ $color: string }>`
   border: 1px solid ${({ $color }) => $color};
   border-left-width: 4px;
   border-radius: ${radii.sm};
-  background: #fff;
+  background: ${colors.panel};
   strong {
     display: flex;
     align-items: center;
@@ -309,7 +309,7 @@ const DayCell = styled.button<{ $selected: boolean; $muted: boolean }>`
   border-bottom: 1px solid ${colors.border};
   border-radius: 0;
   background: ${({ $selected, $muted }) =>
-    $selected ? colors.tealSoft : $muted ? colors.panelSubtle : "#fff"};
+    $selected ? colors.tealSoft : $muted ? colors.panelSubtle : colors.panel};
   color: ${({ $muted }) => ($muted ? colors.subtle : colors.ink)};
   padding: 10px;
   text-align: left;
@@ -353,7 +353,7 @@ const DayNumber = styled.span<{ $today: boolean }>`
   place-items: center;
   border-radius: ${radii.round};
   background: ${({ $today }) => ($today ? colors.ink : "transparent")};
-  color: ${({ $today }) => ($today ? "#fff" : "inherit")};
+  color: ${({ $today }) => ($today ? colors.panel : "inherit")};
   font-size: 12px;
   font-weight: 650;
 
@@ -370,7 +370,7 @@ const Count = styled.span`
   display: grid;
   place-items: center;
   border-radius: ${radii.round};
-  background: #f4f4f5;
+  background: ${colors.panelSubtle};
   color: ${colors.muted};
   font-size: 11px;
   font-weight: 650;

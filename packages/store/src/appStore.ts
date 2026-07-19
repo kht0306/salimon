@@ -24,10 +24,15 @@ import {
   toMonthKey,
 } from "@salimon/domain"
 import { makeAutoObservable, runInAction } from "mobx"
+import {
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+} from "@salimon/types"
 import type {
   Category,
   CategoryUsageType,
   Ledger,
+  LedgerRole,
   LedgerType,
   LocalSmsCandidate,
   Transaction,
@@ -55,6 +60,8 @@ export interface TransactionDraft {
   installmentAmountType?: "monthly" | "principal"
   paymentMethodId?: string
   applyAmountToFuture?: boolean
+  tags?: string[]
+  splits?: Array<{ categoryId: string; amount: number }>
 }
 
 export interface LedgerCreationInput {
@@ -94,7 +101,8 @@ export class AppStore {
     | "ledger"
     | "sms"
     | "samples"
-    | "connection" = "calendar"
+    | "connection"
+    | "trust" = "calendar"
   authState: "loading" | "authenticated" | "anonymous" | "error" = "loading"
   authUser: AuthUserInfo | null = null
   authError: string | null = null
@@ -227,12 +235,33 @@ export class AppStore {
         .filter(
           (item) =>
             item.type === "expense" &&
-            item.status !== "excluded" &&
-            item.categoryId === category.id,
+            item.status === "confirmed",
         )
-        .reduce((sum, item) => sum + item.amount, 0)
+        .reduce((sum, item) => {
+          const splits = this.data.transactionSplits.filter(
+            (split) => split.transactionId === item.id,
+          )
+          return (
+            sum +
+            (splits.length > 0
+              ? splits
+                  .filter((split) => split.categoryId === category.id)
+                  .reduce((splitSum, split) => splitSum + split.amount, 0)
+              : item.categoryId === category.id
+                ? item.amount
+                : 0)
+          )
+        }, 0)
       return [{ category, amount: budget.amount, spent }]
     })
+  }
+
+  get selectedMonthNote() {
+    return this.data.monthNotes.find(
+      (item) =>
+        item.ledgerId === this.selectedLedgerId &&
+        item.month === this.selectedMonth,
+    )
   }
 
   get monthTransactions(): Transaction[] {
@@ -277,7 +306,7 @@ export class AppStore {
     return this.monthTransactions
       .filter(
         (transaction) =>
-          transaction.type === "expense" && transaction.status !== "excluded",
+          transaction.type === "expense" && transaction.status === "confirmed",
       )
       .reduce((sum, transaction) => sum + transaction.amount, 0)
   }
@@ -286,7 +315,7 @@ export class AppStore {
     return this.monthTransactions
       .filter(
         (transaction) =>
-          transaction.type === "income" && transaction.status !== "excluded",
+          transaction.type === "income" && transaction.status === "confirmed",
       )
       .reduce((sum, transaction) => sum + transaction.amount, 0)
   }
@@ -295,7 +324,7 @@ export class AppStore {
     return this.monthTransactions
       .filter(
         (transaction) =>
-          transaction.type === "saving" && transaction.status !== "excluded",
+          transaction.type === "saving" && transaction.status === "confirmed",
       )
       .reduce((sum, transaction) => sum + transaction.amount, 0)
   }
@@ -554,6 +583,32 @@ export class AppStore {
       this.notify("할부 거래에 사용할 카드를 선택해 주세요.", "error")
       return false
     }
+    const tags = [...new Set((draft.tags ?? []).map((tag) => tag.trim()).filter(Boolean))]
+    if (tags.length > 10 || tags.some((tag) => tag.length > 20)) {
+      this.notify("태그는 20자 이내로 최대 10개까지 입력해 주세요.", "error")
+      return false
+    }
+    if (
+      (draft.splits?.length ?? 0) > 0 &&
+      (draft.recurringType ||
+        draft.splits!.length > 10 ||
+        new Set(draft.splits!.map((split) => split.categoryId)).size !==
+          draft.splits!.length ||
+        draft.splits!.some(
+          (split) =>
+            !split.categoryId ||
+            !Number.isSafeInteger(split.amount) ||
+            split.amount <= 0,
+        ) ||
+        draft.splits!.reduce((sum, split) => sum + split.amount, 0) !==
+          draft.amount)
+    ) {
+      this.notify(
+        "일반 거래의 분할 카테고리 금액 합계가 전체 금액과 같아야 합니다.",
+        "error",
+      )
+      return false
+    }
 
     const categoryId =
       draft.categoryId ||
@@ -570,6 +625,7 @@ export class AppStore {
       await this.repository.saveTransaction(this.authUser.id, {
         ...draft,
         categoryId,
+        tags,
         transactionAt: fromDateTimeLocalValue(draft.transactionAt),
       })
       await this.refreshFinanceData()
@@ -602,6 +658,7 @@ export class AppStore {
     color: string,
     usageTypes: CategoryUsageType[],
     budget = 0,
+    parentCategoryId?: string,
   ): Promise<boolean> {
     const trimmed = name.trim()
     if (!trimmed || !this.selectedLedgerId || !this.authUser) {
@@ -638,6 +695,7 @@ export class AppStore {
         color,
         sortOrder: this.currentCategories.length,
         usageTypes,
+        parentCategoryId,
       })
       if (budget > 0 && usageTypes.includes("expense")) {
         await this.repository.setCategoryBudget({
@@ -659,7 +717,12 @@ export class AppStore {
 
   async updateCategory(
     categoryId: string,
-    patch: Partial<Pick<Category, "name" | "icon" | "color" | "usageTypes">>,
+    patch: Partial<
+      Pick<
+        Category,
+        "name" | "icon" | "color" | "usageTypes" | "parentCategoryId"
+      >
+    >,
   ): Promise<boolean> {
     const category = this.data.categories.find((item) => item.id === categoryId)
     const name = patch.name?.trim()
@@ -803,6 +866,27 @@ export class AppStore {
       })
       await this.refreshFinanceData()
       this.notify(`${this.selectedMonth} 예산을 저장했습니다.`)
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async saveMonthNote(note: string): Promise<boolean> {
+    if (!this.selectedLedgerId || note.length > 1_000) {
+      this.notify("월 정산 메모는 1,000자 이내로 입력해 주세요.", "error")
+      return false
+    }
+    try {
+      await this.repository.saveMonthNote(
+        this.selectedLedgerId,
+        this.selectedMonth,
+        note.trim(),
+        this.selectedMonthNote?.id,
+      )
+      await this.refreshFinanceData()
+      this.notify("월 정산 메모를 저장했습니다.")
       return true
     } catch (error) {
       this.setDataError(error)
@@ -1203,7 +1287,9 @@ export class AppStore {
     }
   }
 
-  async createInvite(): Promise<CreatedLedgerInvitation | null> {
+  async createInvite(
+    roleToGrant: Exclude<LedgerRole, "owner"> = "member",
+  ): Promise<CreatedLedgerInvitation | null> {
     if (
       !this.authUser ||
       !this.selectedLedgerId ||
@@ -1214,6 +1300,7 @@ export class AppStore {
     try {
       const invitation = await this.repository.createInvite(
         this.selectedLedgerId,
+        roleToGrant,
       )
       await this.refreshFinanceData()
       this.notify("초대 코드를 만들었습니다.")
@@ -1221,6 +1308,58 @@ export class AppStore {
     } catch (error) {
       this.setDataError(error)
       return null
+    }
+  }
+
+  async updateMemberRole(
+    targetUserId: string,
+    role: Exclude<LedgerRole, "owner">,
+  ): Promise<boolean> {
+    if (!this.currentLedger || this.currentLedger.role !== "owner") return false
+    try {
+      await this.repository.updateLedgerMemberRole(
+        this.currentLedger.id,
+        targetUserId,
+        role,
+      )
+      await this.refreshFinanceData()
+      this.notify("멤버 역할을 변경했습니다.")
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async removeMember(targetUserId: string): Promise<boolean> {
+    if (!this.currentLedger) return false
+    try {
+      await this.repository.removeLedgerMember(
+        this.currentLedger.id,
+        targetUserId,
+      )
+      await this.refreshFinanceData()
+      this.notify("멤버를 공동 가계부에서 내보냈습니다.")
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async transferLedgerOwnership(targetUserId: string): Promise<boolean> {
+    if (!this.currentLedger || this.currentLedger.role !== "owner") return false
+    try {
+      await this.repository.transferLedgerOwnership(
+        this.currentLedger.id,
+        targetUserId,
+      )
+      await this.refreshFinanceData()
+      this.notify("가계부 소유권을 이전했습니다.")
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
     }
   }
 
@@ -1287,6 +1426,128 @@ export class AppStore {
       this.notify("초대를 취소했습니다.")
     } catch (error) {
       this.setDataError(error)
+    }
+  }
+
+  async requestAccountDeletion(): Promise<boolean> {
+    try {
+      const purgeAfter = await this.repository.requestAccountDeletion()
+      await this.refreshFinanceData()
+      this.notify(
+        `${new Date(purgeAfter).toLocaleDateString("ko-KR")}에 계정이 삭제됩니다. 그 전까지 취소할 수 있습니다.`,
+        "info",
+      )
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async acceptLegalTerms(): Promise<boolean> {
+    try {
+      await this.repository.acceptLegalTerms(
+        CURRENT_TERMS_VERSION,
+        CURRENT_PRIVACY_VERSION,
+      )
+      await this.refreshFinanceData()
+      this.notify("약관과 개인정보 처리방침 동의를 기록했습니다.")
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async cancelAccountDeletion(): Promise<boolean> {
+    try {
+      await this.repository.cancelAccountDeletion()
+      await this.refreshFinanceData()
+      this.notify("계정 삭제 요청을 취소했습니다.")
+      return true
+    } catch (error) {
+      this.setDataError(error)
+      return false
+    }
+  }
+
+  async importTransactions(transactions: Transaction[]): Promise<number> {
+    if (!this.authUser || !this.selectedLedgerId) return 0
+    const existingKeys = new Set(
+      this.data.transactions
+        .filter((item) => item.ledgerId === this.selectedLedgerId && !item.deletedAt)
+        .map(transactionDuplicateKey),
+    )
+    const categoryIds = new Set(this.currentCategories.map((item) => item.id))
+    const paymentMethodIds = new Set(
+      this.currentPaymentMethods.map((item) => item.id),
+    )
+    const memberIds = new Set(this.currentMembers.map((item) => item.userId))
+    const valid = transactions
+      .filter(
+        (item) =>
+          Boolean(item && typeof item === "object") &&
+          (item.type === "expense" || item.type === "income" || item.type === "saving") &&
+          (item.status === "confirmed" || item.status === "excluded") &&
+          Number.isSafeInteger(item.amount) &&
+          item.amount > 0 &&
+          typeof item.transactionAt === "string" &&
+          !Number.isNaN(Date.parse(item.transactionAt)),
+      )
+      .filter((item) => {
+        const key = transactionDuplicateKey(item)
+        if (existingKeys.has(key)) return false
+        existingKeys.add(key)
+        return true
+      })
+      .slice(0, 2_000)
+      .map((item) => ({
+        ...item,
+        categoryId:
+          item.categoryId && categoryIds.has(item.categoryId)
+            ? item.categoryId
+            : findOtherCategory(this.currentCategories, this.selectedLedgerId)?.id,
+        paymentMethodId:
+          item.paymentMethodId && paymentMethodIds.has(item.paymentMethodId)
+            ? item.paymentMethodId
+            : undefined,
+        actorUserId:
+          item.actorUserId && memberIds.has(item.actorUserId)
+            ? item.actorUserId
+            : undefined,
+        merchantName:
+          typeof item.merchantName === "string"
+            ? item.merchantName.trim().slice(0, 100)
+            : undefined,
+        memo:
+          typeof item.memo === "string"
+            ? item.memo.trim().slice(0, 500)
+            : undefined,
+        tags: Array.isArray(item.tags)
+          ? [...new Set(
+              item.tags
+                .filter((tag): tag is string => typeof tag === "string")
+                .map((tag) => tag.trim().slice(0, 20))
+                .filter(Boolean),
+            )].slice(0, 10)
+          : [],
+      }))
+    if (valid.length === 0) {
+      this.notify("복원할 새 거래가 없습니다.", "info")
+      return 0
+    }
+    try {
+      await this.repository.importTransactions(
+        this.authUser.id,
+        this.selectedLedgerId,
+        valid,
+      )
+      await this.refreshFinanceData()
+      this.notify(`${valid.length}건의 거래를 복원했습니다.`)
+      return valid.length
+    } catch (error) {
+      this.setDataError(error)
+      return 0
     }
   }
 
@@ -1500,4 +1761,18 @@ function createId(prefix: string): string {
 
 function isHexColor(value: string): boolean {
   return /^#[0-9a-f]{6}$/i.test(value)
+}
+
+function transactionDuplicateKey(
+  transaction: Pick<
+    Transaction,
+    "type" | "amount" | "transactionAt" | "merchantName"
+  >,
+): string {
+  return [
+    transaction.type,
+    transaction.amount,
+    new Date(transaction.transactionAt).toISOString(),
+    transaction.merchantName?.trim().toLowerCase() ?? "",
+  ].join("|")
 }

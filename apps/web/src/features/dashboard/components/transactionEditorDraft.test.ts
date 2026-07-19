@@ -34,10 +34,11 @@ describe("transaction editor drafts", () => {
       expenseCategoryId: "category-1",
       actorUserId: "user-1",
       primaryPaymentMethodId: "card-1",
+      now: new Date(2026, 6, 14, 9, 7),
     })
 
     expect(draft.paymentMethodId).toBe("card-1")
-    expect(draft.transactionAt).toBe("2026-07-14T12:00")
+    expect(draft.transactionAt).toBe("2026-07-14T09:07")
   })
 
   it("copies an ordinary transaction as a separate one-time draft", () => {

@@ -4,12 +4,13 @@ export type LedgerType = "personal" | "shared"
 export type LedgerRole = "owner" | "admin" | "member" | "viewer"
 export type TransactionType = "expense" | "income" | "saving"
 export type CategoryUsageType = "expense" | "income" | "saving"
-export type TransactionStatus = "pending" | "confirmed" | "excluded"
+export type TransactionStatus = "confirmed" | "excluded"
 export type TransactionSourceType =
   | "manual"
   | "android_sms_notification"
   | "paste"
   | "import"
+  | "receipt_ai"
 
 export type SmsCandidateStatus =
   | "detected"
@@ -28,6 +29,22 @@ export interface Profile {
   avatarUrl?: string
   defaultCurrency: Currency
   timezone: string
+}
+
+export interface AccountDeletionRequest {
+  userId: string
+  requestedAt: string
+  purgeAfter: string
+}
+
+export const CURRENT_TERMS_VERSION = "2026-07-19-v1"
+export const CURRENT_PRIVACY_VERSION = "2026-07-19-v1"
+
+export interface LegalConsent {
+  userId: string
+  termsVersion: string
+  privacyVersion: string
+  acceptedAt: string
 }
 
 export interface Ledger {
@@ -50,6 +67,17 @@ export interface LedgerMember {
   status: "active" | "removed"
   isDefault: boolean
   joinedAt: string
+}
+
+export interface LedgerMemberEvent {
+  id: string
+  ledgerId: string
+  actorUserId?: string
+  targetUserId?: string
+  action: "role_changed" | "removed" | "ownership_transferred"
+  previousRole?: LedgerRole
+  nextRole?: LedgerRole
+  createdAt: string
 }
 
 export interface LedgerInvitation {
@@ -75,6 +103,7 @@ export interface Category {
   sortOrder: number
   isDefault: boolean
   isArchived: boolean
+  parentCategoryId?: string
 }
 
 export interface CategoryBudget {
@@ -86,12 +115,21 @@ export interface CategoryBudget {
   createdAt: string
 }
 
+export interface LedgerMonthNote {
+  id: string
+  ledgerId: string
+  month: string
+  note: string
+  updatedBy?: string
+  updatedAt: string
+}
+
 export type RecurringRuleType = "fixed" | "installment"
 
 export interface RecurringRule {
   id: string
   ledgerId: string
-  createdBy: string
+  createdBy?: string
   type: RecurringRuleType
   amount: number
   dayOfMonth: number
@@ -148,7 +186,7 @@ export interface PaymentInstrument {
 export interface Transaction {
   id: string
   ledgerId: string
-  createdBy: string
+  createdBy?: string
   updatedBy?: string
   actorUserId?: string
   recurringRuleId?: string
@@ -172,6 +210,15 @@ export interface Transaction {
   createdAt: string
   updatedAt: string
   deletedAt?: string
+  tags?: string[]
+}
+
+export interface TransactionSplit {
+  id: string
+  transactionId: string
+  categoryId: string
+  amount: number
+  sortOrder: number
 }
 
 export interface ParsedTransaction {
@@ -187,6 +234,20 @@ export interface ParsedTransaction {
   confidence: number
   normalizedHash: string
   rawTextMasked?: string
+}
+
+export interface ReceiptParseResult {
+  amount: number
+  merchantName: string
+  transactionAt: string
+  categoryHint?: string
+  memo?: string
+  paymentLast4?: string
+  confidence: number
+  warnings: string[]
+  provider: "gemini"
+  model: string
+  dataTier: "free" | "paid"
 }
 
 export interface LocalSmsCandidate {

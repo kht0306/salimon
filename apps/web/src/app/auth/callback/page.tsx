@@ -74,7 +74,7 @@ const StatusPanel = styled.section`
   align-items: start;
   border: 1px solid ${colors.border};
   border-radius: ${radii.md};
-  background: #fff;
+  background: ${colors.panel};
   box-shadow: ${shadows.panel};
   padding: 24px;
 

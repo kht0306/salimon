@@ -5,6 +5,7 @@ import { colors, radii, shadows, spacing } from "@salimon/ui-tokens"
 import { MessageCircle, WalletCards } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { useEffect } from "react"
 import { StoreProvider, useAppStore } from "../dashboard/StoreProvider"
 
@@ -47,6 +48,11 @@ const LoginContent = observer(function LoginContent() {
             ? "로그인 상태 확인 중"
             : "카카오로 로그인"}
         </KakaoButton>
+        <LegalNotice>
+          로그인 후 <Link href="/terms">이용약관</Link>과{" "}
+          <Link href="/privacy">개인정보 처리방침</Link>을 확인하고 필수 동의
+          절차를 진행합니다.
+        </LegalNotice>
         {store.authError ? (
           <ErrorMessage role="alert">{store.authError}</ErrorMessage>
         ) : null}
@@ -81,7 +87,7 @@ const Logo = styled.div`
   place-items: center;
   border-radius: ${radii.md};
   background: ${colors.ink};
-  color: #fff;
+  color: ${colors.panel};
 `
 
 const Header = styled.header`
@@ -135,4 +141,15 @@ const ErrorMessage = styled.p`
   margin: 0;
   color: ${colors.coral};
   font-size: 13px;
+`
+
+const LegalNotice = styled.p`
+  margin: -12px 0 0;
+  color: ${colors.muted};
+  font-size: 11px;
+  text-align: center;
+
+  a {
+    color: ${colors.teal};
+  }
 `

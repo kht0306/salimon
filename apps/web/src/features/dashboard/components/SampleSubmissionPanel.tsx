@@ -152,7 +152,7 @@ const Masked = styled.div`
   min-height: 48px;
   border: 1px solid ${colors.border};
   border-radius: ${radii.sm};
-  background: #fff;
+  background: ${colors.panel};
   padding: 10px;
 `
 

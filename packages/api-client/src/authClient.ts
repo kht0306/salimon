@@ -51,6 +51,13 @@ export async function getCurrentAuthSession(): Promise<AuthSessionInfo | null> {
   return toAuthSessionInfo(data.session)
 }
 
+export async function getCurrentAccessToken(): Promise<string | null> {
+  const client = requireSupabaseClient()
+  const { data, error } = await client.auth.getSession()
+  if (error) throw error
+  return data.session?.access_token ?? null
+}
+
 export function observeAuthSession(
   listener: (event: AuthChangeEvent, session: AuthSessionInfo | null) => void,
 ): () => void {

@@ -47,7 +47,7 @@ export function groupTransactionsByRegistrant(
 ): TransactionActorGroup[] {
   const grouped = new Map<string, Transaction[]>()
   for (const transaction of transactions) {
-    const key = transaction.createdBy
+    const key = transaction.createdBy ?? "unknown"
     grouped.set(key, [...(grouped.get(key) ?? []), transaction])
   }
 
@@ -61,7 +61,8 @@ export function groupTransactionsByRegistrant(
   return orderedKeys.map((key) => ({
     key,
     label:
-      members.find((member) => member.userId === key)?.nickname ?? "알 수 없음",
+      members.find((member) => member.userId === key)?.nickname ??
+      (key === "unknown" ? "탈퇴한 멤버" : "알 수 없음"),
     transactions: grouped.get(key) ?? [],
   }))
 }

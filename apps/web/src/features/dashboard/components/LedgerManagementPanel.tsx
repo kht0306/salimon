@@ -2,7 +2,7 @@
 
 import styled from "@emotion/styled"
 import type { CreatedLedgerInvitation } from "@salimon/api-client"
-import type { LedgerType, PaymentInstrument } from "@salimon/types"
+import type { LedgerRole, LedgerType, PaymentInstrument } from "@salimon/types"
 import { colors, radii, spacing } from "@salimon/ui-tokens"
 import {
   Archive,
@@ -16,6 +16,8 @@ import {
   Plus,
   RotateCcw,
   Share2,
+  ShieldCheck,
+  Trash2,
   Users,
 } from "lucide-react"
 import { observer } from "mobx-react-lite"
@@ -69,12 +71,17 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
   >([])
   const [createdInvitation, setCreatedInvitation] =
     useState<CreatedLedgerInvitation | null>(null)
+  const [inviteRole, setInviteRole] =
+    useState<Exclude<LedgerRole, "owner">>("member")
   const [sharedPaymentMethodIds, setSharedPaymentMethodIds] = useState<
     string[]
   >([])
   const invitations = store.data.invitations.filter(
     (invite) => invite.ledgerId === store.selectedLedgerId,
   )
+  const memberEvents = store.data.memberEvents
+    .filter((event) => event.ledgerId === store.selectedLedgerId)
+    .slice(0, 20)
   const canRename = Boolean(
     ledger &&
     (ledger.type === "personal"
@@ -528,22 +535,40 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
         <Panel>
           <PanelHeader>
             <PanelTitle>공동 멤버와 초대</PanelTitle>
-            <Button
-              type="button"
-              $variant="primary"
-              onClick={async () => {
-                const invitation = await store.createInvite()
-                if (invitation) setCreatedInvitation(invitation)
-              }}
-              disabled={!store.authUser || !canManageShared}
-              title={
-                canManageShared
-                  ? "초대 코드 생성"
-                  : "소유자와 관리자만 초대할 수 있습니다."
-              }
-            >
-              <Link size={16} /> 초대 코드 생성
-            </Button>
+            <InviteActions>
+              <Select
+                aria-label="초대할 멤버 역할"
+                value={inviteRole}
+                disabled={!canManageShared}
+                onChange={(event) =>
+                  setInviteRole(
+                    event.target.value as Exclude<LedgerRole, "owner">,
+                  )
+                }
+              >
+                {ledger.role === "owner" ? (
+                  <option value="admin">관리자</option>
+                ) : null}
+                <option value="member">멤버</option>
+                <option value="viewer">뷰어</option>
+              </Select>
+              <Button
+                type="button"
+                $variant="primary"
+                onClick={async () => {
+                  const invitation = await store.createInvite(inviteRole)
+                  if (invitation) setCreatedInvitation(invitation)
+                }}
+                disabled={!store.authUser || !canManageShared}
+                title={
+                  canManageShared
+                    ? "초대 코드 생성"
+                    : "소유자와 관리자만 초대할 수 있습니다."
+                }
+              >
+                <Link size={16} /> 초대 코드 생성
+              </Button>
+            </InviteActions>
           </PanelHeader>
 
           {createdInvitation ? (
@@ -577,6 +602,63 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
                     <strong>{member.nickname}</strong>
                     <Meta>{roleLabels[member.role]}</Meta>
                   </div>
+                  {member.role !== "owner" &&
+                  (ledger.role === "owner" ||
+                    (ledger.role === "admin" && member.role !== "admin")) ? (
+                    <MemberActions>
+                      {ledger.role === "owner" ? (
+                        <RoleSelect
+                          aria-label={`${member.nickname} 역할`}
+                          value={member.role}
+                          onChange={(event) =>
+                            void store.updateMemberRole(
+                              member.userId,
+                              event.target.value as Exclude<
+                                LedgerRole,
+                                "owner"
+                              >,
+                            )
+                          }
+                        >
+                          <option value="admin">관리자</option>
+                          <option value="member">멤버</option>
+                          <option value="viewer">뷰어</option>
+                        </RoleSelect>
+                      ) : null}
+                      {ledger.role === "owner" ? (
+                        <Button
+                          type="button"
+                          title="소유권 이전"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `${member.nickname}님에게 소유권을 이전하시겠습니까? 이전 후 본인은 관리자가 됩니다.`,
+                              )
+                            ) {
+                              void store.transferLedgerOwnership(member.userId)
+                            }
+                          }}
+                        >
+                          <ShieldCheck size={14} /> 소유권 이전
+                        </Button>
+                      ) : null}
+                      <Button
+                        type="button"
+                        $variant="danger"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `${member.nickname}님을 공동 가계부에서 내보내시겠습니까? 기존 거래 기록은 유지됩니다.`,
+                            )
+                          ) {
+                            void store.removeMember(member.userId)
+                          }
+                        }}
+                      >
+                        <Trash2 size={14} /> 내보내기
+                      </Button>
+                    </MemberActions>
+                  ) : null}
                 </Row>
               ))}
             </Rows>
@@ -612,6 +694,35 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
               {invitations.length === 0 ? <Empty>초대 없음</Empty> : null}
             </Rows>
           </Section>
+          {memberEvents.length > 0 ? (
+            <Section>
+              <SectionTitle>최근 멤버 권한 기록</SectionTitle>
+              <EventRows>
+                {memberEvents.map((event) => {
+                  const actor = store.data.members.find(
+                    (member) => member.userId === event.actorUserId,
+                  )?.nickname ?? "탈퇴한 멤버"
+                  const target = store.data.members.find(
+                    (member) => member.userId === event.targetUserId,
+                  )?.nickname ?? "탈퇴한 멤버"
+                  const description =
+                    event.action === "removed"
+                      ? `${target} 내보내기`
+                      : event.action === "ownership_transferred"
+                        ? `${target}에게 소유권 이전`
+                        : `${target} 역할: ${event.previousRole ? roleLabels[event.previousRole] : "-"} → ${event.nextRole ? roleLabels[event.nextRole] : "-"}`
+                  return (
+                    <EventRow key={event.id}>
+                      <span>{description}</span>
+                      <small>
+                        {actor} · {new Date(event.createdAt).toLocaleString("ko-KR")}
+                      </small>
+                    </EventRow>
+                  )
+                })}
+              </EventRows>
+            </Section>
+          ) : null}
         </Panel>
       ) : null}
     </PanelStack>
@@ -1300,7 +1411,7 @@ const SelectAllChoice = styled.button<{ $selected: boolean }>`
     ${({ $selected }) => ($selected ? colors.teal : colors.borderStrong)};
   border-radius: ${radii.sm};
   background: ${({ $selected }) =>
-    $selected ? colors.panel : "rgba(255, 255, 255, 0.6)"};
+    $selected ? colors.panel : colors.panelSubtle};
   color: ${({ $selected }) => ($selected ? colors.teal : colors.ink)};
   padding: 0 10px;
   font-size: 11px;
@@ -1319,7 +1430,7 @@ const SelectAllChoice = styled.button<{ $selected: boolean }>`
 
 const ConversionMethodChoice = styled(PaymentMethodOption)`
   background: ${({ $selected }) =>
-    $selected ? colors.panel : "rgba(255, 255, 255, 0.6)"};
+    $selected ? colors.panel : colors.panelSubtle};
 `
 
 const OneTimeInvite = styled.div`
@@ -1337,6 +1448,23 @@ const OneTimeInvite = styled.div`
     margin: 4px 0 0;
     color: ${colors.muted};
     font-size: 12px;
+  }
+`
+
+const InviteActions = styled.div`
+  display: flex;
+  gap: 7px;
+
+  select {
+    min-width: 96px;
+  }
+
+  @media (max-width: 620px) {
+    width: 100%;
+    select,
+    button {
+      flex: 1;
+    }
   }
 `
 
@@ -1361,11 +1489,34 @@ const Rows = styled.div`
 
 const Row = styled.div`
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid ${colors.border};
   padding: 10px 0;
+
+  @media (max-width: 720px) {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+`
+
+const MemberActions = styled.div`
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+
+  @media (max-width: 720px) {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    padding-left: 44px;
+  }
+`
+
+const RoleSelect = styled(Select)`
+  width: auto;
+  min-width: 92px;
 `
 
 const InviteRow = styled(Row)`
@@ -1403,4 +1554,31 @@ const Empty = styled.div`
   border-bottom: 1px solid ${colors.border};
   color: ${colors.muted};
   font-size: 12px;
+`
+
+const EventRows = styled.div`
+  display: grid;
+  gap: 7px;
+  padding-bottom: 12px;
+`
+
+const EventRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid ${colors.border};
+  padding: 8px 0;
+  font-size: 11px;
+
+  small {
+    color: ${colors.muted};
+    white-space: nowrap;
+  }
+
+  @media (max-width: 620px) {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
 `
