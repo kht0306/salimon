@@ -1,8 +1,17 @@
 "use client"
 
 import styled from "@emotion/styled"
+import type { PaymentInstrument } from "@salimon/types"
 import { colors } from "@salimon/ui-tokens"
-import { Check, Landmark, Plus, Power, PowerOff, Trash2 } from "lucide-react"
+import {
+  Check,
+  Landmark,
+  Pencil,
+  Plus,
+  Power,
+  PowerOff,
+  Trash2,
+} from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useState } from "react"
 import { useAppStore } from "../StoreProvider"
@@ -42,34 +51,31 @@ const banks = [
 
 export const AccountManager = observer(function AccountManager() {
   const store = useAppStore()
-  const ownerUserId = store.authUser?.id ?? ""
   const [bank, setBank] = useState(banks[0])
   const [name, setName] = useState("")
   const [last4, setLast4] = useState("")
-  const [visibility, setVisibility] = useState<"ledger" | "private">("private")
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
     null,
   )
+  const accounts = store.myPaymentInstruments
+    .filter((method) => method.type === "bank")
+    .sort(
+      (a, b) =>
+        Number(b.isActive) - Number(a.isActive) ||
+        a.name.localeCompare(b.name, "ko"),
+    )
   const canSave =
-    Boolean(ownerUserId && bank.trim() && name.trim()) &&
+    Boolean(store.authUser && bank.trim() && name.trim()) &&
     (!last4 || last4.length === 4)
-  const effectiveVisibility =
-    store.currentLedger?.type === "personal"
-      ? "private"
-      : visibility
 
   function resetForm() {
     setSelectedAccountId(null)
     setBank(banks[0])
     setName("")
     setLast4("")
-    setVisibility("private")
   }
 
-  function selectAccount(
-    account: (typeof store.currentLedgerAccounts)[number],
-  ) {
-    if (account.ownerUserId !== store.authUser?.id) return
+  function selectAccount(account: PaymentInstrument) {
     if (selectedAccountId === account.id) {
       resetForm()
       return
@@ -78,17 +84,10 @@ export const AccountManager = observer(function AccountManager() {
     setBank(account.issuer ?? banks[0])
     setName(account.name)
     setLast4(account.last4 ?? "")
-    setVisibility(account.visibility)
   }
 
   async function save() {
-    const input = {
-      ownerUserId,
-      bank,
-      name,
-      last4: last4 || undefined,
-      visibility: effectiveVisibility,
-    }
+    const input = { bank, name, last4: last4 || undefined }
     const saved = selectedAccountId
       ? await store.updateAccount(selectedAccountId, input)
       : await store.createAccount(input)
@@ -98,7 +97,7 @@ export const AccountManager = observer(function AccountManager() {
   return (
     <Panel>
       <PanelHeader>
-        <PanelTitle>계좌 관리</PanelTitle>
+        <PanelTitle>내 계좌 관리</PanelTitle>
         <Button
           $variant="primary"
           disabled={!canSave}
@@ -108,38 +107,18 @@ export const AccountManager = observer(function AccountManager() {
           {selectedAccountId ? "계좌 수정" : "계좌 등록"}
         </Button>
       </PanelHeader>
-
+      <ScopeNotice>
+        계좌는 특정 가계부에 속하지 않습니다. 여기서 한 번 등록한 뒤 가계부
+        관리에서 사용할 가계부에 연결하세요.
+      </ScopeNotice>
       <Composer>
         <Field>
           <span>
             계좌 소유자<RequiredMark>*</RequiredMark>
           </span>
-          <Input
-            value={
-              store.currentMembers.find(
-                (member) => member.userId === store.authUser?.id,
-              )?.nickname ?? "본인"
-            }
-            disabled
-          />
-          <OwnerHelp>본인 소유 계좌만 등록·수정할 수 있습니다.</OwnerHelp>
+          <Input value={store.data.profile?.nickname ?? "본인"} disabled />
+          <OwnerHelp>내 계정에 독립적으로 저장됩니다.</OwnerHelp>
         </Field>
-        <VisibilityField>
-          <input
-            type="checkbox"
-            checked={effectiveVisibility === "ledger"}
-            disabled={store.currentLedger?.type !== "shared"}
-            onChange={(event) =>
-              setVisibility(event.target.checked ? "ledger" : "private")
-            }
-          />
-          공동 멤버에게 공개
-          <small>
-            {store.currentLedger?.type === "personal"
-              ? "개인 가계부에서는 나만 볼 수 있습니다."
-              : "선택하지 않으면 나만 볼 수 있습니다."}
-          </small>
-        </VisibilityField>
         <Field>
           <span>
             은행<RequiredMark>*</RequiredMark>
@@ -176,104 +155,81 @@ export const AccountManager = observer(function AccountManager() {
           />
         </Field>
       </Composer>
-
       <Hint>
-        전체 계좌번호와 잔액은 저장하지 않습니다. 등록한 계좌는 지출 거래의
-        결제수단으로 사용할 수 있습니다.
+        전체 계좌번호와 잔액은 저장하지 않습니다. 활성 계좌만 가계부 관리에서
+        연결할 수 있습니다.
       </Hint>
-
-      <MemberGroups>
-        {store.currentMembers.map((member) => {
-          const accounts = store.currentLedgerAccounts
-            .filter((account) => account.ownerUserId === member.userId)
-            .sort((a, b) => a.name.localeCompare(b.name, "ko"))
-          return (
-            <MemberSection key={member.userId}>
-              <MemberHeader>
-                <MemberAvatar>{member.nickname.slice(0, 1)}</MemberAvatar>
-                <div>
-                  <strong>{member.nickname}</strong>
-                  <span>
-                    {member.role === "owner" ? "가계부 소유자" : "멤버"} · 계좌{" "}
-                    {accounts.length}개
-                  </span>
-                </div>
-              </MemberHeader>
-              <Rows>
-                {accounts.map((account) => (
-                  <Row
-                    key={account.id}
-                    role={account.ownerUserId === store.authUser?.id ? "button" : undefined}
-                    tabIndex={account.ownerUserId === store.authUser?.id ? 0 : undefined}
-                    aria-pressed={account.ownerUserId === store.authUser?.id ? selectedAccountId === account.id : undefined}
-                    $selected={selectedAccountId === account.id}
-                    $interactive={account.ownerUserId === store.authUser?.id}
-                    onClick={() => selectAccount(account)}
-                    onKeyDown={(event) => {
-                      if (event.target !== event.currentTarget) return
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault()
-                        selectAccount(account)
-                      }
-                    }}
-                  >
-                    <Landmark size={18} />
-                    <div>
-                      <strong>{account.name}</strong>
-                      <Meta>
-                        {account.issuer}
-                        {account.last4 ? ` · •••• ${account.last4}` : ""}
-                        {!account.isActive ? " · 비활성" : ""}
-                        {account.visibility === "private" ? " · 나만 보기" : ""}
-                      </Meta>
-                    </div>
-                    {account.ownerUserId === store.authUser?.id ? (
-                    <Actions onClick={(event) => event.stopPropagation()}>
-                      <Button
-                        $variant={account.isActive ? "ghost" : "soft"}
-                        onClick={() =>
-                          void store.setAccountActive(
-                            account.id,
-                            !account.isActive,
-                          )
-                        }
-                      >
-                        {account.isActive ? (
-                          <PowerOff size={14} />
-                        ) : (
-                          <Power size={14} />
-                        )}
-                        {account.isActive ? "비활성화" : "활성화"}
-                      </Button>
-                      <Button
-                        $variant="danger"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              "이 계좌를 삭제하시겠습니까? 기존 거래에는 삭제된 계좌로 표시됩니다.",
-                            )
-                          )
-                            void store.deleteAccount(account.id)
-                        }}
-                      >
-                        <Trash2 size={14} /> 삭제
-                      </Button>
-                    </Actions>
-                    ) : <ReadOnlyBadge>공동 공개 · 읽기 전용</ReadOnlyBadge>}
-                  </Row>
-                ))}
-                {accounts.length === 0 ? (
-                  <Empty>등록된 계좌가 없습니다.</Empty>
-                ) : null}
-              </Rows>
-            </MemberSection>
-          )
-        })}
-      </MemberGroups>
+      <ListHeader>
+        <strong>내 계좌</strong>
+        <span>{accounts.length}개</span>
+      </ListHeader>
+      <Rows>
+        {accounts.map((account) => (
+          <Row
+            key={account.id}
+            $selected={selectedAccountId === account.id}
+          >
+            <Landmark size={18} />
+            <div>
+              <strong>{account.name}</strong>
+              <Meta>
+                {account.issuer}
+                {account.last4 ? ` · •••• ${account.last4}` : ""}
+                {!account.isActive ? " · 비활성" : ""}
+              </Meta>
+            </div>
+            <Actions>
+              <Button
+                $variant={selectedAccountId === account.id ? "soft" : "ghost"}
+                onClick={() => selectAccount(account)}
+              >
+                <Pencil size={14} />
+                {selectedAccountId === account.id ? "수정 취소" : "수정"}
+              </Button>
+              <Button
+                $variant={account.isActive ? "ghost" : "soft"}
+                onClick={() =>
+                  void store.setAccountActive(account.id, !account.isActive)
+                }
+              >
+                {account.isActive ? (
+                  <PowerOff size={14} />
+                ) : (
+                  <Power size={14} />
+                )}
+                {account.isActive ? "비활성화" : "활성화"}
+              </Button>
+              <Button
+                $variant="danger"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "이 계좌를 삭제하시겠습니까? 모든 가계부 연결이 해제되며 기존 거래에는 삭제된 계좌로 표시됩니다.",
+                    )
+                  ) {
+                    void store.deleteAccount(account.id)
+                  }
+                }}
+              >
+                <Trash2 size={14} /> 삭제
+              </Button>
+            </Actions>
+          </Row>
+        ))}
+        {accounts.length === 0 ? <Empty>등록된 계좌가 없습니다.</Empty> : null}
+      </Rows>
     </Panel>
   )
 })
 
+const ScopeNotice = styled.p`
+  margin: 0;
+  padding: 12px 18px;
+  border-bottom: 1px solid ${colors.border};
+  background: ${colors.tealSoft};
+  color: ${colors.ink};
+  font-size: 12px;
+`
 const Composer = styled.div`
   display: grid;
   grid-template-columns: repeat(4, minmax(140px, 1fr));
@@ -289,7 +245,6 @@ const Composer = styled.div`
     grid-template-columns: 1fr;
   }
 `
-
 const Hint = styled.p`
   margin: 0;
   padding: 10px 18px;
@@ -297,82 +252,34 @@ const Hint = styled.p`
   border-bottom: 1px solid ${colors.border};
   font-size: 12px;
 `
-
-const VisibilityField = styled.label`
+const ListHeader = styled.div`
   display: flex;
   align-items: center;
-  gap: 7px;
-  min-height: 38px;
-  color: ${colors.ink};
-  font-size: 13px;
-  font-weight: 600;
-
-  small {
-    color: ${colors.muted};
-    font-size: 11px;
-    font-weight: 400;
-  }
-`
-
-const MemberGroups = styled.div`
-  display: grid;
-`
-
-const MemberSection = styled.section`
-  & + & {
-    border-top: 1px solid ${colors.border};
-  }
-`
-
-const MemberHeader = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  justify-content: space-between;
   padding: 14px 18px 8px;
 
   span {
-    display: block;
-    margin-top: 2px;
     color: ${colors.muted};
     font-size: 11px;
   }
 `
-
-const MemberAvatar = styled.div`
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: ${colors.tealSoft};
-  color: ${colors.teal};
-  font-weight: 700;
-`
-
 const Rows = styled.div`
   display: grid;
+  padding-bottom: 8px;
 `
-
-const Row = styled.article<{ $selected: boolean; $interactive: boolean }>`
+const Row = styled.article<{ $selected: boolean }>`
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   padding: 12px 18px;
   border-top: 1px solid ${colors.border};
-  background: ${({ $selected }) => ($selected ? colors.tealSoft : colors.panel)};
-  cursor: ${({ $interactive }) => ($interactive ? "pointer" : "default")};
-
-  &:focus-visible {
-    outline: 2px solid ${colors.focus};
-    outline-offset: -2px;
-  }
-
+  background: ${({ $selected }) =>
+    $selected ? colors.tealSoft : colors.panel};
   @media (max-width: 760px) {
     grid-template-columns: 24px minmax(0, 1fr);
   }
 `
-
 const Meta = styled.span`
   display: block;
   margin-top: 3px;
@@ -383,25 +290,17 @@ const OwnerHelp = styled.small`
   color: ${colors.muted};
   font-weight: 400;
 `
-const ReadOnlyBadge = styled.span`
+const Empty = styled.div`
+  padding: 20px 18px;
   color: ${colors.muted};
-  font-size: 11px;
-  white-space: nowrap;
+  font-size: 13px;
 `
-
 const Actions = styled.div`
   display: flex;
+  justify-content: flex-end;
   gap: 6px;
 
   @media (max-width: 760px) {
     grid-column: 1 / -1;
-    justify-content: flex-end;
   }
-`
-
-const Empty = styled.div`
-  padding: 18px;
-  color: ${colors.muted};
-  text-align: center;
-  font-size: 12px;
 `

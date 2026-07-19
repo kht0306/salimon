@@ -497,63 +497,43 @@ export class SupabaseFinanceRepository {
   }
 
   async createCard(input: {
-    ledgerId: string
-    ownerUserId: string
     name: string
     issuer: string
     last4?: string
     paymentDay: number
     billingPeriodEndDay: number
     billingPeriodEndMonthOffset: -1 | 0
-    isPrimary: boolean
     isDebit: boolean
-    visibility: "ledger" | "private"
   }): Promise<void> {
     const client = requireSupabaseClient()
-    const { data, error } = await client
-      .from("payment_methods")
-      .insert({
-        ledger_id: input.ledgerId,
-        owner_user_id: input.ownerUserId,
-        name: input.name,
-        type: "card",
-        last4: input.last4 || null,
-        issuer: input.issuer,
-        visibility: input.visibility,
-        payment_day: input.isDebit ? 31 : input.paymentDay,
-        billing_period_end_day: input.isDebit ? 31 : input.billingPeriodEndDay,
-        billing_period_end_month_offset: input.isDebit
-          ? -1
-          : input.billingPeriodEndMonthOffset,
-        is_debit: input.isDebit,
-        is_primary: false,
-      })
-      .select("id")
-      .single()
+    const { error } = await client.rpc("create_user_payment_instrument", {
+      p_type: "card",
+      p_name: input.name,
+      p_last4: input.last4 ?? null,
+      p_issuer: input.issuer,
+      p_payment_day: input.paymentDay,
+      p_billing_period_end_day: input.billingPeriodEndDay,
+      p_billing_period_end_month_offset: input.billingPeriodEndMonthOffset,
+      p_is_debit: input.isDebit,
+    })
     throwIfError(error)
-    if (input.isPrimary && data?.id) await this.setCardPrimary(data.id)
   }
 
   async createAccount(input: {
-    ledgerId: string
-    ownerUserId: string
     name: string
     bank: string
     last4?: string
-    visibility: "ledger" | "private"
   }): Promise<void> {
     const client = requireSupabaseClient()
-    const { error } = await client.from("payment_methods").insert({
-      ledger_id: input.ledgerId,
-      owner_user_id: input.ownerUserId,
-      name: input.name,
-      type: "bank",
-      last4: input.last4 || null,
-      issuer: input.bank,
-      visibility: input.visibility,
-      is_active: true,
-      is_primary: false,
-      is_debit: false,
+    const { error } = await client.rpc("create_user_payment_instrument", {
+      p_type: "bank",
+      p_name: input.name,
+      p_last4: input.last4 ?? null,
+      p_issuer: input.bank,
+      p_payment_day: null,
+      p_billing_period_end_day: null,
+      p_billing_period_end_month_offset: null,
+      p_is_debit: false,
     })
     throwIfError(error)
   }
@@ -561,147 +541,84 @@ export class SupabaseFinanceRepository {
   async updateAccount(
     accountId: string,
     input: {
-      ownerUserId: string
       name: string
       bank: string
       last4?: string
-      visibility: "ledger" | "private"
     },
   ): Promise<void> {
     const client = requireSupabaseClient()
-    const { error } = await client
-      .from("payment_methods")
-      .update({
-        owner_user_id: input.ownerUserId,
-        name: input.name,
-        issuer: input.bank,
-        last4: input.last4 || null,
-        visibility: input.visibility,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", accountId)
-      .eq("type", "bank")
+    const { error } = await client.rpc("update_user_payment_instrument", {
+      p_id: accountId,
+      p_type: "bank",
+      p_name: input.name,
+      p_last4: input.last4 ?? null,
+      p_issuer: input.bank,
+      p_payment_day: null,
+      p_billing_period_end_day: null,
+      p_billing_period_end_month_offset: null,
+      p_is_debit: false,
+    })
     throwIfError(error)
   }
 
   async setAccountActive(accountId: string, isActive: boolean): Promise<void> {
     const client = requireSupabaseClient()
-    const { error } = await client
-      .from("payment_methods")
-      .update({
-        is_active: isActive,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", accountId)
-      .eq("type", "bank")
+    const { error } = await client.rpc("set_user_payment_instrument_active", {
+      p_id: accountId,
+      p_is_active: isActive,
+    })
     throwIfError(error)
   }
 
   async deleteAccount(accountId: string): Promise<void> {
     const client = requireSupabaseClient()
-    const { error } = await client
-      .from("payment_methods")
-      .update({
-        is_active: false,
-        is_primary: false,
-        deleted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", accountId)
-      .eq("type", "bank")
+    const { error } = await client.rpc("delete_user_payment_instrument", {
+      p_id: accountId,
+    })
     throwIfError(error)
   }
 
   async updateCard(
     cardId: string,
     input: {
-      ownerUserId: string
       name: string
       issuer: string
       last4?: string
       paymentDay: number
       billingPeriodEndDay: number
       billingPeriodEndMonthOffset: -1 | 0
-      isPrimary: boolean
       isDebit: boolean
-      visibility: "ledger" | "private"
     },
   ): Promise<void> {
     const client = requireSupabaseClient()
-    const { error } = await client
-      .from("payment_methods")
-      .update({
-        owner_user_id: input.ownerUserId,
-        name: input.name,
-        issuer: input.issuer,
-        last4: input.last4 || null,
-        payment_day: input.isDebit ? 31 : input.paymentDay,
-        billing_period_end_day: input.isDebit ? 31 : input.billingPeriodEndDay,
-        billing_period_end_month_offset: input.isDebit
-          ? -1
-          : input.billingPeriodEndMonthOffset,
-        is_debit: input.isDebit,
-        visibility: input.visibility,
-        is_primary: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", cardId)
+    const { error } = await client.rpc("update_user_payment_instrument", {
+      p_id: cardId,
+      p_type: "card",
+      p_name: input.name,
+      p_last4: input.last4 ?? null,
+      p_issuer: input.issuer,
+      p_payment_day: input.paymentDay,
+      p_billing_period_end_day: input.billingPeriodEndDay,
+      p_billing_period_end_month_offset: input.billingPeriodEndMonthOffset,
+      p_is_debit: input.isDebit,
+    })
     throwIfError(error)
-    if (input.isPrimary) await this.setCardPrimary(cardId)
   }
 
   async setCardActive(cardId: string, isActive: boolean): Promise<void> {
     const client = requireSupabaseClient()
-    const { error } = await client
-      .from("payment_methods")
-      .update({
-        is_active: isActive,
-        ...(!isActive ? { is_primary: false } : {}),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", cardId)
+    const { error } = await client.rpc("set_user_payment_instrument_active", {
+      p_id: cardId,
+      p_is_active: isActive,
+    })
     throwIfError(error)
   }
 
   async deleteCard(cardId: string): Promise<void> {
     const client = requireSupabaseClient()
-    const { error } = await client
-      .from("payment_methods")
-      .update({
-        is_active: false,
-        is_primary: false,
-        deleted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", cardId)
-    throwIfError(error)
-  }
-
-  async setCardPrimary(cardId: string): Promise<void> {
-    const client = requireSupabaseClient()
-    const { data: card, error: readError } = await client
-      .from("payment_methods")
-      .select("ledger_id, owner_user_id")
-      .eq("id", cardId)
-      .single()
-    throwIfError(readError)
-    if (!card) throw new Error("카드를 찾을 수 없습니다.")
-
-    const { error: clearError } = await client
-      .from("payment_methods")
-      .update({ is_primary: false, updated_at: new Date().toISOString() })
-      .eq("ledger_id", card.ledger_id)
-      .eq("owner_user_id", card.owner_user_id)
-    throwIfError(clearError)
-
-    const { error } = await client
-      .from("payment_methods")
-      .update({
-        is_primary: true,
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", cardId)
+    const { error } = await client.rpc("delete_user_payment_instrument", {
+      p_id: cardId,
+    })
     throwIfError(error)
   }
 
@@ -886,14 +803,11 @@ export class SupabaseFinanceRepository {
     throwIfError(error)
   }
 
-  async convertPersonalLedgerToShared(
-    ledgerId: string,
-    sharedPaymentMethodIds: string[],
-  ): Promise<void> {
+  async convertPersonalLedgerToShared(ledgerId: string): Promise<void> {
     const client = requireSupabaseClient()
     const { error } = await client.rpc("convert_personal_ledger_to_shared", {
       p_ledger_id: ledgerId,
-      p_shared_payment_method_ids: sharedPaymentMethodIds,
+      p_shared_payment_method_ids: [],
     })
     throwIfError(error)
   }
@@ -990,12 +904,14 @@ export class SupabaseFinanceRepository {
     ledgerId: string,
     paymentInstrumentIds: string[],
     ledgerVisibleInstrumentIds: string[],
+    primaryInstrumentId?: string,
   ): Promise<void> {
     const client = requireSupabaseClient()
     const { error } = await client.rpc("sync_my_ledger_payment_methods", {
       p_ledger_id: ledgerId,
       p_payment_instrument_ids: paymentInstrumentIds,
       p_ledger_visible_instrument_ids: ledgerVisibleInstrumentIds,
+      p_primary_instrument_id: primaryInstrumentId ?? null,
     })
     throwIfError(error)
   }

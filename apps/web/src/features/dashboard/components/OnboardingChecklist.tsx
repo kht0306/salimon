@@ -14,13 +14,18 @@ export const OnboardingChecklist = observer(function OnboardingChecklist() {
 
   const steps = [
     {
-      label: "공동 가계부 준비",
+      label:
+        store.currentLedger.type === "personal"
+          ? "공동 가계부로 전환"
+          : "공동 가계부 준비",
       done: store.currentLedger.type === "shared",
       view: "ledger" as const,
     },
     {
       label: "생활 멤버 초대",
-      done: store.currentLedger.type === "personal" || store.currentMembers.length > 1,
+      done:
+        store.currentLedger.type === "shared" &&
+        store.currentMembers.length > 1,
       view: "ledger" as const,
     },
     {

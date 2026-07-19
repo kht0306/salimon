@@ -895,18 +895,15 @@ export class AppStore {
   }
 
   async createCard(input: {
-    ownerUserId: string
     name: string
     issuer: string
     last4?: string
     paymentDay: number
     billingPeriodEndDay: number
     billingPeriodEndMonthOffset: -1 | 0
-    isPrimary: boolean
     isDebit: boolean
-    visibility: "ledger" | "private"
   }): Promise<boolean> {
-    if (!this.selectedLedgerId || !input.name.trim() || !input.issuer.trim()) {
+    if (!this.authUser || !input.name.trim() || !input.issuer.trim()) {
       this.notify("카드사와 카드 별칭을 입력해 주세요.", "error")
       return false
     }
@@ -922,18 +919,15 @@ export class AppStore {
       return false
     }
     try {
-      const isFirstCard = !this.currentLedgerCards.some(
-        (card) => card.ownerUserId === input.ownerUserId,
-      )
       await this.repository.createCard({
         ...input,
-        ledgerId: this.selectedLedgerId,
         name: input.name.trim(),
         issuer: input.issuer.trim(),
-        isPrimary: isFirstCard || input.isPrimary,
       })
       await this.refreshFinanceData()
-      this.notify("카드를 등록했습니다.")
+      this.notify(
+        "내 카드에 등록했습니다. 가계부 관리에서 사용할 가계부에 연결해 주세요.",
+      )
       return true
     } catch (error) {
       this.setDataError(error)
@@ -944,19 +938,18 @@ export class AppStore {
   async updateCard(
     cardId: string,
     input: {
-      ownerUserId: string
       name: string
       issuer: string
       last4?: string
       paymentDay: number
       billingPeriodEndDay: number
       billingPeriodEndMonthOffset: -1 | 0
-      isPrimary: boolean
       isDebit: boolean
-      visibility: "ledger" | "private"
     },
   ): Promise<boolean> {
-    const card = this.currentLedgerCards.find((item) => item.id === cardId)
+    const card = this.myPaymentInstruments.find(
+      (item) => item.id === cardId && item.type === "card",
+    )
     if (!card || !input.name.trim() || !input.issuer.trim()) {
       this.notify("카드사와 카드 별칭을 입력해 주세요.", "error")
       return false
@@ -973,14 +966,10 @@ export class AppStore {
       return false
     }
     try {
-      const isFirstCard = !this.currentLedgerCards.some(
-        (item) => item.id !== cardId && item.ownerUserId === input.ownerUserId,
-      )
       await this.repository.updateCard(cardId, {
         ...input,
         name: input.name.trim(),
         issuer: input.issuer.trim(),
-        isPrimary: isFirstCard || input.isPrimary,
       })
       await this.refreshFinanceData()
       this.notify("카드를 수정했습니다.")
@@ -1007,32 +996,19 @@ export class AppStore {
     try {
       await this.repository.deleteCard(cardId)
       await this.refreshFinanceData()
-      this.notify("카드를 삭제했습니다.")
-    } catch (error) {
-      this.setDataError(error)
-    }
-  }
-
-  async setCardPrimary(cardId: string): Promise<void> {
-    try {
-      await this.repository.setCardPrimary(cardId)
-      await this.refreshFinanceData()
-      this.notify("주 카드를 변경했습니다.")
+      this.notify("카드를 삭제하고 모든 가계부 연결을 해제했습니다.")
     } catch (error) {
       this.setDataError(error)
     }
   }
 
   async createAccount(input: {
-    ownerUserId: string
     name: string
     bank: string
     last4?: string
-    visibility: "ledger" | "private"
   }): Promise<boolean> {
     if (
-      !this.selectedLedgerId ||
-      !input.ownerUserId ||
+      !this.authUser ||
       !input.name.trim() ||
       !input.bank.trim() ||
       (input.last4 && !/^\d{4}$/.test(input.last4))
@@ -1044,12 +1020,13 @@ export class AppStore {
     try {
       await this.repository.createAccount({
         ...input,
-        ledgerId: this.selectedLedgerId,
         name: input.name.trim(),
         bank: input.bank.trim(),
       })
       await this.refreshFinanceData()
-      this.notify("계좌를 등록했습니다.")
+      this.notify(
+        "내 계좌에 등록했습니다. 가계부 관리에서 사용할 가계부에 연결해 주세요.",
+      )
       return true
     } catch (error) {
       this.setDataError(error)
@@ -1060,19 +1037,16 @@ export class AppStore {
   async updateAccount(
     accountId: string,
     input: {
-      ownerUserId: string
       name: string
       bank: string
       last4?: string
-      visibility: "ledger" | "private"
     },
   ): Promise<boolean> {
-    const account = this.currentLedgerAccounts.find(
-      (item) => item.id === accountId,
+    const account = this.myPaymentInstruments.find(
+      (item) => item.id === accountId && item.type === "bank",
     )
     if (
       !account ||
-      !input.ownerUserId ||
       !input.name.trim() ||
       !input.bank.trim() ||
       (input.last4 && !/^\d{4}$/.test(input.last4))
@@ -1112,7 +1086,7 @@ export class AppStore {
     try {
       await this.repository.deleteAccount(accountId)
       await this.refreshFinanceData()
-      this.notify("계좌를 삭제했습니다.")
+      this.notify("계좌를 삭제하고 모든 가계부 연결을 해제했습니다.")
     } catch (error) {
       this.setDataError(error)
     }
@@ -1216,9 +1190,7 @@ export class AppStore {
     }
   }
 
-  async convertCurrentLedgerToShared(
-    sharedPaymentMethodIds: string[],
-  ): Promise<boolean> {
+  async convertCurrentLedgerToShared(): Promise<boolean> {
     if (
       !this.authUser ||
       !this.currentLedger ||
@@ -1229,10 +1201,7 @@ export class AppStore {
     }
 
     try {
-      await this.repository.convertPersonalLedgerToShared(
-        this.currentLedger.id,
-        sharedPaymentMethodIds,
-      )
+      await this.repository.convertPersonalLedgerToShared(this.currentLedger.id)
       await this.refreshFinanceData()
       this.notify("개인 가계부를 공동 가계부로 전환했습니다.")
       return this.dataState === "ready"
@@ -1395,16 +1364,17 @@ export class AppStore {
   async syncMyLedgerPaymentMethods(
     paymentInstrumentIds: string[],
     ledgerVisibleInstrumentIds: string[],
+    primaryInstrumentId?: string,
   ): Promise<boolean> {
-    if (!this.currentLedger || this.currentLedger.type !== "shared")
-      return false
+    if (!this.currentLedger) return false
     if (this.ledgerMutationState !== "idle") return false
     this.ledgerMutationState = "syncing-payment-methods"
     try {
       await this.repository.syncMyLedgerPaymentMethods(
         this.currentLedger.id,
         paymentInstrumentIds,
-        ledgerVisibleInstrumentIds,
+        this.currentLedger.type === "shared" ? ledgerVisibleInstrumentIds : [],
+        primaryInstrumentId,
       )
       await this.refreshFinanceData()
       this.notify("이 가계부에 연결할 내 카드·계좌를 저장했습니다.")
@@ -1525,10 +1495,10 @@ export class AppStore {
             : undefined,
         tags: Array.isArray(item.tags)
           ? [...new Set(
-              item.tags
-                .filter((tag): tag is string => typeof tag === "string")
-                .map((tag) => tag.trim().slice(0, 20))
-                .filter(Boolean),
+                item.tags
+                  .filter((tag): tag is string => typeof tag === "string")
+                  .map((tag) => tag.trim().slice(0, 20))
+                  .filter(Boolean),
             )].slice(0, 10)
           : [],
       }))

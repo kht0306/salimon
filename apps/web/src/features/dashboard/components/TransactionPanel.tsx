@@ -730,12 +730,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
               {draft.recurringType === "installment" &&
               store.currentCards.length === 0 ? (
                 <CardRequired role="alert">
-                  카드 관리 메뉴에서 카드를 먼저 등록해 주세요.
+                  내 카드 메뉴에서 카드를 먼저 등록하고 가계부에 연결해 주세요.
                 </CardRequired>
               ) : null}
               {draft.type === "saving" && store.currentAccounts.length === 0 ? (
                 <CardRequired role="alert">
-                  계좌 관리 메뉴에서 계좌를 먼저 등록해 주세요.
+                  내 계좌 메뉴에서 계좌를 먼저 등록하고 가계부에 연결해 주세요.
                 </CardRequired>
               ) : null}
             </Field>

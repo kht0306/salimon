@@ -222,14 +222,14 @@ const DashboardContent = observer(function DashboardContent() {
             aria-current={store.activeView === "cards" ? "page" : undefined}
             onClick={() => store.setView("cards")}
           >
-            <WalletCards size={17} /> 카드 관리
+            <WalletCards size={17} /> 내 카드
           </NavButton>
           <NavButton
             $active={store.activeView === "accounts"}
             aria-current={store.activeView === "accounts" ? "page" : undefined}
             onClick={() => store.setView("accounts")}
           >
-            <Landmark size={17} /> 계좌 관리
+            <Landmark size={17} /> 내 계좌
           </NavButton>
           <NavButton
             $active={store.activeView === "trust"}
