@@ -140,18 +140,15 @@ describe("setDefaultLedger", () => {
 })
 
 describe("convertPersonalLedgerToShared", () => {
-  it("passes user payment-instrument ids to the conversion RPC", async () => {
+  it("keeps every payment-instrument link private during conversion", async () => {
     rpc.mockResolvedValue({ data: null, error: null })
     const repository = new SupabaseFinanceRepository()
 
-    await repository.convertPersonalLedgerToShared("ledger-1", [
-      "instrument-card",
-      "instrument-account",
-    ])
+    await repository.convertPersonalLedgerToShared("ledger-1")
 
     expect(rpc).toHaveBeenCalledWith("convert_personal_ledger_to_shared", {
       p_ledger_id: "ledger-1",
-      p_shared_payment_method_ids: ["instrument-card", "instrument-account"],
+      p_shared_payment_method_ids: [],
     })
   })
 })
@@ -184,7 +181,7 @@ describe("acceptInvite", () => {
 })
 
 describe("syncMyLedgerPaymentMethods", () => {
-  it("passes connected and shared instruments separately", async () => {
+  it("passes connected, shared, and primary instruments separately", async () => {
     rpc.mockResolvedValue({ data: null, error: null })
     const repository = new SupabaseFinanceRepository()
 
@@ -192,12 +189,66 @@ describe("syncMyLedgerPaymentMethods", () => {
       "ledger-2",
       ["instrument-1", "instrument-2"],
       ["instrument-2"],
+      "instrument-1",
     )
 
     expect(rpc).toHaveBeenCalledWith("sync_my_ledger_payment_methods", {
       p_ledger_id: "ledger-2",
       p_payment_instrument_ids: ["instrument-1", "instrument-2"],
       p_ledger_visible_instrument_ids: ["instrument-2"],
+      p_primary_instrument_id: "instrument-1",
     })
+  })
+})
+
+describe("independent payment instruments", () => {
+  it("creates a card without a ledger id", async () => {
+    rpc.mockResolvedValue({ data: "instrument-1", error: null })
+    const repository = new SupabaseFinanceRepository()
+
+    await repository.createCard({
+      name: "생활비 카드",
+      issuer: "신한카드",
+      last4: "1234",
+      paymentDay: 14,
+      billingPeriodEndDay: 31,
+      billingPeriodEndMonthOffset: -1,
+      isDebit: false,
+    })
+
+    expect(rpc).toHaveBeenCalledWith("create_user_payment_instrument", {
+      p_type: "card",
+      p_name: "생활비 카드",
+      p_last4: "1234",
+      p_issuer: "신한카드",
+      p_payment_day: 14,
+      p_billing_period_end_day: 31,
+      p_billing_period_end_month_offset: -1,
+      p_is_debit: false,
+    })
+    expect(rpc.mock.calls[0]?.[1]).not.toHaveProperty("p_ledger_id")
+  })
+
+  it("creates an account without a ledger id", async () => {
+    rpc.mockResolvedValue({ data: "instrument-2", error: null })
+    const repository = new SupabaseFinanceRepository()
+
+    await repository.createAccount({
+      name: "급여 계좌",
+      bank: "국민은행",
+      last4: "5678",
+    })
+
+    expect(rpc).toHaveBeenCalledWith("create_user_payment_instrument", {
+      p_type: "bank",
+      p_name: "급여 계좌",
+      p_last4: "5678",
+      p_issuer: "국민은행",
+      p_payment_day: null,
+      p_billing_period_end_day: null,
+      p_billing_period_end_month_offset: null,
+      p_is_debit: false,
+    })
+    expect(rpc.mock.calls[0]?.[1]).not.toHaveProperty("p_ledger_id")
   })
 })
