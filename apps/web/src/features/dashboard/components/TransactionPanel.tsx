@@ -2,6 +2,7 @@
 
 import styled from "@emotion/styled"
 import {
+  findOtherCategory,
   formatKoreanDate,
   formatMoneyInput,
   formatKrw,
@@ -9,12 +10,17 @@ import {
   splitInstallmentPrincipal,
 } from "@salimon/domain"
 import type { TransactionGrouping } from "@salimon/store"
-import type { CategoryUsageType, Transaction } from "@salimon/types"
+import type {
+  CategoryUsageType,
+  ReceiptParseResult,
+  Transaction,
+} from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import {
   Check,
   ChevronDown,
   Copy,
+  ListPlus,
   Pencil,
   Plus,
   Save,
@@ -45,6 +51,7 @@ import {
   type TransactionEditorDraft,
 } from "./transactionEditorDraft"
 import { TransactionMetadataChips } from "./TransactionMetadataChips"
+import { ReceiptImporter } from "./ReceiptImporter"
 import {
   getPaymentMethodTypeLabel,
   groupTransactionsByActor,
@@ -59,6 +66,15 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const [copySource, setCopySource] = useState<Transaction | null>(null)
   const [isAdding, setAdding] = useState(false)
   const [isSaving, setSaving] = useState(false)
+  const [receiptWarnings, setReceiptWarnings] = useState<string[]>([])
+  const [tagsInput, setTagsInput] = useState("")
+  const [splits, setSplits] = useState<
+    Array<{ categoryId: string; amount: string }>
+  >([])
+  const initialTagsRef = useRef("")
+  const initialSplitsRef = useRef<Array<{ categoryId: string; amount: string }>>(
+    [],
+  )
   const editorRef = useRef<HTMLDivElement>(null)
   const savingRef = useRef(false)
   const selectedDate = store.selectedDate
@@ -66,12 +82,16 @@ export const TransactionPanel = observer(function TransactionPanel() {
     () =>
       createNewTransactionDraft({
         selectedDate,
-        expenseCategoryId: store.expenseCategories[0]?.id,
+        expenseCategoryId: findOtherCategory(
+          store.expenseCategories,
+          store.selectedLedgerId,
+        )?.id,
         actorUserId: store.authUser?.id,
         primaryPaymentMethodId: store.currentUserPrimaryCard?.id,
       }),
     [
       selectedDate,
+      store.selectedLedgerId,
       store.expenseCategories,
       store.authUser?.id,
       store.currentUserPrimaryCard?.id,
@@ -99,11 +119,29 @@ export const TransactionPanel = observer(function TransactionPanel() {
     const dirty =
       store.transactionEditorOpen &&
       isAdding &&
-      JSON.stringify(draft) !== JSON.stringify(initialDraftRef.current)
+      (JSON.stringify(draft) !== JSON.stringify(initialDraftRef.current) ||
+        tagsInput !== initialTagsRef.current ||
+        JSON.stringify(splits) !== JSON.stringify(initialSplitsRef.current))
     store.setTransactionEditorDirty(dirty)
-  }, [draft, isAdding, store, store.transactionEditorOpen])
+  }, [draft, isAdding, splits, store, store.transactionEditorOpen, tagsInput])
 
   const amount = Number(draft.amount)
+  const splitTotal = splits.reduce(
+    (sum, split) => sum + Number(split.amount || 0),
+    0,
+  )
+  const splitsValid =
+    splits.length === 0 ||
+    (draft.recurringType === "none" &&
+      splits.length <= 10 &&
+      new Set(splits.map((split) => split.categoryId)).size === splits.length &&
+      splits.every(
+        (split) =>
+          Boolean(split.categoryId) &&
+          Number.isSafeInteger(Number(split.amount)) &&
+          Number(split.amount) > 0,
+      ) &&
+      splitTotal === amount)
   const installmentMonths = Number(draft.installmentMonths)
   const installmentAmounts =
     draft.recurringType === "installment" &&
@@ -120,6 +158,19 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const selectableCategories = store.currentCategories.filter((category) =>
     category.usageTypes.includes(draft.type as CategoryUsageType),
   )
+  const categoryLabel = (categoryId: string): string => {
+    const category = store.currentCategories.find(
+      (item) => item.id === categoryId,
+    )
+    const parent = category?.parentCategoryId
+      ? store.currentCategories.find(
+          (item) => item.id === category.parentCategoryId,
+        )
+      : undefined
+    return category
+      ? `${parent ? `${parent.name} › ` : ""}${category.name}`
+      : "삭제된 카테고리"
+  }
   const savingAccountIsValid =
     draft.type !== "saving" ||
     store.currentAccounts.some(
@@ -132,6 +183,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
     /^\d{2}:\d{2}$/.test(transactionTime) &&
     Boolean(store.selectedLedgerId) &&
     savingAccountIsValid &&
+    splitsValid &&
     (draft.recurringType !== "installment" ||
       (Number.isSafeInteger(installmentMonths) &&
         installmentMonths >= 2 &&
@@ -141,6 +193,29 @@ export const TransactionPanel = observer(function TransactionPanel() {
         (isEditingInstallment ||
           draft.installmentAmountType !== "principal" ||
           amount >= installmentMonths)))
+  const possibleDuplicates = store.data.transactions.filter((transaction) => {
+    if (
+      transaction.id === editing?.id ||
+      transaction.ledgerId !== store.selectedLedgerId ||
+      transaction.deletedAt ||
+      transaction.type !== draft.type ||
+      transaction.amount !== amount
+    ) {
+      return false
+    }
+    const sameMerchant =
+      !draft.merchantName.trim() ||
+      transaction.merchantName?.trim().toLowerCase() ===
+        draft.merchantName.trim().toLowerCase()
+    return (
+      sameMerchant &&
+      Math.abs(
+        new Date(draft.transactionAt).getTime() -
+          new Date(transaction.transactionAt).getTime(),
+      ) <=
+        15 * 60_000
+    )
+  })
   const recurrenceGroups = groupTransactionsByRecurrence(
     store.calendarSelectedDateTransactions,
   ).map((recurrenceGroup) => ({
@@ -170,6 +245,11 @@ export const TransactionPanel = observer(function TransactionPanel() {
     setEditing(null)
     setCopySource(null)
     setDraft(initialDraft)
+    setReceiptWarnings([])
+    initialTagsRef.current = ""
+    initialSplitsRef.current = []
+    setTagsInput("")
+    setSplits([])
     setAdding(true)
     store.setTransactionEditorDirty(false)
     store.setTransactionEditorOpen(true)
@@ -209,11 +289,26 @@ export const TransactionPanel = observer(function TransactionPanel() {
           transaction.transactionAt,
       ),
       applyAmountToFuture: true,
+      sourceType: transaction.sourceType,
+      parseConfidence: transaction.parseConfidence,
     }
+    const editTags = (transaction.tags ?? []).join(", ")
+    const editSplits = store.data.transactionSplits
+      .filter((split) => split.transactionId === transaction.id)
+      .sort((first, second) => first.sortOrder - second.sortOrder)
+      .map((split) => ({
+        categoryId: split.categoryId,
+        amount: String(split.amount),
+      }))
     initialDraftRef.current = editDraft
+    initialTagsRef.current = editTags
+    initialSplitsRef.current = editSplits
     setEditing(transaction)
     setCopySource(null)
     setDraft(editDraft)
+    setReceiptWarnings([])
+    setTagsInput(editTags)
+    setSplits(editSplits)
     setAdding(true)
     store.setTransactionEditorDirty(false)
     store.setTransactionEditorOpen(true)
@@ -223,7 +318,10 @@ export const TransactionPanel = observer(function TransactionPanel() {
     const validCategories = store.currentCategories.filter((category) =>
       category.usageTypes.includes(transaction.type as CategoryUsageType),
     )
-    const fallbackCategoryId = validCategories[0]?.id
+    const fallbackCategoryId = findOtherCategory(
+      validCategories,
+      store.selectedLedgerId,
+    )?.id
     const copyDraft = createCopiedTransactionDraft({
       transaction,
       fallbackCategoryId,
@@ -241,12 +339,58 @@ export const TransactionPanel = observer(function TransactionPanel() {
     })
 
     initialDraftRef.current = copyDraft
+    const copyTags = (transaction.tags ?? []).join(", ")
+    initialTagsRef.current = copyTags
+    initialSplitsRef.current = []
     setEditing(null)
     setCopySource(transaction)
     setDraft(copyDraft)
+    setReceiptWarnings([])
+    setTagsInput(copyTags)
+    setSplits([])
     setAdding(true)
     store.setTransactionEditorDirty(false)
     store.setTransactionEditorOpen(true)
+  }
+
+  function applyReceipt(result: ReceiptParseResult) {
+    const category =
+      store.expenseCategories.find(
+        (item) =>
+          item.name.toLowerCase() === result.categoryHint?.toLowerCase(),
+      ) ?? findOtherCategory(store.expenseCategories, store.selectedLedgerId)
+    const paymentMethod = result.paymentLast4
+      ? store.currentPaymentMethods.find(
+          (item) => item.last4 === result.paymentLast4,
+        )
+      : undefined
+    const nextDraft: TransactionEditorDraft = {
+      ...initialDraft,
+      amount: String(result.amount),
+      merchantName: result.merchantName,
+      memo: result.memo ?? "",
+      categoryId: category?.id ?? "",
+      paymentMethodId: paymentMethod?.id ?? initialDraft.paymentMethodId,
+      transactionAt: getDateTimeLocalValue(result.transactionAt),
+      sourceType: "receipt_ai",
+      parseConfidence: result.confidence,
+    }
+    initialDraftRef.current = nextDraft
+    initialTagsRef.current = ""
+    initialSplitsRef.current = []
+    setEditing(null)
+    setCopySource(null)
+    setDraft(nextDraft)
+    setReceiptWarnings(result.warnings)
+    setTagsInput("")
+    setSplits([])
+    setAdding(true)
+    store.setTransactionEditorDirty(false)
+    store.setTransactionEditorOpen(true)
+    store.notify(
+      "영수증을 읽었습니다. 금액과 거래일을 확인한 뒤 저장해 주세요.",
+      "info",
+    )
   }
 
   function closeForm() {
@@ -271,7 +415,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
         id: editing?.id,
         ledgerId: store.selectedLedgerId,
         type: draft.type as Transaction["type"],
-        status: draft.status as "pending" | "confirmed" | "excluded",
+        status: draft.status,
         amount,
         transactionAt: draft.transactionAt,
         categoryId: draft.categoryId || undefined,
@@ -296,6 +440,16 @@ export const TransactionPanel = observer(function TransactionPanel() {
             ? draft.installmentAmountType
             : undefined,
         applyAmountToFuture: draft.applyAmountToFuture,
+        sourceType: draft.sourceType,
+        parseConfidence: draft.parseConfidence,
+        tags: tagsInput
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        splits: splits.map((split) => ({
+          categoryId: split.categoryId,
+          amount: Number(split.amount),
+        })),
       })
       if (saved) {
         closeForm()
@@ -341,6 +495,13 @@ export const TransactionPanel = observer(function TransactionPanel() {
         </HeaderActions>
       </PanelTop>
 
+      <ReceiptImportArea>
+        <ReceiptImporter
+          disabled={!store.authUser || !store.selectedLedgerId}
+          onApply={applyReceipt}
+        />
+      </ReceiptImportArea>
+
       {isAdding && store.transactionEditorOpen ? (
         <Editor ref={editorRef}>
           <EditorHeader>
@@ -366,6 +527,19 @@ export const TransactionPanel = observer(function TransactionPanel() {
             </CopyNotice>
           ) : null}
 
+          {draft.sourceType === "receipt_ai" ? (
+            <ReceiptNotice role="status">
+              <strong>AI가 만든 영수증 초안입니다.</strong>
+              <span>
+                정확도 {Math.round((draft.parseConfidence ?? 0) * 100)}% ·
+                금액, 거래일시, 가맹점을 반드시 확인해 주세요.
+              </span>
+              {receiptWarnings.map((warning) => (
+                <small key={warning}>· {warning}</small>
+              ))}
+            </ReceiptNotice>
+          ) : null}
+
           <TwoColumns>
             <Field>
               <span>
@@ -377,6 +551,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 disabled={isEditingInstallment}
                 onChange={(event) => {
                   const type = event.target.value as Transaction["type"]
+                  setSplits([])
                   setDraft({
                     ...draft,
                     type,
@@ -424,7 +599,6 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 }
               >
                 <option value="confirmed">확정</option>
-                <option value="pending">대기</option>
                 <option value="excluded">제외</option>
               </Select>
             </Field>
@@ -439,6 +613,10 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 onChange={(event) => {
                   const recurringType = event.target
                     .value as TransactionEditorDraft["recurringType"]
+                  if (recurringType !== "none") {
+                    setSplits([])
+                    setTagsInput("")
+                  }
                   setDraft({
                     ...draft,
                     recurringType,
@@ -706,11 +884,95 @@ export const TransactionPanel = observer(function TransactionPanel() {
               <option value="">기본 카테고리 자동 적용</option>
               {selectableCategories.map((category) => (
                 <option key={category.id} value={category.id}>
-                  {category.name}
+                  {categoryLabel(category.id)}
                 </option>
               ))}
             </Select>
           </Field>
+
+          {draft.recurringType === "none" ? (
+            <SplitSection>
+              <SplitHeader>
+                <span>
+                  <strong>카테고리 분할</strong>
+                  <small>여러 항목을 한 번에 결제했을 때 사용합니다.</small>
+                </span>
+                <Button
+                  type="button"
+                  disabled={splits.length >= 10 || selectableCategories.length === 0}
+                  onClick={() =>
+                    setSplits([
+                      ...splits,
+                      {
+                        categoryId:
+                          draft.categoryId || selectableCategories[0]?.id || "",
+                        amount: "",
+                      },
+                    ])
+                  }
+                >
+                  <ListPlus size={14} /> 항목 추가
+                </Button>
+              </SplitHeader>
+              {splits.map((split, index) => (
+                <SplitRow key={`${index}-${split.categoryId}`}>
+                  <Select
+                    aria-label={`분할 ${index + 1} 카테고리`}
+                    value={split.categoryId}
+                    onChange={(event) =>
+                      setSplits(
+                        splits.map((item, itemIndex) =>
+                          itemIndex === index
+                            ? { ...item, categoryId: event.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  >
+                    {selectableCategories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {categoryLabel(category.id)}
+                      </option>
+                    ))}
+                  </Select>
+                  <Input
+                    aria-label={`분할 ${index + 1} 금액`}
+                    inputMode="numeric"
+                    value={formatMoneyInput(split.amount)}
+                    onChange={(event) =>
+                      setSplits(
+                        splits.map((item, itemIndex) =>
+                          itemIndex === index
+                            ? {
+                                ...item,
+                                amount: event.target.value.replace(/\D/g, ""),
+                              }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <IconButton
+                    type="button"
+                    title={`분할 ${index + 1} 삭제`}
+                    onClick={() =>
+                      setSplits(
+                        splits.filter((_, itemIndex) => itemIndex !== index),
+                      )
+                    }
+                  >
+                    <X size={15} />
+                  </IconButton>
+                </SplitRow>
+              ))}
+              {splits.length > 0 ? (
+                <SplitSummary $valid={splitsValid}>
+                  합계 {formatKrw(splitTotal)} / 거래 금액 {formatKrw(amount || 0)}
+                  {!splitsValid ? " · 합계와 거래 금액을 맞춰 주세요." : ""}
+                </SplitSummary>
+              ) : null}
+            </SplitSection>
+          ) : null}
 
           <Field>
             가맹점/내용
@@ -731,6 +993,26 @@ export const TransactionPanel = observer(function TransactionPanel() {
               }
             />
           </Field>
+
+          {draft.recurringType === "none" ? (
+            <Field>
+              태그
+              <Input
+                value={tagsInput}
+                maxLength={219}
+                placeholder="예: 여행, 공동구매 (쉼표로 구분)"
+                onChange={(event) => setTagsInput(event.target.value)}
+              />
+              <FieldHint>태그는 20자 이내로 최대 10개까지 저장됩니다.</FieldHint>
+            </Field>
+          ) : null}
+
+          {possibleDuplicates.length > 0 ? (
+            <DuplicateNotice role="alert">
+              같은 금액·가맹점·15분 이내 거래가 {possibleDuplicates.length}건
+              있습니다. 중복 등록인지 확인해 주세요.
+            </DuplicateNotice>
+          ) : null}
 
           <Button
             $variant="primary"
@@ -799,6 +1081,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
                               transaction={transaction}
                               category={category}
                               paymentMethod={paymentMethod}
+                              splitCount={
+                                store.data.transactionSplits.filter(
+                                  (split) =>
+                                    split.transactionId === transaction.id,
+                                ).length
+                              }
                             />
                             <Amount $type={transaction.type}>
                               {formatKrw(transaction.amount)}
@@ -892,7 +1180,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
               store.calendarSelectedDateTransactions
                 .filter(
                   (item) =>
-                    item.type === "expense" && item.status !== "excluded",
+                    item.type === "expense" && item.status === "confirmed",
                 )
                 .reduce((sum, item) => sum + item.amount, 0),
             )}
@@ -905,7 +1193,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
               store.calendarSelectedDateTransactions
                 .filter(
                   (item) =>
-                    item.type === "income" && item.status !== "excluded",
+                    item.type === "income" && item.status === "confirmed",
                 )
                 .reduce((sum, item) => sum + item.amount, 0),
             )}
@@ -918,7 +1206,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
               store.calendarSelectedDateTransactions
                 .filter(
                   (item) =>
-                    item.type === "saving" && item.status !== "excluded",
+                    item.type === "saving" && item.status === "confirmed",
                 )
                 .reduce((sum, item) => sum + item.amount, 0),
             )}
@@ -929,7 +1217,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           <strong>
             {formatKrw(
               store.calendarSelectedDateTransactions
-                .filter((item) => item.status !== "excluded")
+                .filter((item) => item.status === "confirmed")
                 .reduce(
                   (sum, item) =>
                     sum +
@@ -994,6 +1282,14 @@ const HeaderActions = styled.div`
   gap: 7px;
 `
 
+const ReceiptImportArea = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  margin: -3px 0 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid ${colors.border};
+`
+
 const GroupingControl = styled.label`
   min-height: 34px;
   display: inline-flex;
@@ -1001,7 +1297,7 @@ const GroupingControl = styled.label`
   gap: 6px;
   border: 1px solid ${colors.border};
   border-radius: ${radii.sm};
-  background: #fff;
+  background: ${colors.panel};
   color: ${colors.muted};
   padding: 0 5px 0 7px;
   font-size: 11px;
@@ -1074,6 +1370,31 @@ const CopyNotice = styled.div`
   }
 `
 
+const ReceiptNotice = styled.div`
+  display: grid;
+  gap: 3px;
+  border: 1px solid ${colors.teal};
+  border-radius: ${radii.sm};
+  background: ${colors.tealSoft};
+  color: ${colors.ink};
+  padding: 10px 11px;
+  font-size: 11px;
+
+  span,
+  small {
+    color: ${colors.muted};
+  }
+`
+
+const DuplicateNotice = styled.div`
+  border: 1px solid ${colors.amber};
+  border-radius: ${radii.sm};
+  background: ${colors.amberSoft};
+  color: ${colors.amber};
+  padding: 10px 11px;
+  font-size: 11px;
+`
+
 const EditorHeader = styled.div`
   display: flex;
   align-items: center;
@@ -1099,6 +1420,50 @@ const DateTimeInputs = styled.div`
   gap: 8px;
 `
 
+const SplitSection = styled.section`
+  display: grid;
+  gap: 8px;
+  border: 1px solid ${colors.border};
+  border-radius: ${radii.sm};
+  background: ${colors.panel};
+  padding: 10px;
+`
+
+const SplitHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  > span {
+    display: grid;
+    gap: 2px;
+  }
+
+  small {
+    color: ${colors.muted};
+    font-size: 10px;
+  }
+`
+
+const SplitRow = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 34px;
+  gap: 7px;
+`
+
+const SplitSummary = styled.small<{ $valid: boolean }>`
+  color: ${({ $valid }) => ($valid ? colors.muted : colors.coral)};
+  font-size: 11px;
+  font-weight: ${({ $valid }) => ($valid ? 500 : 700)};
+`
+
+const FieldHint = styled.small`
+  color: ${colors.muted};
+  font-size: 10px;
+  font-weight: 400;
+`
+
 const InstallmentPreview = styled.small`
   color: ${colors.muted};
   font-size: 11px;
@@ -1112,7 +1477,8 @@ const FutureAmountScope = styled.label<{ $checked: boolean }>`
   border: 1px solid
     ${({ $checked }) => ($checked ? colors.focus : colors.border)};
   border-radius: ${radii.sm};
-  background: ${({ $checked }) => ($checked ? colors.tealSoft : "#fff")};
+  background: ${({ $checked }) =>
+    $checked ? colors.tealSoft : colors.panel};
   color: ${colors.ink};
   padding: 10px 11px;
   cursor: pointer;
@@ -1200,7 +1566,7 @@ const TransactionGroupHeader = styled.div`
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid ${colors.borderStrong};
-  background: #fff;
+  background: ${colors.panel};
   color: ${colors.ink};
   padding: 7px 9px 7px 18px;
   font-size: 11px;

@@ -6,7 +6,11 @@ import type {
   Ledger,
   LedgerInvitation,
   LedgerMember,
+  LedgerMemberEvent,
+  LedgerMonthNote,
+  LedgerRole,
   LedgerType,
+  LegalConsent,
   PaymentMethod,
   PaymentInstrument,
   Profile,
@@ -14,6 +18,7 @@ import type {
   Transaction,
   TransactionSourceType,
   TransactionStatus,
+  TransactionSplit,
   TransactionType,
 } from "@salimon/types"
 import type { FinanceData } from "./financeData"
@@ -41,6 +46,8 @@ export interface RemoteTransactionInput {
   installmentAmountType?: "monthly" | "principal"
   paymentMethodId?: string
   applyAmountToFuture?: boolean
+  tags?: string[]
+  splits?: Array<{ categoryId: string; amount: number }>
 }
 
 export interface RemoteSampleInput {
@@ -70,6 +77,7 @@ export class SupabaseFinanceRepository {
       profileResult,
       ledgersResult,
       membersResult,
+      memberEventsResult,
       categoriesResult,
       categoryUsagesResult,
       budgetsResult,
@@ -79,6 +87,10 @@ export class SupabaseFinanceRepository {
       transactionsResult,
       invitationsResult,
       samplesResult,
+      deletionRequestResult,
+      legalConsentResult,
+      monthNotesResult,
+      transactionSplitsResult,
     ] = await Promise.all([
       client
         .from("profiles")
@@ -95,12 +107,18 @@ export class SupabaseFinanceRepository {
         .select(
           "id, ledger_id, user_id, nickname, role, status, is_default, joined_at",
         )
-        .eq("status", "active")
         .order("joined_at"),
+      client
+        .from("ledger_member_events")
+        .select(
+          "id, ledger_id, actor_user_id, target_user_id, action, previous_role, next_role, created_at",
+        )
+        .order("created_at", { ascending: false })
+        .limit(200),
       client
         .from("categories")
         .select(
-          "id, ledger_id, created_by, type, name, icon, color, sort_order, is_default, is_archived",
+          "id, ledger_id, created_by, type, name, icon, color, sort_order, is_default, is_archived, parent_category_id",
         )
         .order("sort_order"),
       client.from("category_usage_types").select("category_id, usage_type"),
@@ -130,13 +148,7 @@ export class SupabaseFinanceRepository {
         )
         .in("type", ["card", "bank"])
         .order("created_at"),
-      client
-        .from("transactions")
-        .select(
-          "id, ledger_id, created_by, updated_by, actor_user_id, type, status, amount, currency, transaction_at, category_id, payment_method_id, merchant_name, memo, source_type, source_app, source_sender, source_hash, parse_confidence, recurring_rule_id, recurring_type, installment_number, installment_total, created_at, updated_at, deleted_at",
-        )
-        .is("deleted_at", null)
-        .order("transaction_at", { ascending: false }),
+      fetchAllTransactionRows(client),
       client
         .from("ledger_invitations")
         .select(
@@ -149,12 +161,26 @@ export class SupabaseFinanceRepository {
           "id, submitted_by, card_company_name, masked_message, expected_amount, expected_merchant_name, expected_transaction_at, parse_result, consent_version, status, created_at",
         )
         .order("created_at", { ascending: false }),
+      client
+        .from("account_deletion_requests")
+        .select("user_id, requested_at, purge_after")
+        .maybeSingle(),
+      client
+        .from("legal_consents")
+        .select("user_id, terms_version, privacy_version, accepted_at")
+        .maybeSingle(),
+      client
+        .from("ledger_month_notes")
+        .select("id, ledger_id, month, note, updated_by, updated_at")
+        .order("month", { ascending: false }),
+      fetchAllTransactionSplitRows(client),
     ])
 
     const results = [
       profileResult,
       ledgersResult,
       membersResult,
+      memberEventsResult,
       categoriesResult,
       categoryUsagesResult,
       budgetsResult,
@@ -164,6 +190,10 @@ export class SupabaseFinanceRepository {
       transactionsResult,
       invitationsResult,
       samplesResult,
+      deletionRequestResult,
+      legalConsentResult,
+      monthNotesResult,
+      transactionSplitsResult,
     ]
     const failed = results.find((result) => result.error)
     if (failed?.error) {
@@ -191,6 +221,9 @@ export class SupabaseFinanceRepository {
         mapLedger(row, members, userId),
       ),
       members,
+      memberEvents: ((memberEventsResult.data ?? []) as Row[]).map(
+        mapMemberEvent,
+      ),
       invitations: ((invitationsResult.data ?? []) as Row[]).map(mapInvitation),
       categories: ((categoriesResult.data ?? []) as Row[]).map((row) =>
         mapCategory(row, categoryUsages.get(stringValue(row.id))),
@@ -198,6 +231,7 @@ export class SupabaseFinanceRepository {
       categoryBudgets: ((budgetsResult.data ?? []) as Row[]).map(
         mapCategoryBudget,
       ),
+      monthNotes: ((monthNotesResult.data ?? []) as Row[]).map(mapMonthNote),
       recurringRules: ((rulesResult.data ?? []) as Row[]).map(mapRecurringRule),
       paymentMethods: ((paymentMethodsResult.data ?? []) as Row[]).map(
         mapPaymentMethod,
@@ -208,8 +242,25 @@ export class SupabaseFinanceRepository {
       transactions: ((transactionsResult.data ?? []) as Row[]).map(
         mapTransaction,
       ),
+      transactionSplits: ((transactionSplitsResult.data ?? []) as Row[]).map(
+        mapTransactionSplit,
+      ),
       smsCandidates: [],
       cardMessageSamples: ((samplesResult.data ?? []) as Row[]).map(mapSample),
+      accountDeletionRequest: deletionRequestResult.data
+        ? {
+            userId: stringValue((deletionRequestResult.data as Row).user_id),
+            requestedAt: stringValue(
+              (deletionRequestResult.data as Row).requested_at,
+            ),
+            purgeAfter: stringValue(
+              (deletionRequestResult.data as Row).purge_after,
+            ),
+          }
+        : undefined,
+      legalConsent: legalConsentResult.data
+        ? mapLegalConsent(legalConsentResult.data as Row)
+        : undefined,
     }
   }
 
@@ -232,6 +283,7 @@ export class SupabaseFinanceRepository {
       source_type: input.sourceType ?? "manual",
       source_hash: input.sourceHash ?? null,
       parse_confidence: input.parseConfidence ?? null,
+      tags: input.tags ?? [],
       updated_by: userId,
       updated_at: new Date().toISOString(),
     }
@@ -258,7 +310,18 @@ export class SupabaseFinanceRepository {
         },
       )
       throwIfError(error)
-      return typeof data === "string" ? data : undefined
+      const transactionId = typeof data === "string" ? data : input.id
+      if (input.tags !== undefined) {
+        const { error: tagError } = await client
+          .from("transactions")
+          .update({ tags: input.tags })
+          .eq("id", transactionId)
+        throwIfError(tagError)
+      }
+      if (input.splits !== undefined) {
+        await this.replaceTransactionSplits(transactionId, input.splits)
+      }
+      return transactionId
     }
 
     if (input.recurringType === "installment") {
@@ -313,8 +376,76 @@ export class SupabaseFinanceRepository {
     const result = await client
       .from("transactions")
       .insert({ ...payload, created_by: userId })
+      .select("id")
+      .single()
     throwIfError(result.error)
-    return undefined
+    const transactionId =
+      result.data && typeof result.data.id === "string"
+        ? result.data.id
+        : undefined
+    if (transactionId && input.splits !== undefined) {
+      await this.replaceTransactionSplits(transactionId, input.splits)
+    }
+    return transactionId
+  }
+
+  private async replaceTransactionSplits(
+    transactionId: string,
+    splits: Array<{ categoryId: string; amount: number }>,
+  ): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("replace_transaction_splits", {
+      p_transaction_id: transactionId,
+      p_splits: splits.map((split) => ({
+        categoryId: split.categoryId,
+        amount: split.amount,
+      })),
+    })
+    throwIfError(error)
+  }
+
+  async importTransactions(
+    userId: string,
+    ledgerId: string,
+    transactions: Array<
+      Pick<
+        Transaction,
+        | "type"
+        | "status"
+        | "amount"
+        | "transactionAt"
+        | "categoryId"
+        | "paymentMethodId"
+        | "merchantName"
+        | "memo"
+        | "actorUserId"
+        | "tags"
+      >
+    >,
+  ): Promise<void> {
+    const client = requireSupabaseClient()
+    const rows = transactions.map((transaction) => ({
+      ledger_id: ledgerId,
+      created_by: userId,
+      updated_by: userId,
+      type: transaction.type,
+      status: transaction.status,
+      amount: transaction.amount,
+      transaction_at: transaction.transactionAt,
+      category_id: transaction.categoryId ?? null,
+      payment_method_id: transaction.paymentMethodId ?? null,
+      merchant_name: transaction.merchantName ?? null,
+      memo: transaction.memo ?? null,
+      actor_user_id: transaction.actorUserId ?? null,
+      source_type: "import",
+      tags: transaction.tags ?? [],
+    }))
+    for (let index = 0; index < rows.length; index += 200) {
+      const { error } = await client
+        .from("transactions")
+        .insert(rows.slice(index, index + 200))
+      throwIfError(error)
+    }
   }
 
   async materializeMonth(month: string): Promise<void> {
@@ -338,6 +469,29 @@ export class SupabaseFinanceRepository {
       p_category_id: input.categoryId,
       p_effective_month: `${input.month}-01`,
       p_amount: input.amount,
+    })
+    throwIfError(error)
+  }
+
+  async saveMonthNote(
+    ledgerId: string,
+    month: string,
+    note: string,
+    existingId?: string,
+  ): Promise<void> {
+    const client = requireSupabaseClient()
+    if (existingId) {
+      const { error } = await client
+        .from("ledger_month_notes")
+        .update({ note })
+        .eq("id", existingId)
+      throwIfError(error)
+      return
+    }
+    const { error } = await client.from("ledger_month_notes").insert({
+      ledger_id: ledgerId,
+      month: `${month}-01`,
+      note,
     })
     throwIfError(error)
   }
@@ -584,6 +738,7 @@ export class SupabaseFinanceRepository {
     color: string
     sortOrder: number
     usageTypes: CategoryUsageType[]
+    parentCategoryId?: string
   }): Promise<string> {
     const client = requireSupabaseClient()
     const { data, error } = await client
@@ -597,6 +752,7 @@ export class SupabaseFinanceRepository {
         color: input.color,
         sort_order: input.sortOrder,
         is_default: false,
+        parent_category_id: input.parentCategoryId ?? null,
       })
       .select("id")
       .single()
@@ -611,7 +767,15 @@ export class SupabaseFinanceRepository {
   async updateCategory(
     categoryId: string,
     patch: Partial<
-      Pick<Category, "name" | "icon" | "color" | "isArchived" | "usageTypes">
+      Pick<
+        Category,
+        | "name"
+        | "icon"
+        | "color"
+        | "isArchived"
+        | "usageTypes"
+        | "parentCategoryId"
+      >
     >,
   ): Promise<void> {
     const client = requireSupabaseClient()
@@ -622,6 +786,9 @@ export class SupabaseFinanceRepository {
     if (patch.icon !== undefined) payload.icon = patch.icon
     if (patch.color !== undefined) payload.color = patch.color
     if (patch.isArchived !== undefined) payload.is_archived = patch.isArchived
+    if (patch.parentCategoryId !== undefined) {
+      payload.parent_category_id = patch.parentCategoryId || null
+    }
 
     const { error } = await client
       .from("categories")
@@ -731,10 +898,14 @@ export class SupabaseFinanceRepository {
     throwIfError(error)
   }
 
-  async createInvite(ledgerId: string): Promise<CreatedLedgerInvitation> {
+  async createInvite(
+    ledgerId: string,
+    roleToGrant: Exclude<LedgerRole, "owner">,
+  ): Promise<CreatedLedgerInvitation> {
     const client = requireSupabaseClient()
     const { data, error } = await client.rpc("create_ledger_invite", {
       p_ledger_id: ledgerId,
+      p_role_to_grant: roleToGrant,
     })
     throwIfError(error)
     if (!data || typeof data !== "object") {
@@ -753,6 +924,44 @@ export class SupabaseFinanceRepository {
       inviteCode: result.inviteCode,
       expiresAt: result.expiresAt,
     }
+  }
+
+  async updateLedgerMemberRole(
+    ledgerId: string,
+    targetUserId: string,
+    role: Exclude<LedgerRole, "owner">,
+  ): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("update_ledger_member_role", {
+      p_ledger_id: ledgerId,
+      p_target_user_id: targetUserId,
+      p_role: role,
+    })
+    throwIfError(error)
+  }
+
+  async removeLedgerMember(
+    ledgerId: string,
+    targetUserId: string,
+  ): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("remove_ledger_member", {
+      p_ledger_id: ledgerId,
+      p_target_user_id: targetUserId,
+    })
+    throwIfError(error)
+  }
+
+  async transferLedgerOwnership(
+    ledgerId: string,
+    targetUserId: string,
+  ): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("transfer_ledger_ownership", {
+      p_ledger_id: ledgerId,
+      p_target_user_id: targetUserId,
+    })
+    throwIfError(error)
   }
 
   async acceptInvite(inviteCode: string): Promise<AcceptLedgerInviteResult> {
@@ -817,6 +1026,38 @@ export class SupabaseFinanceRepository {
     })
     throwIfError(error)
   }
+
+  async requestAccountDeletion(): Promise<string> {
+    const client = requireSupabaseClient()
+    const { data, error } = await client.rpc("request_account_deletion")
+    throwIfError(error)
+    if (typeof data !== "string") {
+      throw new Error("계정 삭제 일정을 확인하지 못했습니다.")
+    }
+    return data
+  }
+
+  async acceptLegalTerms(
+    termsVersion: string,
+    privacyVersion: string,
+  ): Promise<string> {
+    const client = requireSupabaseClient()
+    const { data, error } = await client.rpc("accept_current_legal_terms", {
+      p_terms_version: termsVersion,
+      p_privacy_version: privacyVersion,
+    })
+    throwIfError(error)
+    if (typeof data !== "string") {
+      throw new Error("약관 동의 기록을 확인하지 못했습니다.")
+    }
+    return data
+  }
+
+  async cancelAccountDeletion(): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("cancel_account_deletion")
+    throwIfError(error)
+  }
 }
 
 function requireSupabaseClient() {
@@ -826,6 +1067,47 @@ function requireSupabaseClient() {
   }
 
   return client
+}
+
+const DATABASE_PAGE_SIZE = 500
+
+async function fetchAllTransactionRows(
+  client: ReturnType<typeof requireSupabaseClient>,
+): Promise<{ data: Row[] | null; error: unknown }> {
+  const rows: Row[] = []
+  for (let from = 0; ; from += DATABASE_PAGE_SIZE) {
+    const { data, error } = await client
+      .from("transactions")
+      .select(
+        "id, ledger_id, created_by, updated_by, actor_user_id, type, status, amount, currency, transaction_at, category_id, payment_method_id, merchant_name, memo, source_type, source_app, source_sender, source_hash, parse_confidence, recurring_rule_id, recurring_type, installment_number, installment_total, created_at, updated_at, deleted_at, tags",
+      )
+      .is("deleted_at", null)
+      .order("transaction_at", { ascending: false })
+      .order("id")
+      .range(from, from + DATABASE_PAGE_SIZE - 1)
+    if (error) return { data: null, error }
+    rows.push(...((data ?? []) as Row[]))
+    if ((data?.length ?? 0) < DATABASE_PAGE_SIZE) break
+  }
+  return { data: rows, error: null }
+}
+
+async function fetchAllTransactionSplitRows(
+  client: ReturnType<typeof requireSupabaseClient>,
+): Promise<{ data: Row[] | null; error: unknown }> {
+  const rows: Row[] = []
+  for (let from = 0; ; from += DATABASE_PAGE_SIZE) {
+    const { data, error } = await client
+      .from("transaction_splits")
+      .select("id, transaction_id, category_id, amount, sort_order")
+      .order("transaction_id")
+      .order("sort_order")
+      .range(from, from + DATABASE_PAGE_SIZE - 1)
+    if (error) return { data: null, error }
+    rows.push(...((data ?? []) as Row[]))
+    if ((data?.length ?? 0) < DATABASE_PAGE_SIZE) break
+  }
+  return { data: rows, error: null }
 }
 
 function throwIfError(error: { message: string } | null): void {
@@ -890,6 +1172,23 @@ function mapInvitation(row: Row): LedgerInvitation {
   }
 }
 
+function mapMemberEvent(row: Row): LedgerMemberEvent {
+  const action = stringValue(row.action)
+  return {
+    id: stringValue(row.id),
+    ledgerId: stringValue(row.ledger_id),
+    actorUserId: optionalString(row.actor_user_id),
+    targetUserId: optionalString(row.target_user_id),
+    action:
+      action === "removed" || action === "ownership_transferred"
+        ? action
+        : "role_changed",
+    previousRole: optionalLedgerRole(row.previous_role),
+    nextRole: optionalLedgerRole(row.next_role),
+    createdAt: stringValue(row.created_at),
+  }
+}
+
 function mapCategory(row: Row, usageTypes?: CategoryUsageType[]): Category {
   const type = mapTransactionType(row.type)
   return {
@@ -907,6 +1206,7 @@ function mapCategory(row: Row, usageTypes?: CategoryUsageType[]): Category {
     sortOrder: numberValue(row.sort_order),
     isDefault: Boolean(row.is_default),
     isArchived: Boolean(row.is_archived),
+    parentCategoryId: optionalString(row.parent_category_id),
   }
 }
 
@@ -927,11 +1227,31 @@ function mapCategoryBudget(row: Row): CategoryBudget {
   }
 }
 
+function mapMonthNote(row: Row): LedgerMonthNote {
+  return {
+    id: stringValue(row.id),
+    ledgerId: stringValue(row.ledger_id),
+    month: stringValue(row.month).slice(0, 7),
+    note: optionalString(row.note) ?? "",
+    updatedBy: optionalString(row.updated_by),
+    updatedAt: stringValue(row.updated_at),
+  }
+}
+
+function mapLegalConsent(row: Row): LegalConsent {
+  return {
+    userId: stringValue(row.user_id),
+    termsVersion: stringValue(row.terms_version),
+    privacyVersion: stringValue(row.privacy_version),
+    acceptedAt: stringValue(row.accepted_at),
+  }
+}
+
 function mapRecurringRule(row: Row): RecurringRule {
   return {
     id: stringValue(row.id),
     ledgerId: stringValue(row.ledger_id),
-    createdBy: stringValue(row.created_by),
+    createdBy: optionalString(row.created_by),
     type: row.rule_type === "installment" ? "installment" : "fixed",
     amount: numberValue(row.amount),
     dayOfMonth: numberValue(row.day_of_month),
@@ -1015,7 +1335,7 @@ function mapTransaction(row: Row): Transaction {
   return {
     id: stringValue(row.id),
     ledgerId: stringValue(row.ledger_id),
-    createdBy: stringValue(row.created_by),
+    createdBy: optionalString(row.created_by),
     updatedBy: optionalString(row.updated_by),
     actorUserId: optionalString(row.actor_user_id),
     type: mapTransactionType(row.type),
@@ -1051,6 +1371,19 @@ function mapTransaction(row: Row): Transaction {
     createdAt: stringValue(row.created_at),
     updatedAt: stringValue(row.updated_at),
     deletedAt: optionalString(row.deleted_at),
+    tags: Array.isArray(row.tags)
+      ? row.tags.filter((tag): tag is string => typeof tag === "string")
+      : [],
+  }
+}
+
+function mapTransactionSplit(row: Row): TransactionSplit {
+  return {
+    id: stringValue(row.id),
+    transactionId: stringValue(row.transaction_id),
+    categoryId: stringValue(row.category_id),
+    amount: numberValue(row.amount),
+    sortOrder: numberValue(row.sort_order),
   }
 }
 
@@ -1092,18 +1425,28 @@ function mapRole(value: unknown): Ledger["role"] {
     : "member"
 }
 
+function optionalLedgerRole(value: unknown): LedgerRole | undefined {
+  return value === "owner" ||
+    value === "admin" ||
+    value === "member" ||
+    value === "viewer"
+    ? value
+    : undefined
+}
+
 function mapTransactionType(value: unknown): TransactionType {
   return value === "income" || value === "saving" ? value : "expense"
 }
 
 function mapTransactionStatus(value: unknown): TransactionStatus {
-  return value === "pending" || value === "excluded" ? value : "confirmed"
+  return value === "excluded" ? value : "confirmed"
 }
 
 function mapSourceType(value: unknown): TransactionSourceType {
   return value === "android_sms_notification" ||
     value === "paste" ||
-    value === "import"
+    value === "import" ||
+    value === "receipt_ai"
     ? value
     : "manual"
 }

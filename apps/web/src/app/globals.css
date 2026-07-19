@@ -4,6 +4,68 @@
   --surface: #ffffff;
   --border: #e4e4e7;
   --focus: #2563eb;
+  --color-ink: #18181b;
+  --color-muted: #71717a;
+  --color-subtle: #a1a1aa;
+  --color-canvas: #f8f8f9;
+  --color-panel: #ffffff;
+  --color-panel-subtle: #fafafa;
+  --color-sidebar: #fbfbfc;
+  --color-border: #e4e4e7;
+  --color-border-strong: #d4d4d8;
+  --color-focus: #2563eb;
+  --color-teal: #0f766e;
+  --color-teal-soft: #f0fdfa;
+  --color-green: #15803d;
+  --color-green-soft: #f0fdf4;
+  --color-coral: #dc2626;
+  --color-coral-soft: #fef2f2;
+  --color-amber: #d97706;
+  --color-amber-soft: #fffbeb;
+  --color-violet: #7c3aed;
+  --color-violet-soft: #f5f3ff;
+  --color-blue: #2563eb;
+  --color-blue-soft: #f0f9ff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #111113;
+    --foreground: #f4f4f5;
+    --surface: #18181b;
+    --border: #3f3f46;
+    --color-ink: #f4f4f5;
+    --color-muted: #a1a1aa;
+    --color-subtle: #71717a;
+    --color-canvas: #111113;
+    --color-panel: #18181b;
+    --color-panel-subtle: #202024;
+    --color-sidebar: #161619;
+    --color-border: #3f3f46;
+    --color-border-strong: #52525b;
+    --color-focus: #60a5fa;
+    --color-teal: #5eead4;
+    --color-teal-soft: #123b37;
+    --color-green: #4ade80;
+    --color-green-soft: #12351f;
+    --color-coral: #f87171;
+    --color-coral-soft: #3f1d22;
+    --color-amber: #fbbf24;
+    --color-amber-soft: #422f10;
+    --color-violet: #c4b5fd;
+    --color-violet-soft: #30234f;
+    --color-blue: #93c5fd;
+    --color-blue-soft: #172e4d;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  .legal-card p,
+  .legal-card li {
+    color: #d4d4d8;
+  }
 }
 
 * {
@@ -66,4 +128,55 @@ a {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+.legal-page {
+  min-height: 100dvh;
+  padding: 40px 18px;
+  background: var(--background);
+}
+
+.legal-card {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: clamp(22px, 5vw, 48px);
+  box-shadow: 0 18px 50px rgb(15 23 42 / 6%);
+}
+
+.legal-card h1 {
+  margin: 22px 0 4px;
+  font-size: clamp(26px, 5vw, 38px);
+}
+
+.legal-card h2 {
+  margin: 30px 0 10px;
+  font-size: 17px;
+}
+
+.legal-card p,
+.legal-card li {
+  color: #52525b;
+  line-height: 1.75;
+}
+
+.legal-card ul {
+  padding-left: 21px;
+}
+
+.legal-card a {
+  color: #0f766e;
+}
+
+.legal-back {
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.legal-effective {
+  margin-top: 0;
+  color: #71717a;
+  font-size: 12px;
 }

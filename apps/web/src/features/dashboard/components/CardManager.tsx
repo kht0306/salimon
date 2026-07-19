@@ -44,7 +44,7 @@ export const CardManager = observer(function CardManager() {
   const [issuer, setIssuer] = useState(issuers[0])
   const [name, setName] = useState("")
   const [last4, setLast4] = useState("")
-  const [ownerUserId, setOwnerUserId] = useState(store.authUser?.id ?? "")
+  const ownerUserId = store.authUser?.id ?? ""
   const [paymentDay, setPaymentDay] = useState("")
   const [endDay, setEndDay] = useState("")
   const [endOffset, setEndOffset] = useState<"-1" | "0">("-1")
@@ -57,13 +57,10 @@ export const CardManager = observer(function CardManager() {
   )
   const paymentDayNumber = Number(paymentDay)
   const endDayNumber = Number(endDay)
-  const canKeepPrivate = ownerUserId === store.authUser?.id
   const effectiveVisibility =
     store.currentLedger?.type === "personal"
       ? "private"
-      : canKeepPrivate
-        ? visibility
-        : "ledger"
+      : visibility
   const canSave =
     Boolean(ownerUserId && issuer.trim() && name.trim()) &&
     (!last4 || last4.length === 4) &&
@@ -98,7 +95,6 @@ export const CardManager = observer(function CardManager() {
 
   function resetForm() {
     setSelectedCardId(null)
-    setOwnerUserId(store.authUser?.id ?? "")
     setIssuer(issuers[0])
     setName("")
     setLast4("")
@@ -111,12 +107,12 @@ export const CardManager = observer(function CardManager() {
   }
 
   function selectCard(card: (typeof store.currentLedgerCards)[number]) {
+    if (card.ownerUserId !== store.authUser?.id) return
     if (selectedCardId === card.id) {
       resetForm()
       return
     }
     setSelectedCardId(card.id)
-    setOwnerUserId(card.ownerUserId ?? store.authUser?.id ?? "")
     setIssuer(card.issuer ?? issuers[0])
     setName(card.name)
     setLast4(card.last4 ?? "")
@@ -171,17 +167,15 @@ export const CardManager = observer(function CardManager() {
           <span>
             카드 소유자<RequiredMark>*</RequiredMark>
           </span>
-          <Select
-            required
-            value={ownerUserId}
-            onChange={(event) => setOwnerUserId(event.target.value)}
-          >
-            {store.currentMembers.map((member) => (
-              <option key={member.userId} value={member.userId}>
-                {member.nickname}
-              </option>
-            ))}
-          </Select>
+          <Input
+            value={
+              store.currentMembers.find(
+                (member) => member.userId === store.authUser?.id,
+              )?.nickname ?? "본인"
+            }
+            disabled
+          />
+          <OwnerHelp>본인 소유 카드만 등록·수정할 수 있습니다.</OwnerHelp>
         </Field>
         <Field>
           <span>
@@ -289,7 +283,7 @@ export const CardManager = observer(function CardManager() {
           <input
             type="checkbox"
             checked={effectiveVisibility === "ledger"}
-            disabled={store.currentLedger?.type !== "shared" || !canKeepPrivate}
+            disabled={store.currentLedger?.type !== "shared"}
             onChange={(event) =>
               setVisibility(event.target.checked ? "ledger" : "private")
             }
@@ -298,9 +292,7 @@ export const CardManager = observer(function CardManager() {
           <small>
             {store.currentLedger?.type === "personal"
               ? "개인 가계부에서는 나만 볼 수 있습니다."
-              : canKeepPrivate
-                ? "선택하지 않으면 나만 볼 수 있습니다."
-                : "다른 멤버 소유 카드는 공동으로 등록됩니다."}
+              : "선택하지 않으면 나만 볼 수 있습니다."}
           </small>
         </PrimaryField>
       </Composer>
@@ -334,10 +326,11 @@ export const CardManager = observer(function CardManager() {
                 {memberCards.map((card) => (
                   <Row
                     key={card.id}
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={selectedCardId === card.id}
+                    role={card.ownerUserId === store.authUser?.id ? "button" : undefined}
+                    tabIndex={card.ownerUserId === store.authUser?.id ? 0 : undefined}
+                    aria-pressed={card.ownerUserId === store.authUser?.id ? selectedCardId === card.id : undefined}
                     $selected={selectedCardId === card.id}
+                    $interactive={card.ownerUserId === store.authUser?.id}
                     onClick={() => selectCard(card)}
                     onKeyDown={(event) => {
                       if (event.target !== event.currentTarget) return
@@ -361,6 +354,7 @@ export const CardManager = observer(function CardManager() {
                         {card.visibility === "private" ? " · 나만 보기" : ""}
                       </Meta>
                     </div>
+                    {card.ownerUserId === store.authUser?.id ? (
                     <Actions onClick={(event) => event.stopPropagation()}>
                       {card.isPrimary ? (
                         <PrimaryBadge>
@@ -401,6 +395,7 @@ export const CardManager = observer(function CardManager() {
                         <Trash2 size={14} /> 삭제
                       </Button>
                     </Actions>
+                    ) : <ReadOnlyBadge>공동 공개 · 읽기 전용</ReadOnlyBadge>}
                   </Row>
                 ))}
                 {memberCards.length === 0 ? (
@@ -488,7 +483,7 @@ const Rows = styled.div`
   display: grid;
   padding: 4px 18px 12px;
 `
-const Row = styled.div<{ $selected: boolean }>`
+const Row = styled.div<{ $selected: boolean; $interactive: boolean }>`
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -502,7 +497,7 @@ const Row = styled.div<{ $selected: boolean }>`
   border-radius: 8px;
   background: ${({ $selected }) =>
     $selected ? colors.tealSoft : "transparent"};
-  cursor: pointer;
+  cursor: ${({ $interactive }) => ($interactive ? "pointer" : "default")};
   transition:
     border-color 120ms ease,
     background 120ms ease;
@@ -511,11 +506,24 @@ const Row = styled.div<{ $selected: boolean }>`
     outline: 2px solid ${colors.teal};
     outline-offset: 2px;
   }
+
+  @media (max-width: 760px) {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
 `
 const Meta = styled.div`
   margin-top: 3px;
   color: ${colors.muted};
   font-size: 12px;
+`
+const OwnerHelp = styled.small`
+  color: ${colors.muted};
+  font-weight: 400;
+`
+const ReadOnlyBadge = styled.span`
+  color: ${colors.muted};
+  font-size: 11px;
+  white-space: nowrap;
 `
 const Empty = styled.div`
   padding: 20px 0;
@@ -525,7 +533,13 @@ const Empty = styled.div`
 const Actions = styled.div`
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
+
+  @media (max-width: 760px) {
+    grid-column: 1 / -1;
+  }
 `
 const PrimaryBadge = styled.span`
   min-height: 36px;
@@ -533,9 +547,9 @@ const PrimaryBadge = styled.span`
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border: 1px solid #c4b5fd;
+  border: 1px solid ${colors.violet};
   border-radius: 6px;
-  background: #f5f3ff;
+  background: ${colors.violetSoft};
   color: ${colors.violet};
   padding: 0 12px;
   font-size: 13px;

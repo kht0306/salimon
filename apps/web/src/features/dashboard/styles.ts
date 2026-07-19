@@ -32,11 +32,16 @@ export const Sidebar = styled.aside`
   gap: ${spacing[4]};
 
   @media (max-width: 820px) {
-    position: relative;
+    position: sticky;
+    z-index: 50;
+    top: 0;
     height: auto;
     overflow: visible;
     border-bottom: 1px solid ${colors.border};
     border-right: 0;
+    padding: 10px 12px;
+    gap: 9px;
+    box-shadow: 0 5px 16px rgb(15 23 42 / 6%);
   }
 `
 
@@ -84,6 +89,11 @@ export const PanelHeader = styled.div`
   min-height: 52px;
   padding: 10px ${spacing[4]};
   border-bottom: 1px solid ${colors.border};
+
+  @media (max-width: 620px) {
+    align-items: stretch;
+    flex-direction: column;
+  }
 `
 
 export const PanelTitle = styled.h2`
@@ -105,15 +115,15 @@ export const Button = styled.button<{
   border-radius: ${radii.sm};
   border: 1px solid
     ${({ $variant }) =>
-      $variant === "danger" ? "#fecaca" : colors.borderStrong};
+      $variant === "danger" ? colors.coral : colors.borderStrong};
   background: ${({ $variant }) => {
     if ($variant === "primary") return colors.ink
     if ($variant === "danger") return colors.coralSoft
     if ($variant === "soft") return colors.tealSoft
-    return "#ffffff"
+    return colors.panel
   }};
   color: ${({ $variant }) => {
-    if ($variant === "primary") return "#ffffff"
+    if ($variant === "primary") return colors.panel
     if ($variant === "danger") return colors.coral
     if ($variant === "soft") return colors.teal
     return colors.ink
@@ -130,7 +140,7 @@ export const Button = styled.button<{
   &:hover {
     border-color: ${colors.borderStrong};
     background: ${({ $variant }) =>
-      $variant === "primary" ? "#27272a" : colors.panelSubtle};
+      $variant === "primary" ? colors.muted : colors.panelSubtle};
   }
 
   &:disabled {
@@ -164,7 +174,7 @@ export const Input = styled.input`
   min-height: ${controls.default};
   border-radius: ${radii.sm};
   border: 1px solid ${colors.border};
-  background: #fff;
+  background: ${colors.panel};
   color: ${colors.ink};
   padding: 7px 10px;
   transition:
@@ -184,7 +194,7 @@ export const Select = styled.select`
   min-height: ${controls.default};
   border-radius: ${radii.sm};
   border: 1px solid ${colors.border};
-  background: #fff;
+  background: ${colors.panel};
   color: ${colors.ink};
   padding: 8px 10px;
 
@@ -202,7 +212,7 @@ export const Textarea = styled.textarea`
   resize: vertical;
   border-radius: ${radii.sm};
   border: 1px solid ${colors.border};
-  background: #fff;
+  background: ${colors.panel};
   color: ${colors.ink};
   padding: 8px 10px;
 
@@ -218,6 +228,10 @@ export const MetricRow = styled.div`
   grid-template-columns: minmax(0, 1fr);
   border-top: 1px solid ${colors.border};
   border-bottom: 1px solid ${colors.border};
+
+  @media (max-width: 820px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 `
 
 export const Metric = styled.div`
@@ -226,6 +240,14 @@ export const Metric = styled.div`
 
   & + & {
     border-top: 1px solid ${colors.border};
+  }
+
+  @media (max-width: 820px) {
+    padding: 7px 5px;
+    & + & {
+      border-top: 0;
+      border-left: 1px solid ${colors.border};
+    }
   }
 `
 
@@ -251,4 +273,8 @@ export const MetricValue = styled.div<{
   font-weight: 650;
   line-height: 1.12;
   overflow-wrap: anywhere;
+
+  @media (max-width: 820px) {
+    font-size: 11px;
+  }
 `

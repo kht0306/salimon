@@ -16,6 +16,8 @@ export interface TransactionEditorDraft {
   paymentMethodId: string
   transactionAt: string
   applyAmountToFuture: boolean
+  sourceType: Transaction["sourceType"]
+  parseConfidence?: number
 }
 
 export function createNewTransactionDraft(input: {
@@ -23,7 +25,14 @@ export function createNewTransactionDraft(input: {
   expenseCategoryId?: string
   actorUserId?: string
   primaryPaymentMethodId?: string
+  now?: Date
 }): TransactionEditorDraft {
+  const now = input.now ?? new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+  const time =
+    input.selectedDate === today
+      ? `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
+      : "12:00"
   return {
     amount: "",
     merchantName: "",
@@ -37,8 +46,10 @@ export function createNewTransactionDraft(input: {
     installmentMonths: "2",
     installmentAmountType: "monthly",
     paymentMethodId: input.primaryPaymentMethodId ?? "",
-    transactionAt: `${input.selectedDate}T12:00`,
+    transactionAt: `${input.selectedDate}T${time}`,
     applyAmountToFuture: true,
+    sourceType: "manual",
+    parseConfidence: undefined,
   }
 }
 
@@ -85,6 +96,8 @@ export function createCopiedTransactionDraft(input: {
     paymentMethodId,
     transactionAt: getDateTimeLocalValue(transaction.transactionAt),
     applyAmountToFuture: true,
+    sourceType: "manual",
+    parseConfidence: undefined,
   }
 }
 

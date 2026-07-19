@@ -42,7 +42,7 @@ const banks = [
 
 export const AccountManager = observer(function AccountManager() {
   const store = useAppStore()
-  const [ownerUserId, setOwnerUserId] = useState(store.authUser?.id ?? "")
+  const ownerUserId = store.authUser?.id ?? ""
   const [bank, setBank] = useState(banks[0])
   const [name, setName] = useState("")
   const [last4, setLast4] = useState("")
@@ -53,17 +53,13 @@ export const AccountManager = observer(function AccountManager() {
   const canSave =
     Boolean(ownerUserId && bank.trim() && name.trim()) &&
     (!last4 || last4.length === 4)
-  const canKeepPrivate = ownerUserId === store.authUser?.id
   const effectiveVisibility =
     store.currentLedger?.type === "personal"
       ? "private"
-      : canKeepPrivate
-        ? visibility
-        : "ledger"
+      : visibility
 
   function resetForm() {
     setSelectedAccountId(null)
-    setOwnerUserId(store.authUser?.id ?? "")
     setBank(banks[0])
     setName("")
     setLast4("")
@@ -73,12 +69,12 @@ export const AccountManager = observer(function AccountManager() {
   function selectAccount(
     account: (typeof store.currentLedgerAccounts)[number],
   ) {
+    if (account.ownerUserId !== store.authUser?.id) return
     if (selectedAccountId === account.id) {
       resetForm()
       return
     }
     setSelectedAccountId(account.id)
-    setOwnerUserId(account.ownerUserId ?? store.authUser?.id ?? "")
     setBank(account.issuer ?? banks[0])
     setName(account.name)
     setLast4(account.last4 ?? "")
@@ -118,23 +114,21 @@ export const AccountManager = observer(function AccountManager() {
           <span>
             계좌 소유자<RequiredMark>*</RequiredMark>
           </span>
-          <Select
-            required
-            value={ownerUserId}
-            onChange={(event) => setOwnerUserId(event.target.value)}
-          >
-            {store.currentMembers.map((member) => (
-              <option key={member.userId} value={member.userId}>
-                {member.nickname}
-              </option>
-            ))}
-          </Select>
+          <Input
+            value={
+              store.currentMembers.find(
+                (member) => member.userId === store.authUser?.id,
+              )?.nickname ?? "본인"
+            }
+            disabled
+          />
+          <OwnerHelp>본인 소유 계좌만 등록·수정할 수 있습니다.</OwnerHelp>
         </Field>
         <VisibilityField>
           <input
             type="checkbox"
             checked={effectiveVisibility === "ledger"}
-            disabled={store.currentLedger?.type !== "shared" || !canKeepPrivate}
+            disabled={store.currentLedger?.type !== "shared"}
             onChange={(event) =>
               setVisibility(event.target.checked ? "ledger" : "private")
             }
@@ -143,9 +137,7 @@ export const AccountManager = observer(function AccountManager() {
           <small>
             {store.currentLedger?.type === "personal"
               ? "개인 가계부에서는 나만 볼 수 있습니다."
-              : canKeepPrivate
-                ? "선택하지 않으면 나만 볼 수 있습니다."
-                : "다른 멤버 소유 계좌는 공동으로 등록됩니다."}
+              : "선택하지 않으면 나만 볼 수 있습니다."}
           </small>
         </VisibilityField>
         <Field>
@@ -211,10 +203,11 @@ export const AccountManager = observer(function AccountManager() {
                 {accounts.map((account) => (
                   <Row
                     key={account.id}
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={selectedAccountId === account.id}
+                    role={account.ownerUserId === store.authUser?.id ? "button" : undefined}
+                    tabIndex={account.ownerUserId === store.authUser?.id ? 0 : undefined}
+                    aria-pressed={account.ownerUserId === store.authUser?.id ? selectedAccountId === account.id : undefined}
                     $selected={selectedAccountId === account.id}
+                    $interactive={account.ownerUserId === store.authUser?.id}
                     onClick={() => selectAccount(account)}
                     onKeyDown={(event) => {
                       if (event.target !== event.currentTarget) return
@@ -234,6 +227,7 @@ export const AccountManager = observer(function AccountManager() {
                         {account.visibility === "private" ? " · 나만 보기" : ""}
                       </Meta>
                     </div>
+                    {account.ownerUserId === store.authUser?.id ? (
                     <Actions onClick={(event) => event.stopPropagation()}>
                       <Button
                         $variant={account.isActive ? "ghost" : "soft"}
@@ -265,6 +259,7 @@ export const AccountManager = observer(function AccountManager() {
                         <Trash2 size={14} /> 삭제
                       </Button>
                     </Actions>
+                    ) : <ReadOnlyBadge>공동 공개 · 읽기 전용</ReadOnlyBadge>}
                   </Row>
                 ))}
                 {accounts.length === 0 ? (
@@ -358,15 +353,15 @@ const Rows = styled.div`
   display: grid;
 `
 
-const Row = styled.article<{ $selected: boolean }>`
+const Row = styled.article<{ $selected: boolean; $interactive: boolean }>`
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   padding: 12px 18px;
   border-top: 1px solid ${colors.border};
-  background: ${({ $selected }) => ($selected ? colors.tealSoft : "#fff")};
-  cursor: pointer;
+  background: ${({ $selected }) => ($selected ? colors.tealSoft : colors.panel)};
+  cursor: ${({ $interactive }) => ($interactive ? "pointer" : "default")};
 
   &:focus-visible {
     outline: 2px solid ${colors.focus};
@@ -383,6 +378,15 @@ const Meta = styled.span`
   margin-top: 3px;
   color: ${colors.muted};
   font-size: 11px;
+`
+const OwnerHelp = styled.small`
+  color: ${colors.muted};
+  font-weight: 400;
+`
+const ReadOnlyBadge = styled.span`
+  color: ${colors.muted};
+  font-size: 11px;
+  white-space: nowrap;
 `
 
 const Actions = styled.div`

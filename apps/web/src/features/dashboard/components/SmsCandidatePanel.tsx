@@ -139,7 +139,7 @@ const CandidateList = styled.div`
 const Candidate = styled.article`
   border: 1px solid ${colors.border};
   border-radius: ${radii.sm};
-  background: #fff;
+  background: ${colors.panel};
   padding: 12px;
 `
 
