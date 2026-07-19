@@ -9,6 +9,7 @@ import {
   groupTransactionsByRecurrence,
   groupTransactionsByRegistrant,
   matchesPaymentMethodFilter,
+  sortPaymentMethodsForSelection,
 } from "./transactionPresentation"
 
 const transaction: Transaction = {
@@ -50,6 +51,47 @@ describe("getPaymentMethodTypeLabel", () => {
     expect(getPaymentMethodTypeLabel(card)).toBe("신용")
     expect(getPaymentMethodTypeLabel({ ...card, isDebit: true })).toBe("체크")
     expect(getPaymentMethodTypeLabel(account)).toBe("계좌")
+  })
+})
+
+describe("sortPaymentMethodsForSelection", () => {
+  it("orders primary, credit, and debit cards while preserving registration order", () => {
+    const paymentMethods = [
+      { ...card, id: "debit-1", name: "먼저 등록한 체크", isDebit: true },
+      { ...card, id: "credit-1", name: "먼저 등록한 신용" },
+      { ...account, id: "account-1" },
+      { ...card, id: "credit-2", name: "나중에 등록한 신용" },
+      {
+        ...card,
+        id: "primary",
+        name: "주 카드",
+        isPrimary: true,
+        isDebit: true,
+      },
+      { ...card, id: "debit-2", name: "나중에 등록한 체크", isDebit: true },
+      { ...account, id: "account-2" },
+    ]
+
+    expect(
+      sortPaymentMethodsForSelection(paymentMethods).map((method) => method.id),
+    ).toEqual([
+      "primary",
+      "credit-1",
+      "credit-2",
+      "debit-1",
+      "debit-2",
+      "account-1",
+      "account-2",
+    ])
+    expect(paymentMethods.map((method) => method.id)).toEqual([
+      "debit-1",
+      "credit-1",
+      "account-1",
+      "credit-2",
+      "primary",
+      "debit-2",
+      "account-2",
+    ])
   })
 })
 

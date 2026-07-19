@@ -125,6 +125,31 @@ export function getPaymentMethodTypeLabel(
   return "결제수단"
 }
 
+export function sortPaymentMethodsForSelection(
+  paymentMethods: PaymentMethod[],
+): PaymentMethod[] {
+  return paymentMethods
+    .map((paymentMethod, registrationOrder) => ({
+      paymentMethod,
+      registrationOrder,
+    }))
+    .sort(
+      (a, b) =>
+        getPaymentMethodSelectionOrder(a.paymentMethod) -
+          getPaymentMethodSelectionOrder(b.paymentMethod) ||
+        a.registrationOrder - b.registrationOrder,
+    )
+    .map(({ paymentMethod }) => paymentMethod)
+}
+
+function getPaymentMethodSelectionOrder(
+  paymentMethod: Pick<PaymentMethod, "type" | "isPrimary" | "isDebit">,
+): number {
+  if (paymentMethod.type !== "card") return 3
+  if (paymentMethod.isPrimary) return 0
+  return paymentMethod.isDebit ? 2 : 1
+}
+
 export function getPaymentMetadataLabel(
   transaction: Transaction,
   paymentMethod?: PaymentMethod,
