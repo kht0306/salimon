@@ -50,6 +50,7 @@ import {
   groupTransactionsByActor,
   groupTransactionsByRecurrence,
   groupTransactionsByRegistrant,
+  sortPaymentMethodsForSelection,
 } from "./transactionPresentation"
 
 export const TransactionPanel = observer(function TransactionPanel() {
@@ -529,21 +530,14 @@ export const TransactionPanel = observer(function TransactionPanel() {
                       : "현금"}
                 </option>
                 {store.currentMembers.map((member) => {
-                  const memberMethods = (
-                    draft.type === "saving"
+                  const memberMethods = sortPaymentMethodsForSelection(
+                    (draft.type === "saving"
                       ? store.currentAccounts
                       : draft.recurringType === "installment"
                         ? store.currentCards
                         : store.currentPaymentMethods
+                    ).filter((method) => method.ownerUserId === member.userId),
                   )
-                    .filter((method) => method.ownerUserId === member.userId)
-                    .sort(
-                      (a, b) =>
-                        Number(Boolean(b.isPrimary)) -
-                          Number(Boolean(a.isPrimary)) ||
-                        Number(a.type === "bank") - Number(b.type === "bank") ||
-                        a.name.localeCompare(b.name, "ko"),
-                    )
                   return memberMethods.length > 0 ? (
                     <optgroup key={member.userId} label={member.nickname}>
                       {memberMethods.map((method) => (
