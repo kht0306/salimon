@@ -106,6 +106,8 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const isEditingInstallment = isInstallmentEditLocked(editing)
   const isEditingFixed = editing?.recurringType === "fixed"
   const isEditingRecurring = isEditingFixed || isEditingInstallment
+  const isSalaryIncome =
+    draft.type === "income" && draft.incomeKind === "salary"
 
   useEffect(
     () => () => {
@@ -697,7 +699,11 @@ export const TransactionPanel = observer(function TransactionPanel() {
               </Field>
             )}
             {draft.type === "income" && draft.incomeKind === "side_income" ? (
-              <FutureAmountScope $checked={draft.recurringType === "fixed"}>
+              <IncomeRecurrenceCard
+                as="label"
+                $checked={draft.recurringType === "fixed"}
+                $interactive
+              >
                 <input
                   type="checkbox"
                   checked={draft.recurringType === "fixed"}
@@ -715,14 +721,14 @@ export const TransactionPanel = observer(function TransactionPanel() {
                   }}
                 />
                 <span>
-                  <strong>고정수입으로 반복</strong>
-                  <small>매월 같은 일자에 수입 거래를 생성합니다.</small>
+                  <strong>고정 수입</strong>
+                  <small>매월 같은 일자에 거래 생성</small>
                 </span>
-              </FutureAmountScope>
+              </IncomeRecurrenceCard>
             ) : draft.type === "income" ? (
-              <EditPolicyNotice role="status">
-                월급은 매월 고정수입으로 등록됩니다.
-              </EditPolicyNotice>
+              <IncomeRecurrenceCard role="status">
+                <span>월급은 매월 고정수입으로 등록됩니다.</span>
+              </IncomeRecurrenceCard>
             ) : null}
             {draft.recurringType === "installment" ? (
               <Field>
@@ -947,7 +953,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           </Field>
 
           <Field>
-            행위자
+            {isSalaryIncome ? "근로자" : "행위자"}
             <Select
               value={draft.actorUserId}
               onChange={(event) =>
@@ -1077,7 +1083,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           ) : null}
 
           <Field>
-            가맹점/내용
+            {isSalaryIncome ? "회사" : "가맹점/내용"}
             <Input
               value={draft.merchantName}
               onChange={(event) =>
@@ -1557,7 +1563,7 @@ const AmountControl = styled.div<{ $withType: boolean }>`
 
 const DateTimeInputs = styled.div`
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 112px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 `
 
@@ -1634,6 +1640,48 @@ const FutureAmountScope = styled.label<{ $checked: boolean }>`
   span {
     display: grid;
     gap: 3px;
+  }
+
+  strong {
+    font-size: 12px;
+  }
+
+  small {
+    color: ${colors.muted};
+    font-size: 10px;
+    font-weight: 400;
+  }
+`
+
+const IncomeRecurrenceCard = styled.div<{
+  $checked?: boolean
+  $interactive?: boolean
+}>`
+  height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid
+    ${({ $checked }) => ($checked ? colors.focus : colors.border)};
+  border-radius: ${radii.sm};
+  background: ${({ $checked }) =>
+    $checked ? colors.tealSoft : colors.panel};
+  color: ${colors.ink};
+  padding: 8px 11px;
+  cursor: ${({ $interactive }) => ($interactive ? "pointer" : "default")};
+
+  input {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: ${colors.teal};
+  }
+
+  span {
+    display: grid;
+    gap: 2px;
+    font-size: 12px;
+    line-height: 1.35;
   }
 
   strong {
