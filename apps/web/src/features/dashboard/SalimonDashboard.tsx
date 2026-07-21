@@ -60,11 +60,8 @@ export function SalimonDashboard() {
 const DashboardContent = observer(function DashboardContent() {
   const store = useAppStore()
   const router = useRouter()
-  const currentMembership = store.data.members.find(
-    (member) =>
-      member.ledgerId === store.selectedLedgerId &&
-      member.userId === store.authUser?.id,
-  )
+  const currentMembership = store.currentMembership
+  const isArchivedLedger = Boolean(store.currentLedger?.archivedAt)
 
   useEffect(() => {
     if (store.authState !== "loading" && !store.authUser) {
@@ -111,14 +108,15 @@ const DashboardContent = observer(function DashboardContent() {
               value={store.selectedLedgerId}
               onChange={(event) => store.switchLedger(event.target.value)}
               aria-label="가계부 선택"
-              disabled={store.activeLedgers.length === 0}
+              disabled={store.selectableLedgers.length === 0}
             >
-              {store.activeLedgers.length === 0 ? (
+              {store.selectableLedgers.length === 0 ? (
                 <option value="">로그인 후 불러오기</option>
               ) : null}
-              {store.activeLedgers.map((ledger) => (
+              {store.selectableLedgers.map((ledger) => (
                 <option key={ledger.id} value={ledger.id}>
                   {ledger.name} · {ledger.type === "shared" ? "공동" : "개인"}
+                  {ledger.archivedAt ? " · (보관중)" : ""}
                 </option>
               ))}
             </LedgerSelect>
@@ -127,6 +125,7 @@ const DashboardContent = observer(function DashboardContent() {
               $active={Boolean(currentMembership?.isDefault)}
               disabled={
                 !store.selectedLedgerId ||
+                isArchivedLedger ||
                 Boolean(currentMembership?.isDefault) ||
                 store.ledgerMutationState !== "idle"
               }
@@ -161,76 +160,86 @@ const DashboardContent = observer(function DashboardContent() {
           </LedgerControl>
         </LedgerField>
 
-        <MetricRow>
-          <Metric>
-            <MetricLabel>월 지출</MetricLabel>
-            <MetricValue $tone="expense">
-              {formatKrw(store.monthExpenseTotal)}
-            </MetricValue>
-          </Metric>
-          <Metric>
-            <MetricLabel>월 수입</MetricLabel>
-            <MetricValue $tone="income">
-              {formatKrw(store.monthIncomeTotal)}
-            </MetricValue>
-          </Metric>
-          <Metric>
-            <MetricLabel>월 저축</MetricLabel>
-            <MetricValue $tone="saving">
-              {formatKrw(store.monthSavingTotal)}
-            </MetricValue>
-          </Metric>
-        </MetricRow>
+        {!isArchivedLedger ? (
+          <MetricRow>
+            <Metric>
+              <MetricLabel>월 지출</MetricLabel>
+              <MetricValue $tone="expense">
+                {formatKrw(store.monthExpenseTotal)}
+              </MetricValue>
+            </Metric>
+            <Metric>
+              <MetricLabel>월 수입</MetricLabel>
+              <MetricValue $tone="income">
+                {formatKrw(store.monthIncomeTotal)}
+              </MetricValue>
+            </Metric>
+            <Metric>
+              <MetricLabel>월 저축</MetricLabel>
+              <MetricValue $tone="saving">
+                {formatKrw(store.monthSavingTotal)}
+              </MetricValue>
+            </Metric>
+          </MetricRow>
+        ) : null}
 
         <Nav>
-          <NavButton
-            $active={store.activeView === "calendar"}
-            aria-current={store.activeView === "calendar" ? "page" : undefined}
-            onClick={() => store.setView("calendar")}
-          >
-            <CalendarDays size={17} /> 캘린더
-          </NavButton>
-          <NavButton
-            $active={store.activeView === "transactions"}
-            aria-current={
-              store.activeView === "transactions" ? "page" : undefined
-            }
-            onClick={() => store.setView("transactions")}
-          >
-            <ListFilter size={17} /> 내역 검색
-          </NavButton>
-          <NavButton
-            $active={store.activeView === "settlement"}
-            aria-current={
-              store.activeView === "settlement" ? "page" : undefined
-            }
-            onClick={() => store.setView("settlement")}
-          >
-            <ChartNoAxesCombined size={17} /> 정산
-          </NavButton>
-          <NavButton
-            $active={store.activeView === "categories"}
-            aria-current={
-              store.activeView === "categories" ? "page" : undefined
-            }
-            onClick={() => store.setView("categories")}
-          >
-            <Tags size={17} /> 카테고리
-          </NavButton>
-          <NavButton
-            $active={store.activeView === "cards"}
-            aria-current={store.activeView === "cards" ? "page" : undefined}
-            onClick={() => store.setView("cards")}
-          >
-            <WalletCards size={17} /> 내 카드
-          </NavButton>
-          <NavButton
-            $active={store.activeView === "accounts"}
-            aria-current={store.activeView === "accounts" ? "page" : undefined}
-            onClick={() => store.setView("accounts")}
-          >
-            <Landmark size={17} /> 내 계좌
-          </NavButton>
+          {!isArchivedLedger ? (
+            <>
+              <NavButton
+                $active={store.activeView === "calendar"}
+                aria-current={
+                  store.activeView === "calendar" ? "page" : undefined
+                }
+                onClick={() => store.setView("calendar")}
+              >
+                <CalendarDays size={17} /> 캘린더
+              </NavButton>
+              <NavButton
+                $active={store.activeView === "transactions"}
+                aria-current={
+                  store.activeView === "transactions" ? "page" : undefined
+                }
+                onClick={() => store.setView("transactions")}
+              >
+                <ListFilter size={17} /> 내역 검색
+              </NavButton>
+              <NavButton
+                $active={store.activeView === "settlement"}
+                aria-current={
+                  store.activeView === "settlement" ? "page" : undefined
+                }
+                onClick={() => store.setView("settlement")}
+              >
+                <ChartNoAxesCombined size={17} /> 정산
+              </NavButton>
+              <NavButton
+                $active={store.activeView === "categories"}
+                aria-current={
+                  store.activeView === "categories" ? "page" : undefined
+                }
+                onClick={() => store.setView("categories")}
+              >
+                <Tags size={17} /> 카테고리
+              </NavButton>
+              <NavButton
+                $active={store.activeView === "cards"}
+                aria-current={store.activeView === "cards" ? "page" : undefined}
+                onClick={() => store.setView("cards")}
+              >
+                <WalletCards size={17} /> 내 카드
+              </NavButton>
+              <NavButton
+                $active={store.activeView === "accounts"}
+                aria-current={
+                  store.activeView === "accounts" ? "page" : undefined
+                }
+                onClick={() => store.setView("accounts")}
+              >
+                <Landmark size={17} /> 내 계좌
+              </NavButton>
+            </>
+          ) : null}
           <NavButton
             $active={store.activeView === "ledger"}
             aria-current={store.activeView === "ledger" ? "page" : undefined}
@@ -238,7 +247,7 @@ const DashboardContent = observer(function DashboardContent() {
           >
             <Settings2 size={17} /> 가계부 관리
           </NavButton>
-          {isLocalDevelopment ? (
+          {isLocalDevelopment && !isArchivedLedger ? (
             <NavButton
               $active={store.activeView === "connection"}
               aria-current={
@@ -249,13 +258,15 @@ const DashboardContent = observer(function DashboardContent() {
               <Database size={17} /> 앱 관리
             </NavButton>
           ) : null}
-          <NavButton
-            $active={store.activeView === "trust"}
-            aria-current={store.activeView === "trust" ? "page" : undefined}
-            onClick={() => store.setView("trust")}
-          >
-            <ShieldCheck size={17} /> 개인정보·데이터
-          </NavButton>
+          {!isArchivedLedger ? (
+            <NavButton
+              $active={store.activeView === "trust"}
+              aria-current={store.activeView === "trust" ? "page" : undefined}
+              onClick={() => store.setView("trust")}
+            >
+              <ShieldCheck size={17} /> 개인정보·데이터
+            </NavButton>
+          ) : null}
         </Nav>
 
         <SidebarFooter>
@@ -268,7 +279,11 @@ const DashboardContent = observer(function DashboardContent() {
           <div>
             <Eyebrow>
               가계부 /{" "}
-              {store.currentLedger?.type === "shared" ? "공동" : "개인"}
+              {isArchivedLedger
+                ? "보관중"
+                : store.currentLedger?.type === "shared"
+                  ? "공동"
+                  : "개인"}
             </Eyebrow>
             <PageTitle>{store.currentLedger?.name ?? "가계부"}</PageTitle>
           </div>
@@ -277,7 +292,7 @@ const DashboardContent = observer(function DashboardContent() {
           </MobileAuth>
         </Topline>
 
-        <OnboardingChecklist />
+        {!isArchivedLedger ? <OnboardingChecklist /> : null}
 
         {store.activeView === "calendar" ? <CalendarGrid /> : null}
         {store.activeView === "transactions" ? <TransactionListPanel /> : null}

@@ -5,7 +5,6 @@ import type { CreatedLedgerInvitation } from "@salimon/api-client"
 import type { LedgerRole, LedgerType, PaymentInstrument } from "@salimon/types"
 import { colors, radii, spacing } from "@salimon/ui-tokens"
 import {
-  Archive,
   Check,
   Copy,
   CreditCard,
@@ -81,14 +80,19 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
   const memberEvents = store.data.memberEvents
     .filter((event) => event.ledgerId === store.selectedLedgerId)
     .slice(0, 20)
+  const isArchived = Boolean(ledger?.archivedAt)
+  const isDefaultLedger = Boolean(store.currentMembership?.isDefault)
   const canRename = Boolean(
     ledger &&
+    !isArchived &&
     (ledger.type === "personal"
       ? ledger.ownerId === store.authUser?.id
       : ledger.role === "owner" || ledger.role === "admin"),
   )
   const canManageShared = ledger?.role === "owner" || ledger?.role === "admin"
-  const canLinkPaymentMethods = Boolean(ledger && ledger.role !== "viewer")
+  const canLinkPaymentMethods = Boolean(
+    ledger && !isArchived && ledger.role !== "viewer",
+  )
   const isMutating = store.ledgerMutationState !== "idle"
   const activePaymentInstruments = store.myPaymentInstruments.filter(
     (method) => method.isActive,
@@ -131,6 +135,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
             <LedgerMeta>
               {ledger.type === "shared" ? "공동" : "개인"} ·{" "}
               {roleLabels[ledger.role]}
+              {isArchived ? " · 보관중" : ""}
             </LedgerMeta>
           ) : null}
         </PanelHeader>
@@ -143,7 +148,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
             <Input
               value={renameName}
               maxLength={30}
-              disabled={!canRename || isMutating}
+              disabled={!canRename || isMutating || isArchived}
               onChange={(event) => setRenameName(event.target.value)}
               aria-describedby={
                 ledger?.type === "shared" ? "shared-rename-help" : undefined
@@ -155,59 +160,96 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
               </FieldHelp>
             ) : null}
           </Field>
-          <FormAction
-            type="button"
-            $variant="primary"
-            disabled={
-              !canRename ||
-              isMutating ||
-              !renameName.trim() ||
-              renameName.trim() === ledger?.name
-            }
-            onClick={() => void store.renameCurrentLedger(renameName)}
-          >
-            <Pencil size={15} />
-            {store.ledgerMutationState === "renaming"
-              ? "이름 변경 중"
-              : "가계부 이름 변경"}
-          </FormAction>
-        </FormRow>
-
-        {!canRename && ledger ? (
-          <PermissionNotice>
-            이 가계부의 이름을 변경할 권한이 없습니다.
-          </PermissionNotice>
-        ) : null}
-        {ledger ? (
-          <DangerActions>
-            {ledger.role !== "owner" && ledger.type === "shared" ? (
+          <CurrentLedgerActions>
+            <Button
+              type="button"
+              $variant="primary"
+              disabled={
+                !canRename ||
+                isMutating ||
+                !renameName.trim() ||
+                renameName.trim() === ledger?.name
+              }
+              onClick={() => void store.renameCurrentLedger(renameName)}
+            >
+              <Pencil size={15} />
+              {store.ledgerMutationState === "renaming"
+                ? "이름 변경 중"
+                : "가계부 이름 변경"}
+            </Button>
+            {ledger?.ownerId === store.authUser?.id && !isArchived ? (
               <Button
                 type="button"
-                onClick={() => {
-                  if (window.confirm("이 공동 가계부에서 나가시겠습니까?")) {
-                    void store.leaveCurrentSharedLedger()
-                  }
-                }}
-              >
-                공동 가계부 나가기
-              </Button>
-            ) : null}
-            {ledger.ownerId === store.authUser?.id ? (
-              <Button
-                type="button"
+                $variant="danger"
+                disabled={isDefaultLedger || isMutating}
+                aria-describedby={
+                  isDefaultLedger ? "default-ledger-removal-help" : undefined
+                }
                 onClick={() => {
                   if (
                     window.confirm(
-                      "가계부를 보관하시겠습니까? 30일 동안 복구할 수 있으며 카드·계좌 원본은 유지됩니다.",
+                      "가계부를 제거하시겠습니까? 30일 동안 복구할 수 있으며 카드·계좌 원본은 유지됩니다.",
                     )
                   ) {
                     void store.archiveCurrentLedger()
                   }
                 }}
               >
-                <Archive size={15} /> 가계부 보관
+                <Trash2 size={15} />
+                {store.ledgerMutationState === "archiving"
+                  ? "제거 중"
+                  : "가계부 제거"}
               </Button>
             ) : null}
+            {ledger && ledger.ownerId === store.authUser?.id && isArchived ? (
+              <Button
+                type="button"
+                $variant="soft"
+                disabled={isMutating}
+                onClick={() => void store.restoreLedger(ledger.id)}
+              >
+                <RotateCcw size={15} />
+                {store.ledgerMutationState === "restoring"
+                  ? "복구 중"
+                  : "가계부 복구"}
+              </Button>
+            ) : null}
+          </CurrentLedgerActions>
+        </FormRow>
+
+        {isDefaultLedger && !isArchived ? (
+          <RemovalNotice id="default-ledger-removal-help">
+            현재 기본 가계부입니다. 다른 가계부를 기본 가계부로 설정한 후 제거할
+            수 있습니다.
+          </RemovalNotice>
+        ) : null}
+        {isArchived && ledger ? (
+          <RemovalNotice>
+            보관중인 가계부입니다.
+            {ledger.purgeAfter
+              ? ` ${new Date(ledger.purgeAfter).toLocaleDateString("ko-KR")}까지 복구할 수 있습니다.`
+              : " 삭제 전까지 복구할 수 있습니다."}
+          </RemovalNotice>
+        ) : null}
+        {!canRename && ledger && !isArchived ? (
+          <PermissionNotice>
+            이 가계부의 이름을 변경할 권한이 없습니다.
+          </PermissionNotice>
+        ) : null}
+        {ledger?.role !== "owner" &&
+        ledger?.type === "shared" &&
+        !isArchived ? (
+          <DangerActions>
+            <Button
+              type="button"
+              onClick={() => {
+                if (window.confirm("이 공동 가계부에서 나가시겠습니까?")) {
+                  void store.leaveCurrentSharedLedger()
+                }
+              }}
+            >
+              공동 가계부 나가기
+            </Button>
           </DangerActions>
         ) : null}
       </Panel>
@@ -351,7 +393,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
         </JoinRow>
       </Panel>
 
-      {ledger ? (
+      {ledger && !isArchived ? (
         <Panel>
           <PanelHeader>
             <PanelTitle>
@@ -451,7 +493,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
         </Panel>
       ) : null}
 
-      {ledger?.type === "personal" ? (
+      {ledger?.type === "personal" && !isArchived ? (
         <Panel>
           <PanelHeader>
             <PanelTitle>공동 사용</PanelTitle>
@@ -493,7 +535,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
         </Panel>
       ) : null}
 
-      {ledger?.type === "shared" ? (
+      {ledger?.type === "shared" && !isArchived ? (
         <Panel>
           <PanelHeader>
             <PanelTitle>공동 멤버와 초대</PanelTitle>
@@ -942,6 +984,32 @@ const FormAction = styled(Button)`
     justify-content: center;
     margin-top: 0;
   }
+`
+
+const CurrentLedgerActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${spacing[2]};
+  margin-top: 26px;
+
+  @media (max-width: 640px) {
+    display: grid;
+    grid-template-columns: 1fr;
+    margin-top: 0;
+
+    button {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+`
+
+const RemovalNotice = styled.p`
+  margin: 0;
+  padding: 0 18px 16px;
+  color: ${colors.muted};
+  font-size: 12px;
+  line-height: 1.5;
 `
 
 const CreateGrid = styled.div`

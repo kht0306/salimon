@@ -113,6 +113,8 @@ export class AppStore {
     | "creating"
     | "renaming"
     | "setting-default"
+    | "archiving"
+    | "restoring"
     | "syncing-payment-methods" = "idle"
   private initializedWorkspaceUserId: string | null = null
   private workspaceInitialization: Promise<void> | null = null
@@ -145,8 +147,20 @@ export class AppStore {
     )
   }
 
+  get currentMembership() {
+    return this.data.members.find(
+      (member) =>
+        member.ledgerId === this.selectedLedgerId &&
+        member.userId === this.authUser?.id,
+    )
+  }
+
   get activeLedgers() {
     return this.data.ledgers.filter((ledger) => !ledger.archivedAt)
+  }
+
+  get selectableLedgers() {
+    return this.data.ledgers
   }
 
   get archivedOwnedLedgers() {
@@ -342,12 +356,17 @@ export class AppStore {
   hydrate(data: FinanceData): void {
     this.data = data
     if (
-      !this.activeLedgers.some((ledger) => ledger.id === this.selectedLedgerId)
+      !this.selectableLedgers.some(
+        (ledger) => ledger.id === this.selectedLedgerId,
+      )
     ) {
       const defaultLedgerId = this.data.members.find(
         (member) => member.userId === this.authUser?.id && member.isDefault,
       )?.ledgerId
       this.selectedLedgerId = defaultLedgerId ?? this.activeLedgers[0]?.id ?? ""
+    }
+    if (this.currentLedger?.archivedAt) {
+      this.activeView = "ledger"
     }
   }
 
@@ -379,7 +398,7 @@ export class AppStore {
   }
 
   setView(view: AppStore["activeView"]): void {
-    this.activeView = view
+    this.activeView = this.currentLedger?.archivedAt ? "ledger" : view
   }
 
   setCalendarRegistrant(registrantId: string): void {
@@ -487,11 +506,20 @@ export class AppStore {
   switchLedger(ledgerId: string): void {
     this.selectedLedgerId = ledgerId
     this.calendarRegistrantId = ""
-    this.activeView = "calendar"
+    this.activeView = this.currentLedger?.archivedAt ? "ledger" : "calendar"
   }
 
   async setDefaultLedger(ledgerId: string): Promise<boolean> {
     if (!this.authUser || !ledgerId) return false
+    if (
+      this.data.ledgers.find((ledger) => ledger.id === ledgerId)?.archivedAt
+    ) {
+      this.notify(
+        "보관중인 가계부는 기본 가계부로 설정할 수 없습니다.",
+        "error",
+      )
+      return false
+    }
     if (
       this.data.members.some(
         (member) =>
@@ -1214,29 +1242,52 @@ export class AppStore {
   async archiveCurrentLedger(): Promise<boolean> {
     const ledger = this.currentLedger
     if (!ledger || ledger.ownerId !== this.authUser?.id) return false
+    if (this.currentMembership?.isDefault) {
+      this.notify(
+        "다른 가계부를 기본 가계부로 설정한 후 제거할 수 있습니다.",
+        "error",
+      )
+      return false
+    }
+    if (this.ledgerMutationState !== "idle") return false
+    this.ledgerMutationState = "archiving"
     try {
       await this.repository.archiveLedger(ledger.id)
       await this.refreshFinanceData()
-      this.notify("가계부를 30일 보관함으로 옮겼습니다.")
+      runInAction(() => {
+        this.activeView = "ledger"
+      })
+      this.notify("가계부를 제거했습니다. 30일 동안 복구할 수 있습니다.")
       return this.dataState === "ready"
     } catch (error) {
       this.setDataError(error)
       return false
+    } finally {
+      runInAction(() => {
+        this.ledgerMutationState = "idle"
+      })
     }
   }
 
   async restoreLedger(ledgerId: string): Promise<boolean> {
+    if (this.ledgerMutationState !== "idle") return false
+    this.ledgerMutationState = "restoring"
     try {
       await this.repository.restoreLedger(ledgerId)
       await this.refreshFinanceData()
       runInAction(() => {
         this.selectedLedgerId = ledgerId
+        this.activeView = "ledger"
       })
       this.notify("가계부를 복구했습니다.")
       return this.dataState === "ready"
     } catch (error) {
       this.setDataError(error)
       return false
+    } finally {
+      runInAction(() => {
+        this.ledgerMutationState = "idle"
+      })
     }
   }
 
