@@ -702,7 +702,10 @@ const DataTable = styled.table`
   tr[data-excluded="true"] { color: ${colors.muted}; background: ${colors.panelSubtle}; }
   td[data-negative="true"] { color: ${colors.coral}; font-weight: 700; }
   &.transaction-table th:first-of-type,
-  &.transaction-table td:first-of-type { width: 120px; }
+  &.transaction-table td:first-of-type {
+    width: 1%;
+    white-space: nowrap;
+  }
   &.transaction-table th:nth-of-type(4),
   &.transaction-table td:nth-of-type(4) { width: 36%; }
   @media (max-width: 640px) { &.desktop-table { display: none; } }
