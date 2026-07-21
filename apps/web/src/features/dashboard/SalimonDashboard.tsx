@@ -232,13 +232,6 @@ const DashboardContent = observer(function DashboardContent() {
             <Landmark size={17} /> 내 계좌
           </NavButton>
           <NavButton
-            $active={store.activeView === "trust"}
-            aria-current={store.activeView === "trust" ? "page" : undefined}
-            onClick={() => store.setView("trust")}
-          >
-            <ShieldCheck size={17} /> 개인정보·데이터
-          </NavButton>
-          <NavButton
             $active={store.activeView === "ledger"}
             aria-current={store.activeView === "ledger" ? "page" : undefined}
             onClick={() => store.setView("ledger")}
@@ -256,6 +249,13 @@ const DashboardContent = observer(function DashboardContent() {
               <Database size={17} /> 앱 관리
             </NavButton>
           ) : null}
+          <NavButton
+            $active={store.activeView === "trust"}
+            aria-current={store.activeView === "trust" ? "page" : undefined}
+            onClick={() => store.setView("trust")}
+          >
+            <ShieldCheck size={17} /> 개인정보·데이터
+          </NavButton>
         </Nav>
 
         <SidebarFooter>

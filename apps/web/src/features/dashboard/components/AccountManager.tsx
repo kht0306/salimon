@@ -117,7 +117,6 @@ export const AccountManager = observer(function AccountManager() {
             계좌 소유자<RequiredMark>*</RequiredMark>
           </span>
           <Input value={store.data.profile?.nickname ?? "본인"} disabled />
-          <OwnerHelp>내 계정에 독립적으로 저장됩니다.</OwnerHelp>
         </Field>
         <Field>
           <span>
@@ -285,10 +284,6 @@ const Meta = styled.span`
   margin-top: 3px;
   color: ${colors.muted};
   font-size: 11px;
-`
-const OwnerHelp = styled.small`
-  color: ${colors.muted};
-  font-weight: 400;
 `
 const Empty = styled.div`
   padding: 20px 18px;

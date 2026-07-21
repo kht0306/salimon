@@ -305,7 +305,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
           저축 <strong data-tone="saving">{formatKrw(saving)}</strong>
         </span>
         <span>
-          정산 <strong>{formatKrw(income - expense)}</strong>
+          합계 <strong>{formatKrw(income - expense)}</strong>
         </span>
       </Totals>
       <Rows>
