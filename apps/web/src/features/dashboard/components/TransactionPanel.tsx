@@ -20,6 +20,7 @@ import { colors, radii } from "@salimon/ui-tokens"
 import {
   Check,
   ChevronDown,
+  CircleStop,
   Copy,
   ListPlus,
   Pencil,
@@ -47,6 +48,7 @@ import {
   canCopyTransaction,
   createCopiedTransactionDraft,
   createNewTransactionDraft,
+  getIncomeRecurringType,
   getInstallmentPaymentMethodId,
   isInstallmentEditLocked,
   type TransactionEditorDraft,
@@ -102,6 +104,8 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const [draft, setDraft] = useState(initialDraft)
   const initialDraftRef = useRef(initialDraft)
   const isEditingInstallment = isInstallmentEditLocked(editing)
+  const isEditingFixed = editing?.recurringType === "fixed"
+  const isEditingRecurring = isEditingFixed || isEditingInstallment
 
   useEffect(
     () => () => {
@@ -193,6 +197,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
     /^\d{2}:\d{2}$/.test(transactionTime) &&
     Boolean(store.selectedLedgerId) &&
     savingAccountIsValid &&
+    (draft.type !== "income" ||
+      (Boolean(draft.incomeKind) &&
+        (draft.incomeKind !== "salary" || draft.recurringType === "fixed"))) &&
     splitsValid &&
     (draft.recurringType !== "installment" ||
       (Number.isSafeInteger(installmentMonths) &&
@@ -284,6 +291,10 @@ export const TransactionPanel = observer(function TransactionPanel() {
       merchantName: transaction.merchantName ?? "",
       memo: transaction.memo ?? "",
       type: transaction.type,
+      incomeKind:
+        transaction.type === "income"
+          ? (transaction.incomeKind ?? "side_income")
+          : undefined,
       status: transaction.status,
       categoryId: transaction.categoryId ?? "",
       actorUserId: transaction.actorUserId ?? "",
@@ -298,7 +309,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           firstInstallment?.transactionAt ??
           transaction.transactionAt,
       ),
-      applyAmountToFuture: true,
+      applyChangesToFuture: true,
       sourceType: transaction.sourceType,
       parseConfidence: transaction.parseConfidence,
     }
@@ -417,6 +428,14 @@ export const TransactionPanel = observer(function TransactionPanel() {
     if (!Number.isSafeInteger(amount) || amount <= 0) {
       return
     }
+    if (
+      editing &&
+      !editing.recurringType &&
+      draft.recurringType === "fixed" &&
+      !window.confirm("이 거래부터 매월 반복되는 고정 거래로 전환할까요?")
+    ) {
+      return
+    }
 
     savingRef.current = true
     setSaving(true)
@@ -425,6 +444,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
         id: editing?.id,
         ledgerId: store.selectedLedgerId,
         type: draft.type as Transaction["type"],
+        incomeKind: draft.type === "income" ? draft.incomeKind : undefined,
         status: draft.status,
         amount,
         transactionAt: draft.transactionAt,
@@ -449,7 +469,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           draft.recurringType === "installment"
             ? draft.installmentAmountType
             : undefined,
-        applyAmountToFuture: draft.applyAmountToFuture,
+        applyChangesToFuture: draft.applyChangesToFuture,
         sourceType: draft.sourceType,
         parseConfidence: draft.parseConfidence,
         tags: tagsInput
@@ -558,22 +578,19 @@ export const TransactionPanel = observer(function TransactionPanel() {
               <Select
                 required
                 value={draft.type}
-                disabled={isEditingInstallment}
+                disabled={isEditingRecurring}
                 onChange={(event) => {
                   const type = event.target.value as Transaction["type"]
                   setSplits([])
                   setDraft({
                     ...draft,
                     type,
+                    incomeKind: type === "income" ? "side_income" : undefined,
                     categoryId:
                       store.currentCategories.find((category) =>
                         category.usageTypes.includes(type as CategoryUsageType),
                       )?.id ?? "",
-                    recurringType:
-                      type !== "expense" &&
-                      draft.recurringType === "installment"
-                        ? "none"
-                        : draft.recurringType,
+                    recurringType: "none",
                     paymentMethodId:
                       type === "expense"
                         ? draft.paymentMethodId ||
@@ -615,41 +632,98 @@ export const TransactionPanel = observer(function TransactionPanel() {
           </TwoColumns>
 
           <TwoColumns>
-            <Field>
-              반복 유형
-              <Select
-                value={draft.recurringType}
-                disabled={isEditingInstallment}
-                onChange={(event) => {
-                  const recurringType = event.target
-                    .value as TransactionEditorDraft["recurringType"]
-                  if (recurringType !== "none") {
-                    setSplits([])
-                    setTagsInput("")
-                  }
-                  setDraft({
-                    ...draft,
-                    recurringType,
-                    paymentMethodId:
-                      recurringType === "installment"
-                        ? getInstallmentPaymentMethodId({
-                            currentPaymentMethodId: draft.paymentMethodId,
-                            activeCardIds: new Set(
-                              store.currentCards.map((card) => card.id),
-                            ),
-                            primaryCardId: store.currentUserPrimaryCard?.id,
-                          })
-                        : draft.paymentMethodId,
-                  })
-                }}
-              >
-                <option value="none">일반 거래</option>
-                <option value="fixed">고정비</option>
-                <option value="installment" disabled={draft.type !== "expense"}>
-                  카드 할부
-                </option>
-              </Select>
-            </Field>
+            {draft.type === "income" ? (
+              <Field>
+                수입 유형
+                <Select
+                  value={draft.incomeKind ?? "side_income"}
+                  disabled={isEditingFixed}
+                  onChange={(event) => {
+                    const incomeKind = event.target.value as
+                      | "salary"
+                      | "side_income"
+                    const recurringType = getIncomeRecurringType(incomeKind)
+                    if (recurringType === "fixed") {
+                      setSplits([])
+                      setTagsInput("")
+                    }
+                    setDraft({ ...draft, incomeKind, recurringType })
+                  }}
+                >
+                  <option value="salary">월급</option>
+                  <option value="side_income">부수입</option>
+                </Select>
+              </Field>
+            ) : (
+              <Field>
+                반복 유형
+                <Select
+                  value={draft.recurringType}
+                  disabled={isEditingRecurring}
+                  onChange={(event) => {
+                    const recurringType = event.target
+                      .value as TransactionEditorDraft["recurringType"]
+                    if (recurringType !== "none") {
+                      setSplits([])
+                      setTagsInput("")
+                    }
+                    setDraft({
+                      ...draft,
+                      recurringType,
+                      paymentMethodId:
+                        recurringType === "installment"
+                          ? getInstallmentPaymentMethodId({
+                              currentPaymentMethodId: draft.paymentMethodId,
+                              activeCardIds: new Set(
+                                store.currentCards.map((card) => card.id),
+                              ),
+                              primaryCardId: store.currentUserPrimaryCard?.id,
+                            })
+                          : draft.paymentMethodId,
+                    })
+                  }}
+                >
+                  <option value="none">일반 거래</option>
+                  <option value="fixed">
+                    {draft.type === "saving" ? "정기저축" : "고정비"}
+                  </option>
+                  <option
+                    value="installment"
+                    disabled={draft.type !== "expense"}
+                  >
+                    카드 할부
+                  </option>
+                </Select>
+              </Field>
+            )}
+            {draft.type === "income" && draft.incomeKind === "side_income" ? (
+              <FutureAmountScope $checked={draft.recurringType === "fixed"}>
+                <input
+                  type="checkbox"
+                  checked={draft.recurringType === "fixed"}
+                  disabled={isEditingFixed}
+                  onChange={(event) => {
+                    const recurringType = getIncomeRecurringType(
+                      "side_income",
+                      event.target.checked,
+                    )
+                    if (recurringType === "fixed") {
+                      setSplits([])
+                      setTagsInput("")
+                    }
+                    setDraft({ ...draft, recurringType })
+                  }}
+                />
+                <span>
+                  <strong>고정수입으로 반복</strong>
+                  <small>매월 같은 일자에 수입 거래를 생성합니다.</small>
+                </span>
+              </FutureAmountScope>
+            ) : draft.type === "income" ? (
+              <EditPolicyNotice role="status">
+                월급은 매월 고정수입으로 등록됩니다.
+              </EditPolicyNotice>
+            ) : null}
             {draft.recurringType === "installment" ? (
               <Field>
                 <span>
@@ -673,7 +747,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                   }
                 />
               </Field>
-            ) : (
+            ) : draft.type === "income" ? null : (
               <div />
             )}
           </TwoColumns>
@@ -683,10 +757,10 @@ export const TransactionPanel = observer(function TransactionPanel() {
               할부 거래는 거래 유형, 반복 유형, 할부 개월, 결제 수단, 거래일시를
               변경할 수 없습니다. 금액은 선택한 회차 기준으로 수정됩니다.
             </EditPolicyNotice>
-          ) : editing &&
-            draft.recurringType !== (editing.recurringType ?? "none") ? (
+          ) : isEditingFixed ? (
             <EditPolicyNotice role="status">
-              반복 유형 변경은 선택한 거래부터 이후 거래에 적용됩니다.
+              고정 거래의 유형, 수입 유형, 반복 여부와 거래일시는 변경할 수
+              없습니다. 반복 종료는 거래 목록의 종료 작업을 이용해 주세요.
             </EditPolicyNotice>
           ) : null}
 
@@ -809,24 +883,30 @@ export const TransactionPanel = observer(function TransactionPanel() {
             ) : null}
           </Field>
 
-          {editing?.recurringType === "fixed" || isEditingInstallment ? (
-            <FutureAmountScope $checked={draft.applyAmountToFuture}>
+          {isEditingFixed || isEditingInstallment ? (
+            <FutureAmountScope $checked={draft.applyChangesToFuture}>
               <input
                 type="checkbox"
-                checked={draft.applyAmountToFuture}
+                checked={draft.applyChangesToFuture}
                 onChange={(event) =>
                   setDraft({
                     ...draft,
-                    applyAmountToFuture: event.target.checked,
+                    applyChangesToFuture: event.target.checked,
                   })
                 }
               />
               <span>
-                <strong>변경 금액을 이 달 이후 거래에도 적용</strong>
+                <strong>
+                  {isEditingFixed
+                    ? "변경 내용을 이 달 이후 거래에도 적용"
+                    : "변경 금액을 이 달 이후 거래에도 적용"}
+                </strong>
                 <small>
-                  {draft.applyAmountToFuture
+                  {draft.applyChangesToFuture
                     ? "이전 달 거래는 유지하고 선택한 달부터 반영합니다."
-                    : "선택한 달의 거래 금액만 수정합니다."}
+                    : isEditingFixed
+                      ? "선택한 달의 거래만 수정합니다."
+                      : "선택한 달의 거래 금액만 수정합니다."}
                 </small>
               </span>
             </FutureAmountScope>
@@ -841,7 +921,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 required
                 type="date"
                 aria-label="거래 날짜"
-                disabled={isEditingInstallment}
+                disabled={isEditingRecurring}
                 value={transactionDate}
                 onChange={(event) => {
                   setDraft({
@@ -854,7 +934,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 required
                 type="time"
                 aria-label="거래 시간"
-                disabled={isEditingInstallment}
+                disabled={isEditingRecurring}
                 value={transactionTime}
                 onChange={(event) =>
                   setDraft({
@@ -1163,23 +1243,54 @@ export const TransactionPanel = observer(function TransactionPanel() {
                               >
                                 <Pencil size={14} />
                               </CompactAction>
+                              {transaction.recurringType === "fixed" &&
+                              transaction.recurringRuleId ? (
+                                <CompactAction
+                                  title="이번 달까지만 유지하고 반복 종료"
+                                  aria-label="이번 달까지만 유지하고 반복 종료"
+                                  onClick={() =>
+                                    void store.endFixedRule(
+                                      transaction.recurringRuleId!,
+                                      "next",
+                                    )
+                                  }
+                                >
+                                  <CircleStop size={14} />
+                                </CompactAction>
+                              ) : null}
                               <CompactAction
                                 $variant="danger"
-                                title={
+                                aria-label={
                                   transaction.recurringType === "fixed"
-                                    ? "이번 달부터 고정비 제거"
+                                    ? "이번 달부터 고정 거래와 반복 종료"
                                     : "삭제"
                                 }
-                                onClick={() =>
-                                  transaction.recurringType === "fixed" &&
-                                  transaction.recurringRuleId
-                                    ? void store.deactivateFixedRule(
-                                        transaction.recurringRuleId,
-                                      )
-                                    : void store.softDeleteTransaction(
-                                        transaction.id,
-                                      )
+                                title={
+                                  transaction.recurringType === "fixed"
+                                    ? "이번 달부터 고정 거래와 반복 종료"
+                                    : "삭제"
                                 }
+                                onClick={() => {
+                                  if (
+                                    transaction.recurringType === "fixed" &&
+                                    transaction.recurringRuleId
+                                  ) {
+                                    if (
+                                      window.confirm(
+                                        "이번 달 거래와 이후 반복 거래를 모두 종료할까요?",
+                                      )
+                                    ) {
+                                      void store.endFixedRule(
+                                        transaction.recurringRuleId,
+                                        "current",
+                                      )
+                                    }
+                                    return
+                                  }
+                                  void store.softDeleteTransaction(
+                                    transaction.id,
+                                  )
+                                }}
                               >
                                 <Trash2 size={14} />
                               </CompactAction>

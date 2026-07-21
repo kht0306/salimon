@@ -4,6 +4,7 @@ import {
   canCopyTransaction,
   createCopiedTransactionDraft,
   createNewTransactionDraft,
+  getIncomeRecurringType,
   getInstallmentPaymentMethodId,
   isInstallmentEditLocked,
 } from "./transactionEditorDraft"
@@ -39,6 +40,12 @@ describe("transaction editor drafts", () => {
 
     expect(draft.paymentMethodId).toBe("card-1")
     expect(draft.transactionAt).toBe("2026-07-14T09:07")
+  })
+
+  it("always repeats salary and only repeats opted-in side income", () => {
+    expect(getIncomeRecurringType("salary")).toBe("fixed")
+    expect(getIncomeRecurringType("side_income")).toBe("none")
+    expect(getIncomeRecurringType("side_income", true)).toBe("fixed")
   })
 
   it("copies an ordinary transaction as a separate one-time draft", () => {

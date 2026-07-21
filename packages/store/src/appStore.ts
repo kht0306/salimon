@@ -32,6 +32,7 @@ import {
 import type {
   Category,
   CategoryUsageType,
+  IncomeKind,
   Ledger,
   LedgerRole,
   LedgerType,
@@ -45,6 +46,7 @@ export interface TransactionDraft {
   id?: string
   ledgerId: string
   type: TransactionType
+  incomeKind?: IncomeKind
   status: TransactionStatus
   amount: number
   transactionAt: string
@@ -60,7 +62,7 @@ export interface TransactionDraft {
   installmentMonths?: number
   installmentAmountType?: "monthly" | "principal"
   paymentMethodId?: string
-  applyAmountToFuture?: boolean
+  applyChangesToFuture?: boolean
   tags?: string[]
   splits?: Array<{ categoryId: string; amount: number }>
 }
@@ -612,6 +614,14 @@ export class AppStore {
       this.notify("할부 거래에 사용할 카드를 선택해 주세요.", "error")
       return false
     }
+    if (
+      (draft.type === "income" && !draft.incomeKind) ||
+      (draft.type !== "income" && draft.incomeKind) ||
+      (draft.incomeKind === "salary" && draft.recurringType !== "fixed")
+    ) {
+      this.notify("수입 유형과 반복 설정을 확인해 주세요.", "error")
+      return false
+    }
     const tags = [...new Set((draft.tags ?? []).map((tag) => tag.trim()).filter(Boolean))]
     if (tags.length > 10 || tags.some((tag) => tag.length > 20)) {
       this.notify("태그는 20자 이내로 최대 10개까지 입력해 주세요.", "error")
@@ -1138,11 +1148,23 @@ export class AppStore {
     }
   }
 
-  async deactivateFixedRule(ruleId: string): Promise<void> {
+  async endFixedRule(
+    ruleId: string,
+    timing: "current" | "next" = "current",
+  ): Promise<void> {
     try {
-      await this.repository.deactivateFixedRule(ruleId, this.selectedMonth)
+      await this.repository.deactivateFixedRule(
+        ruleId,
+        timing === "current"
+          ? this.selectedMonth
+          : moveMonth(this.selectedMonth, 1),
+      )
       await this.refreshFinanceData()
-      this.notify("이번 달부터 고정비를 해제했습니다.")
+      this.notify(
+        timing === "current"
+          ? "이번 달부터 고정 거래를 종료했습니다."
+          : "다음 달부터 고정 거래를 종료했습니다.",
+      )
     } catch (error) {
       this.setDataError(error)
     }
@@ -1661,6 +1683,7 @@ export class AppStore {
     const saved = await this.saveTransaction({
       ledgerId: candidate.targetLedgerId ?? this.selectedLedgerId,
       type: parsed.type,
+      incomeKind: parsed.type === "income" ? "side_income" : undefined,
       status: "confirmed",
       amount: parsed.amount,
       transactionAt: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(

@@ -3,6 +3,7 @@ import type {
   Category,
   CategoryBudget,
   CategoryUsageType,
+  IncomeKind,
   Ledger,
   LedgerInvitation,
   LedgerMember,
@@ -30,6 +31,7 @@ export interface RemoteTransactionInput {
   id?: string
   ledgerId: string
   type: TransactionType
+  incomeKind?: IncomeKind
   status: TransactionStatus
   amount: number
   transactionAt: string
@@ -45,7 +47,7 @@ export interface RemoteTransactionInput {
   installmentMonths?: number
   installmentAmountType?: "monthly" | "principal"
   paymentMethodId?: string
-  applyAmountToFuture?: boolean
+  applyChangesToFuture?: boolean
   tags?: string[]
   splits?: Array<{ categoryId: string; amount: number }>
 }
@@ -131,7 +133,7 @@ export class SupabaseFinanceRepository {
       client
         .from("recurring_rules")
         .select(
-          "id, ledger_id, created_by, rule_type, amount, day_of_month, time_of_day, start_month, end_month, inactive_from_month, installment_months, installment_amount_type, installment_principal, purchase_at, payment_method_id, category_id, merchant_name, memo, is_active, created_at",
+          "id, ledger_id, created_by, rule_type, transaction_type, income_kind, amount, day_of_month, time_of_day, start_month, end_month, inactive_from_month, installment_months, installment_amount_type, installment_principal, purchase_at, payment_method_id, category_id, merchant_name, memo, is_active, created_at",
         )
         .order("created_at"),
       client
@@ -290,7 +292,7 @@ export class SupabaseFinanceRepository {
 
     if (input.id) {
       const { data, error } = await client.rpc(
-        "update_transaction_with_recurrence_v2",
+        "update_transaction_with_recurrence_v3",
         {
           p_transaction_id: input.id,
           p_ledger_id: input.ledgerId,
@@ -302,11 +304,12 @@ export class SupabaseFinanceRepository {
           p_actor_user_id: input.actorUserId ?? null,
           p_status: input.status,
           p_type: input.type,
+          p_income_kind: input.incomeKind ?? null,
           p_payment_method_id: input.paymentMethodId ?? null,
           p_recurring_type: input.recurringType ?? null,
           p_installment_months: input.installmentMonths ?? null,
           p_installment_amount_type: input.installmentAmountType ?? null,
-          p_apply_amount_to_future: input.applyAmountToFuture ?? true,
+          p_apply_changes_to_future: input.applyChangesToFuture ?? true,
         },
       )
       throwIfError(error)
@@ -365,6 +368,7 @@ export class SupabaseFinanceRepository {
         merchant_name: input.merchantName ?? null,
         memo: input.memo ?? null,
         transaction_type: input.type,
+        income_kind: input.incomeKind ?? null,
         transaction_status: input.status,
         actor_user_id: input.actorUserId ?? null,
       })
@@ -375,7 +379,11 @@ export class SupabaseFinanceRepository {
 
     const result = await client
       .from("transactions")
-      .insert({ ...payload, created_by: userId })
+      .insert({
+        ...payload,
+        income_kind: input.incomeKind ?? null,
+        created_by: userId,
+      })
       .select("id")
       .single()
     throwIfError(result.error)
@@ -1169,6 +1177,8 @@ function mapRecurringRule(row: Row): RecurringRule {
     ledgerId: stringValue(row.ledger_id),
     createdBy: optionalString(row.created_by),
     type: row.rule_type === "installment" ? "installment" : "fixed",
+    transactionType: mapTransactionType(row.transaction_type),
+    incomeKind: mapIncomeKind(row.income_kind),
     amount: numberValue(row.amount),
     dayOfMonth: numberValue(row.day_of_month),
     timeOfDay: stringValue(row.time_of_day),
@@ -1255,6 +1265,7 @@ function mapTransaction(row: Row): Transaction {
     updatedBy: optionalString(row.updated_by),
     actorUserId: optionalString(row.actor_user_id),
     type: mapTransactionType(row.type),
+    incomeKind: mapIncomeKind(row.income_kind),
     status: mapTransactionStatus(row.status),
     amount: numberValue(row.amount),
     currency: "KRW",
@@ -1352,6 +1363,10 @@ function optionalLedgerRole(value: unknown): LedgerRole | undefined {
 
 function mapTransactionType(value: unknown): TransactionType {
   return value === "income" || value === "saving" ? value : "expense"
+}
+
+function mapIncomeKind(value: unknown): IncomeKind | undefined {
+  return value === "salary" || value === "side_income" ? value : undefined
 }
 
 function mapTransactionStatus(value: unknown): TransactionStatus {

@@ -6,6 +6,7 @@ export interface TransactionEditorDraft {
   merchantName: string
   memo: string
   type: Transaction["type"]
+  incomeKind?: Transaction["incomeKind"]
   status: Transaction["status"]
   categoryId: string
   actorUserId: string
@@ -15,7 +16,7 @@ export interface TransactionEditorDraft {
   installmentAmountType: "monthly" | "principal"
   paymentMethodId: string
   transactionAt: string
-  applyAmountToFuture: boolean
+  applyChangesToFuture: boolean
   sourceType: Transaction["sourceType"]
   parseConfidence?: number
 }
@@ -38,6 +39,7 @@ export function createNewTransactionDraft(input: {
     merchantName: "",
     memo: "",
     type: "expense",
+    incomeKind: undefined,
     status: "confirmed",
     categoryId: input.expenseCategoryId ?? "",
     actorUserId: input.actorUserId ?? "",
@@ -47,7 +49,7 @@ export function createNewTransactionDraft(input: {
     installmentAmountType: "monthly",
     paymentMethodId: input.primaryPaymentMethodId ?? "",
     transactionAt: `${input.selectedDate}T${time}`,
-    applyAmountToFuture: true,
+    applyChangesToFuture: true,
     sourceType: "manual",
     parseConfidence: undefined,
   }
@@ -86,6 +88,10 @@ export function createCopiedTransactionDraft(input: {
     merchantName: transaction.merchantName ?? "",
     memo: transaction.memo ?? "",
     type: transaction.type,
+    incomeKind:
+      transaction.type === "income"
+        ? (transaction.incomeKind ?? "side_income")
+        : undefined,
     status: transaction.status,
     categoryId,
     actorUserId,
@@ -95,7 +101,7 @@ export function createCopiedTransactionDraft(input: {
     installmentAmountType: "monthly",
     paymentMethodId,
     transactionAt: getDateTimeLocalValue(transaction.transactionAt),
-    applyAmountToFuture: true,
+    applyChangesToFuture: true,
     sourceType: "manual",
     parseConfidence: undefined,
   }
@@ -120,4 +126,11 @@ export function getInstallmentPaymentMethodId(input: {
     input.activeCardIds.has(input.currentPaymentMethodId)
     ? input.currentPaymentMethodId
     : (input.primaryCardId ?? "")
+}
+
+export function getIncomeRecurringType(
+  incomeKind: NonNullable<Transaction["incomeKind"]>,
+  fixedSideIncome = false,
+): "none" | "fixed" {
+  return incomeKind === "salary" || fixedSideIncome ? "fixed" : "none"
 }
