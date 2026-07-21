@@ -3,6 +3,7 @@ export type Currency = "KRW"
 export type LedgerType = "personal" | "shared"
 export type LedgerRole = "owner" | "admin" | "member" | "viewer"
 export type TransactionType = "expense" | "income" | "saving"
+export type IncomeKind = "salary" | "side_income"
 export type CategoryUsageType = "expense" | "income" | "saving"
 export type TransactionStatus = "confirmed" | "excluded"
 export type TransactionSourceType =
@@ -131,6 +132,8 @@ export interface RecurringRule {
   ledgerId: string
   createdBy?: string
   type: RecurringRuleType
+  transactionType: TransactionType
+  incomeKind?: IncomeKind
   amount: number
   dayOfMonth: number
   timeOfDay: string
@@ -194,6 +197,7 @@ export interface Transaction {
   installmentNumber?: number
   installmentTotal?: number
   type: TransactionType
+  incomeKind?: IncomeKind
   status: TransactionStatus
   amount: number
   currency: Currency

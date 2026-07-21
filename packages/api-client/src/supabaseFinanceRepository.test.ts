@@ -46,7 +46,7 @@ describe("saveTransaction", () => {
       paymentMethodId: "card-1",
     })
 
-    expect(rpc).toHaveBeenCalledWith("update_transaction_with_recurrence_v2", {
+    expect(rpc).toHaveBeenCalledWith("update_transaction_with_recurrence_v3", {
       p_transaction_id: "transaction-1",
       p_ledger_id: "ledger-1",
       p_amount: 12000,
@@ -57,11 +57,12 @@ describe("saveTransaction", () => {
       p_actor_user_id: null,
       p_status: "confirmed",
       p_type: "expense",
+      p_income_kind: null,
       p_payment_method_id: "card-1",
       p_recurring_type: "fixed",
       p_installment_months: null,
       p_installment_amount_type: null,
-      p_apply_amount_to_future: true,
+      p_apply_changes_to_future: true,
     })
     expect(from).not.toHaveBeenCalled()
   })
@@ -78,12 +79,37 @@ describe("saveTransaction", () => {
       amount: 15000,
       transactionAt: "2026-07-14T03:30:00.000Z",
       recurringType: "fixed",
-      applyAmountToFuture: false,
+      applyChangesToFuture: false,
     })
 
     expect(rpc).toHaveBeenCalledWith(
-      "update_transaction_with_recurrence_v2",
-      expect.objectContaining({ p_apply_amount_to_future: false }),
+      "update_transaction_with_recurrence_v3",
+      expect.objectContaining({ p_apply_changes_to_future: false }),
+    )
+  })
+
+  it("passes salary classification with the fixed-income edit", async () => {
+    rpc.mockResolvedValue({ data: "rule-1", error: null })
+    const repository = new SupabaseFinanceRepository()
+
+    await repository.saveTransaction("user-1", {
+      id: "transaction-1",
+      ledgerId: "ledger-1",
+      type: "income",
+      incomeKind: "salary",
+      status: "confirmed",
+      amount: 3000000,
+      transactionAt: "2026-07-25T03:00:00.000Z",
+      recurringType: "fixed",
+    })
+
+    expect(rpc).toHaveBeenCalledWith(
+      "update_transaction_with_recurrence_v3",
+      expect.objectContaining({
+        p_type: "income",
+        p_income_kind: "salary",
+        p_recurring_type: "fixed",
+      }),
     )
   })
 })

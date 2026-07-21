@@ -44,7 +44,12 @@ export function TransactionMetadataChips({
     <Chips>
       {transaction.recurringType === "fixed" ? (
         <FixedChip>
-          <Repeat2 size={13} /> 고정비
+          <Repeat2 size={13} />
+          {transaction.type === "income"
+            ? "고정수입"
+            : transaction.type === "saving"
+              ? "정기저축"
+              : "고정비"}
         </FixedChip>
       ) : null}
       <CategoryChip $color={category?.color ?? colors.subtle}>

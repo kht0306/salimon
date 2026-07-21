@@ -772,7 +772,7 @@ export const CategoryManager = observer(function CategoryManager() {
       </CategoryList>
 
       <RecurringSection>
-        <strong>고정비 관리 ({store.selectedMonth})</strong>
+        <strong>고정 거래 관리 ({store.selectedMonth})</strong>
         {store.data.recurringRules
           .filter(
             (rule) =>
@@ -784,16 +784,37 @@ export const CategoryManager = observer(function CategoryManager() {
           .map((rule) => (
             <RecurringRow key={rule.id}>
               <span>
-                {rule.merchantName || rule.memo || "고정비"} ·{" "}
-                {rule.amount.toLocaleString("ko-KR")}원 · 매월 {rule.dayOfMonth}
-                일
+                {rule.merchantName ||
+                  rule.memo ||
+                  (rule.transactionType === "income"
+                    ? "고정수입"
+                    : rule.transactionType === "saving"
+                      ? "정기저축"
+                      : "고정비")}{" "}
+                · {rule.amount.toLocaleString("ko-KR")}원 · 매월{" "}
+                {rule.dayOfMonth}일
               </span>
-              <Button
-                $variant="danger"
-                onClick={() => void store.deactivateFixedRule(rule.id)}
-              >
-                이번 달부터 해제
-              </Button>
+              <RecurringActions>
+                <Button
+                  onClick={() => void store.endFixedRule(rule.id, "next")}
+                >
+                  다음 달부터 종료
+                </Button>
+                <Button
+                  $variant="danger"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "이번 달 거래와 이후 반복 거래를 모두 종료할까요?",
+                      )
+                    ) {
+                      void store.endFixedRule(rule.id, "current")
+                    }
+                  }}
+                >
+                  이번 달부터 종료
+                </Button>
+              </RecurringActions>
             </RecurringRow>
           ))}
       </RecurringSection>
@@ -1073,6 +1094,13 @@ const RecurringRow = styled.div`
   gap: 12px;
   color: ${colors.muted};
   font-size: 13px;
+`
+
+const RecurringActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
 `
 
 const CategoryIconBadge = styled.span<{ $color: string }>`
