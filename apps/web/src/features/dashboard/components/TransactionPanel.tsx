@@ -108,6 +108,11 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const isEditingRecurring = isEditingFixed || isEditingInstallment
   const isSalaryIncome =
     draft.type === "income" && draft.incomeKind === "salary"
+  const merchantLabel = isSalaryIncome
+    ? "회사명"
+    : draft.type === "income" && draft.incomeKind === "side_income"
+      ? "지급처/지급인"
+      : "가맹점/내용"
 
   useEffect(
     () => () => {
@@ -1083,7 +1088,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           ) : null}
 
           <Field>
-            {isSalaryIncome ? "회사" : "가맹점/내용"}
+            {merchantLabel}
             <Input
               value={draft.merchantName}
               onChange={(event) =>
@@ -1657,7 +1662,8 @@ const IncomeRecurrenceCard = styled.div<{
   $checked?: boolean
   $interactive?: boolean
 }>`
-  height: 58px;
+  min-height: 0;
+  align-self: stretch;
   display: flex;
   align-items: center;
   gap: 9px;
