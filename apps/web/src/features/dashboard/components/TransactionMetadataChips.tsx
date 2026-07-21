@@ -5,7 +5,6 @@ import {
   CalendarRange,
   CreditCard,
   Landmark,
-  ListTree,
   Repeat2,
   Tag,
   Wallet,
@@ -51,12 +50,6 @@ export function TransactionMetadataChips({
       <CategoryChip $color={category?.color ?? colors.subtle}>
         {category?.name ?? "기타"}
       </CategoryChip>
-      {splitCategories.length > 0 ? (
-        <SplitChip title={`${splitCategories.length}개 카테고리로 분할`}>
-          <ListTree size={12} aria-hidden="true" /> 분할{" "}
-          {splitCategories.length}
-        </SplitChip>
-      ) : null}
       {splitCategories.map((splitCategory) => (
         <CategoryChip key={splitCategory.id} $color={splitCategory.color}>
           {splitCategory.name}
@@ -156,8 +149,4 @@ const CategoryChip = styled(Chip)<{ $color: string }>`
 const TagChip = styled(Chip)`
   color: ${colors.muted};
   padding-left: 7px;
-`
-
-const SplitChip = styled(Chip)`
-  box-shadow: inset 3px 0 0 ${colors.amber};
 `
