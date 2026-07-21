@@ -3,14 +3,47 @@
 import styled from "@emotion/styled"
 import { colors, radii } from "@salimon/ui-tokens"
 import { Check, Circle, X } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { observer } from "mobx-react-lite"
 import { useAppStore } from "../StoreProvider"
 
+interface PersistentDismissalState {
+  key: string
+  dismissed: boolean
+}
+
 export const OnboardingChecklist = observer(function OnboardingChecklist() {
   const store = useAppStore()
-  const [dismissed, setDismissed] = useState(false)
-  if (dismissed || store.dataState !== "ready" || !store.currentLedger) return null
+  const [temporarilyDismissedLedgerId, setTemporarilyDismissedLedgerId] =
+    useState<string | null>(null)
+  const [persistentDismissal, setPersistentDismissal] =
+    useState<PersistentDismissalState | null>(null)
+  const dismissalKey =
+    store.authUser && store.selectedLedgerId
+      ? `salimon:onboarding-checklist-dismissed:${store.authUser.id}:${store.selectedLedgerId}`
+      : null
+
+  useEffect(() => {
+    if (!dismissalKey) {
+      setPersistentDismissal(null)
+      return
+    }
+
+    setPersistentDismissal({
+      key: dismissalKey,
+      dismissed: window.localStorage.getItem(dismissalKey) === "true",
+    })
+  }, [dismissalKey])
+
+  if (
+    store.dataState !== "ready" ||
+    !store.currentLedger ||
+    temporarilyDismissedLedgerId === store.selectedLedgerId ||
+    (dismissalKey && persistentDismissal?.key !== dismissalKey) ||
+    persistentDismissal?.dismissed
+  ) {
+    return null
+  }
 
   const steps = [
     {
@@ -62,9 +95,27 @@ export const OnboardingChecklist = observer(function OnboardingChecklist() {
           <strong>공동생활비 시작하기</strong>
           <span>{completed}/{steps.length} 완료</span>
         </div>
-        <button type="button" onClick={() => setDismissed(true)} aria-label="체크리스트 닫기">
-          <X size={15} />
-        </button>
+        <HeaderActions>
+          <KeepClosedButton
+            type="button"
+            onClick={() => {
+              if (!dismissalKey) return
+              window.localStorage.setItem(dismissalKey, "true")
+              setPersistentDismissal({ key: dismissalKey, dismissed: true })
+            }}
+          >
+            계속 닫기
+          </KeepClosedButton>
+          <CloseButton
+            type="button"
+            onClick={() =>
+              setTemporarilyDismissedLedgerId(store.selectedLedgerId)
+            }
+            aria-label="체크리스트 닫기"
+          >
+            <X size={15} />
+          </CloseButton>
+        </HeaderActions>
       </ChecklistHeader>
       <Progress><i style={{ width: `${(completed / steps.length) * 100}%` }} /></Progress>
       <StepList>
@@ -100,7 +151,30 @@ const ChecklistHeader = styled.div`
   gap: 10px;
   > div { display: flex; align-items: baseline; gap: 8px; }
   span { color: ${colors.muted}; font-size: 11px; }
-  button { border: 0; background: transparent; color: ${colors.muted}; }
+`
+const HeaderActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+`
+const KeepClosedButton = styled.button`
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+  color: ${colors.muted};
+  padding: 0 6px;
+  font-size: 11px;
+`
+const CloseButton = styled.button`
+  width: 28px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: ${colors.muted};
+  padding: 0;
 `
 const Progress = styled.div`
   height: 4px;

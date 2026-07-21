@@ -935,7 +935,7 @@ const FormRow = styled.div`
 
 const FormAction = styled(Button)`
   align-self: start;
-  margin-top: 21px;
+  margin-top: 26px;
 
   @media (max-width: 640px) {
     width: 100%;
