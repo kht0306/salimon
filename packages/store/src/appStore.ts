@@ -163,7 +163,20 @@ export class AppStore {
   }
 
   get selectableLedgers() {
-    return this.data.ledgers
+    const defaultLedgerId = this.data.members.find(
+      (member) => member.userId === this.authUser?.id && member.isDefault,
+    )?.ledgerId
+    const defaultLedger = this.data.ledgers.find(
+      (ledger) => ledger.id === defaultLedgerId && !ledger.archivedAt,
+    )
+
+    return [
+      ...(defaultLedger ? [defaultLedger] : []),
+      ...this.data.ledgers.filter(
+        (ledger) => !ledger.archivedAt && ledger.id !== defaultLedgerId,
+      ),
+      ...this.data.ledgers.filter((ledger) => Boolean(ledger.archivedAt)),
+    ]
   }
 
   get archivedOwnedLedgers() {
