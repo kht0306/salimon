@@ -21,14 +21,14 @@ interface TransactionMetadataChipsProps {
   transaction: Transaction
   category?: Category
   paymentMethod?: PaymentMethod
-  splitCount?: number
+  splitCategories?: Category[]
 }
 
 export function TransactionMetadataChips({
   transaction,
   category,
   paymentMethod,
-  splitCount = 0,
+  splitCategories = [],
 }: TransactionMetadataChipsProps) {
   const paymentLabel = getPaymentMetadataLabel(transaction, paymentMethod)
   const installmentLabel = getInstallmentLabel(transaction)
@@ -51,11 +51,17 @@ export function TransactionMetadataChips({
       <CategoryChip $color={category?.color ?? colors.subtle}>
         {category?.name ?? "기타"}
       </CategoryChip>
-      {splitCount > 0 ? (
-        <SplitChip title={`${splitCount}개 카테고리로 분할`}>
-          <ListTree size={12} aria-hidden="true" /> 분할 {splitCount}
+      {splitCategories.length > 0 ? (
+        <SplitChip title={`${splitCategories.length}개 카테고리로 분할`}>
+          <ListTree size={12} aria-hidden="true" /> 분할{" "}
+          {splitCategories.length}
         </SplitChip>
       ) : null}
+      {splitCategories.map((splitCategory) => (
+        <CategoryChip key={splitCategory.id} $color={splitCategory.color}>
+          {splitCategory.name}
+        </CategoryChip>
+      ))}
       {paymentLabel ? (
         <PaymentChip $kind={paymentKind} title={paymentLabel}>
           {paymentMethod?.type === "card" ? (
