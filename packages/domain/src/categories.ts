@@ -15,7 +15,18 @@ export const expenseCategorySeeds = [
   { name: "문화/여가", icon: "ticket", color: "#755aa8" },
   { name: "교육", icon: "book-open", color: "#b8783e" },
   { name: "기타", icon: "more-horizontal", color: "#727a82" },
+  { name: "분할", icon: "list-tree", color: "#d99a24" },
 ] as const
+
+export const SPLIT_CATEGORY_NAME = "분할"
+
+export function isSplitCategory(category: Category | undefined): boolean {
+  return Boolean(
+    category?.isDefault &&
+    category.type === "expense" &&
+    category.name === SPLIT_CATEGORY_NAME,
+  )
+}
 
 export const incomeCategorySeeds = [
   { name: "급여", icon: "briefcase-business", color: "#2d6a4f" },
@@ -48,6 +59,10 @@ export function createDefaultCategories(
       true,
     ),
   )
+  const splitCategory = expense.find((category) => isSplitCategory(category))
+  if (splitCategory) {
+    splitCategory.usageTypes = ["expense", "income", "saving"]
+  }
   const income = incomeCategorySeeds.map((seed, index) =>
     createCategory(
       ledgerId,
@@ -117,7 +132,7 @@ export function findOtherCategory(
   return (
     expenseCategories.find((category) => category.name === "기타") ??
     expenseCategories
-      .filter((category) => category.isDefault)
+      .filter((category) => category.isDefault && !isSplitCategory(category))
       .sort((a, b) => b.sortOrder - a.sortOrder)[0]
   )
 }

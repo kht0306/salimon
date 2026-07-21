@@ -17,6 +17,7 @@ import {
 import {
   findOtherCategory,
   fromDateTimeLocalValue,
+  isSplitCategory,
   maskSensitiveText,
   moveMonth,
   parseCardSmsText,
@@ -758,6 +759,19 @@ export class AppStore {
       this.notify("카테고리 이름을 입력해 주세요.", "error")
       return false
     }
+    if (
+      isSplitCategory(category) &&
+      ((name !== undefined && name !== category.name) ||
+        (patch.usageTypes !== undefined &&
+          (patch.usageTypes.length !== 3 ||
+            !(["expense", "income", "saving"] as const).every((usageType) =>
+              patch.usageTypes?.includes(usageType),
+            ))) ||
+        (patch.parentCategoryId !== undefined && patch.parentCategoryId !== ""))
+    ) {
+      this.notify("분할 카테고리의 기본 설정은 변경할 수 없습니다.", "error")
+      return false
+    }
     if (patch.color !== undefined && !isHexColor(patch.color)) {
       this.notify("색상은 # 뒤에 6자리 HEX 코드로 입력해 주세요.", "error")
       return false
@@ -797,7 +811,11 @@ export class AppStore {
 
   async archiveCategory(categoryId: string): Promise<void> {
     const category = this.data.categories.find((item) => item.id === categoryId)
-    if (!category || category.name === "기타") return
+    if (!category) return
+    if (category.name === "기타" || isSplitCategory(category)) {
+      this.notify("기본 카테고리는 제거할 수 없습니다.", "error")
+      return
+    }
 
     try {
       await this.repository.updateCategory(categoryId, { isArchived: true })

@@ -1,7 +1,7 @@
 "use client"
 
 import styled from "@emotion/styled"
-import { formatMoneyInput } from "@salimon/domain"
+import { formatMoneyInput, isSplitCategory } from "@salimon/domain"
 import type { Category, CategoryUsageType } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import {
@@ -738,8 +738,13 @@ export const CategoryManager = observer(function CategoryManager() {
                 </>
               ) : (
                 <IconButton
-                  title="카테고리 수정"
+                  title={
+                    isSplitCategory(category)
+                      ? "분할 카테고리는 수정할 수 없습니다"
+                      : "카테고리 수정"
+                  }
                   aria-label={`${category.name} 수정`}
+                  disabled={isSplitCategory(category)}
                   onClick={() => startEditing(category)}
                 >
                   <Pencil size={15} />
@@ -748,12 +753,12 @@ export const CategoryManager = observer(function CategoryManager() {
               <IconButton
                 $variant="danger"
                 title={
-                  category.name === "기타"
-                    ? "기타 카테고리는 제거할 수 없습니다"
+                  category.name === "기타" || isSplitCategory(category)
+                    ? `${category.name} 카테고리는 제거할 수 없습니다`
                     : "카테고리 제거"
                 }
                 aria-label={`${category.name} 제거`}
-                disabled={category.name === "기타"}
+                disabled={category.name === "기타" || isSplitCategory(category)}
                 onClick={() => void store.archiveCategory(category.id)}
               >
                 <Archive size={15} />

@@ -325,6 +325,15 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
           const paymentMethod = store.data.paymentMethods.find(
             (item) => item.id === transaction.paymentMethodId,
           )
+          const splitCategories = store.data.transactionSplits
+            .filter((split) => split.transactionId === transaction.id)
+            .sort((first, second) => first.sortOrder - second.sortOrder)
+            .flatMap((split) => {
+              const splitCategory = store.data.categories.find(
+                (item) => item.id === split.categoryId,
+              )
+              return splitCategory ? [splitCategory] : []
+            })
           return (
             <Row
               key={transaction.id}
@@ -341,11 +350,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
                   transaction={transaction}
                   category={category}
                   paymentMethod={paymentMethod}
-                  splitCount={
-                    store.data.transactionSplits.filter(
-                      (split) => split.transactionId === transaction.id,
-                    ).length
-                  }
+                  splitCategories={splitCategories}
                 />
                 <strong>
                   {transaction.merchantName || transaction.memo || "거래"}

@@ -7,6 +7,7 @@ import {
   formatMoneyInput,
   formatKrw,
   getDateTimeLocalValue,
+  isSplitCategory,
   splitInstallmentPrincipal,
 } from "@salimon/domain"
 import type { TransactionGrouping } from "@salimon/store"
@@ -126,13 +127,19 @@ export const TransactionPanel = observer(function TransactionPanel() {
   }, [draft, isAdding, splits, store, store.transactionEditorOpen, tagsInput])
 
   const amount = Number(draft.amount)
+  const splitCategorySelected = isSplitCategory(
+    store.currentCategories.find(
+      (category) => category.id === draft.categoryId,
+    ),
+  )
   const splitTotal = splits.reduce(
     (sum, split) => sum + Number(split.amount || 0),
     0,
   )
   const splitsValid =
     splits.length === 0 ||
-    (draft.recurringType === "none" &&
+    (splitCategorySelected &&
+      draft.recurringType === "none" &&
       splits.length <= 10 &&
       new Set(splits.map((split) => split.categoryId)).size === splits.length &&
       splits.every(
@@ -157,6 +164,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const transactionTime = transactionTimeValue.slice(0, 5)
   const selectableCategories = store.currentCategories.filter((category) =>
     category.usageTypes.includes(draft.type as CategoryUsageType),
+  )
+  const splitSelectableCategories = selectableCategories.filter(
+    (category) => !isSplitCategory(category),
   )
   const categoryLabel = (categoryId: string): string => {
     const category = store.currentCategories.find(
@@ -446,7 +456,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
           .split(",")
           .map((tag) => tag.trim())
           .filter(Boolean),
-        splits: splits.map((split) => ({
+        splits: (splitCategorySelected ? splits : []).map((split) => ({
           categoryId: split.categoryId,
           amount: Number(split.amount),
         })),
@@ -877,9 +887,19 @@ export const TransactionPanel = observer(function TransactionPanel() {
             기준 카테고리
             <Select
               value={draft.categoryId}
-              onChange={(event) =>
-                setDraft({ ...draft, categoryId: event.target.value })
-              }
+              onChange={(event) => {
+                const categoryId = event.target.value
+                if (
+                  !isSplitCategory(
+                    store.currentCategories.find(
+                      (category) => category.id === categoryId,
+                    ),
+                  )
+                ) {
+                  setSplits([])
+                }
+                setDraft({ ...draft, categoryId })
+              }}
             >
               <option value="">기본 카테고리 자동 적용</option>
               {selectableCategories.map((category) => (
@@ -890,7 +910,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
             </Select>
           </Field>
 
-          {draft.recurringType === "none" ? (
+          {draft.recurringType === "none" && splitCategorySelected ? (
             <SplitSection>
               <SplitHeader>
                 <span>
@@ -899,13 +919,15 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 </span>
                 <Button
                   type="button"
-                  disabled={splits.length >= 10 || selectableCategories.length === 0}
+                  disabled={
+                    splits.length >= 10 ||
+                    splitSelectableCategories.length === 0
+                  }
                   onClick={() =>
                     setSplits([
                       ...splits,
                       {
-                        categoryId:
-                          draft.categoryId || selectableCategories[0]?.id || "",
+                        categoryId: splitSelectableCategories[0]?.id || "",
                         amount: "",
                       },
                     ])
@@ -929,7 +951,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                       )
                     }
                   >
-                    {selectableCategories.map((category) => (
+                    {splitSelectableCategories.map((category) => (
                       <option key={category.id} value={category.id}>
                         {categoryLabel(category.id)}
                       </option>
@@ -1061,6 +1083,19 @@ export const TransactionPanel = observer(function TransactionPanel() {
                       const paymentMethod = store.data.paymentMethods.find(
                         (item) => item.id === transaction.paymentMethodId,
                       )
+                      const splitCategories = store.data.transactionSplits
+                        .filter(
+                          (split) => split.transactionId === transaction.id,
+                        )
+                        .sort(
+                          (first, second) => first.sortOrder - second.sortOrder,
+                        )
+                        .flatMap((split) => {
+                          const splitCategory = store.data.categories.find(
+                            (item) => item.id === split.categoryId,
+                          )
+                          return splitCategory ? [splitCategory] : []
+                        })
                       const registrant =
                         store.currentMembers.find(
                           (member) => member.userId === transaction.createdBy,
@@ -1081,12 +1116,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                               transaction={transaction}
                               category={category}
                               paymentMethod={paymentMethod}
-                              splitCount={
-                                store.data.transactionSplits.filter(
-                                  (split) =>
-                                    split.transactionId === transaction.id,
-                                ).length
-                              }
+                              splitCategories={splitCategories}
                             />
                             <Amount $type={transaction.type}>
                               {formatKrw(transaction.amount)}
