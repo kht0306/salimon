@@ -130,7 +130,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
     <PanelStack>
       <Panel>
         <PanelHeader>
-          <PanelTitle>현재 가계부</PanelTitle>
+          <PanelTitle>{ledger ? "현재 가계부" : "가계부 시작하기"}</PanelTitle>
           {ledger ? (
             <LedgerMeta>
               {ledger.type === "shared" ? "공동" : "개인"} ·{" "}
@@ -140,82 +140,92 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
           ) : null}
         </PanelHeader>
 
-        <FormRow>
-          <Field>
-            <span>
-              가계부 이름<RequiredMark>*</RequiredMark>
-            </span>
-            <Input
-              value={renameName}
-              maxLength={30}
-              disabled={!canRename || isMutating || isArchived}
-              onChange={(event) => setRenameName(event.target.value)}
-              aria-describedby={
-                ledger?.type === "shared" ? "shared-rename-help" : undefined
-              }
-            />
-            {ledger?.type === "shared" ? (
-              <FieldHelp id="shared-rename-help">
-                변경한 이름은 모든 공동 멤버에게 동일하게 표시됩니다.
-              </FieldHelp>
-            ) : null}
-          </Field>
-          <CurrentLedgerActions>
-            <Button
-              type="button"
-              $variant="primary"
-              disabled={
-                !canRename ||
-                isMutating ||
-                !renameName.trim() ||
-                renameName.trim() === ledger?.name
-              }
-              onClick={() => void store.renameCurrentLedger(renameName)}
-            >
-              <Pencil size={15} />
-              {store.ledgerMutationState === "renaming"
-                ? "이름 변경 중"
-                : "가계부 이름 변경"}
-            </Button>
-            {ledger?.ownerId === store.authUser?.id && !isArchived ? (
-              <Button
-                type="button"
-                $variant="danger"
-                disabled={isDefaultLedger || isMutating}
+        {ledger ? (
+          <FormRow>
+            <Field>
+              <span>
+                가계부 이름<RequiredMark>*</RequiredMark>
+              </span>
+              <Input
+                value={renameName}
+                maxLength={30}
+                disabled={!canRename || isMutating || isArchived}
+                onChange={(event) => setRenameName(event.target.value)}
                 aria-describedby={
-                  isDefaultLedger ? "default-ledger-removal-help" : undefined
+                  ledger?.type === "shared" ? "shared-rename-help" : undefined
                 }
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "가계부를 제거하시겠습니까? 30일 동안 복구할 수 있으며 카드·계좌 원본은 유지됩니다.",
-                    )
-                  ) {
-                    void store.archiveCurrentLedger()
-                  }
-                }}
-              >
-                <Trash2 size={15} />
-                {store.ledgerMutationState === "archiving"
-                  ? "제거 중"
-                  : "가계부 제거"}
-              </Button>
-            ) : null}
-            {ledger && ledger.ownerId === store.authUser?.id && isArchived ? (
+              />
+              {ledger?.type === "shared" ? (
+                <FieldHelp id="shared-rename-help">
+                  변경한 이름은 모든 공동 멤버에게 동일하게 표시됩니다.
+                </FieldHelp>
+              ) : null}
+            </Field>
+            <CurrentLedgerActions>
               <Button
                 type="button"
-                $variant="soft"
-                disabled={isMutating}
-                onClick={() => void store.restoreLedger(ledger.id)}
+                $variant="primary"
+                disabled={
+                  !canRename ||
+                  isMutating ||
+                  !renameName.trim() ||
+                  renameName.trim() === ledger?.name
+                }
+                onClick={() => void store.renameCurrentLedger(renameName)}
               >
-                <RotateCcw size={15} />
-                {store.ledgerMutationState === "restoring"
-                  ? "복구 중"
-                  : "가계부 복구"}
+                <Pencil size={15} />
+                {store.ledgerMutationState === "renaming"
+                  ? "이름 변경 중"
+                  : "가계부 이름 변경"}
               </Button>
-            ) : null}
-          </CurrentLedgerActions>
-        </FormRow>
+              {ledger?.ownerId === store.authUser?.id && !isArchived ? (
+                <Button
+                  type="button"
+                  $variant="danger"
+                  disabled={isDefaultLedger || isMutating}
+                  aria-describedby={
+                    isDefaultLedger ? "default-ledger-removal-help" : undefined
+                  }
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "가계부를 제거하시겠습니까? 30일 동안 복구할 수 있으며 카드·계좌 원본은 유지됩니다.",
+                      )
+                    ) {
+                      void store.archiveCurrentLedger()
+                    }
+                  }}
+                >
+                  <Trash2 size={15} />
+                  {store.ledgerMutationState === "archiving"
+                    ? "제거 중"
+                    : "가계부 제거"}
+                </Button>
+              ) : null}
+              {ledger && ledger.ownerId === store.authUser?.id && isArchived ? (
+                <Button
+                  type="button"
+                  $variant="soft"
+                  disabled={isMutating}
+                  onClick={() => void store.restoreLedger(ledger.id)}
+                >
+                  <RotateCcw size={15} />
+                  {store.ledgerMutationState === "restoring"
+                    ? "복구 중"
+                    : "가계부 복구"}
+                </Button>
+              ) : null}
+            </CurrentLedgerActions>
+          </FormRow>
+        ) : (
+          <EmptyLedgerNotice>
+            <strong>아직 참여 중인 가계부가 없습니다.</strong>
+            <span>
+              아래에서 새 가계부를 만들거나, 받은 초대 코드로 공동 가계부에
+              참여해 주세요.
+            </span>
+          </EmptyLedgerNotice>
+        )}
 
         {isDefaultLedger && !isArchived ? (
           <RemovalNotice id="default-ledger-removal-help">
@@ -961,6 +971,19 @@ const PanelStack = styled.div`
 const LedgerMeta = styled.span`
   color: ${colors.muted};
   font-size: 12px;
+`
+
+const EmptyLedgerNotice = styled.div`
+  display: grid;
+  gap: ${spacing[2]};
+  padding: ${spacing[5]};
+  color: ${colors.ink};
+
+  span {
+    color: ${colors.muted};
+    font-size: 13px;
+    line-height: 1.6;
+  }
 `
 
 const FormRow = styled.div`

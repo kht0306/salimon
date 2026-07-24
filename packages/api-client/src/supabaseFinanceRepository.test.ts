@@ -191,6 +191,9 @@ describe("acceptInvite", () => {
       status: "already_member",
       ledgerId: "ledger-2",
     })
+    expect(rpc).toHaveBeenCalledWith("accept_ledger_invite_and_set_default", {
+      submitted_code: "ABCDEFGH",
+    })
   })
 
   it("keeps invalid and expired codes indistinguishable", async () => {

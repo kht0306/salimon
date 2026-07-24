@@ -1,4 +1,5 @@
 import { AppStore } from "@salimon/store"
+import { createEmptyFinanceData } from "@salimon/api-client"
 import type { Ledger, LedgerMember } from "@salimon/types"
 import { describe, expect, it } from "vitest"
 
@@ -49,5 +50,16 @@ describe("AppStore.selectableLedgers", () => {
       "archived-1",
       "archived-2",
     ])
+  })
+
+  it("opens ledger setup when an authenticated user has no ledgers", () => {
+    const store = new AppStore()
+    store.authUser = { id: "user-1", nickname: "사용자" }
+
+    store.hydrate(createEmptyFinanceData())
+    store.setView("calendar")
+
+    expect(store.selectedLedgerId).toBe("")
+    expect(store.activeView).toBe("ledger")
   })
 })

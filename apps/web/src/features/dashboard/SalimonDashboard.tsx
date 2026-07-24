@@ -61,6 +61,7 @@ const DashboardContent = observer(function DashboardContent() {
   const store = useAppStore()
   const router = useRouter()
   const currentMembership = store.currentMembership
+  const hasCurrentLedger = Boolean(store.currentLedger)
   const isArchivedLedger = Boolean(store.currentLedger?.archivedAt)
 
   useEffect(() => {
@@ -88,7 +89,11 @@ const DashboardContent = observer(function DashboardContent() {
   }
 
   return (
-    <Shell $showTransactionPanel={store.activeView === "calendar"}>
+    <Shell
+      $showTransactionPanel={
+        hasCurrentLedger && store.activeView === "calendar"
+      }
+    >
       <Sidebar>
         <Brand
           type="button"
@@ -111,7 +116,7 @@ const DashboardContent = observer(function DashboardContent() {
               disabled={store.selectableLedgers.length === 0}
             >
               {store.selectableLedgers.length === 0 ? (
-                <option value="">로그인 후 불러오기</option>
+                <option value="">아직 가계부가 없습니다</option>
               ) : null}
               {store.selectableLedgers.map((ledger) => (
                 <option key={ledger.id} value={ledger.id}>
@@ -160,7 +165,7 @@ const DashboardContent = observer(function DashboardContent() {
           </LedgerControl>
         </LedgerField>
 
-        {!isArchivedLedger ? (
+        {hasCurrentLedger && !isArchivedLedger ? (
           <MetricRow>
             <Metric>
               <MetricLabel>월 지출</MetricLabel>
@@ -184,7 +189,7 @@ const DashboardContent = observer(function DashboardContent() {
         ) : null}
 
         <Nav>
-          {!isArchivedLedger ? (
+          {hasCurrentLedger && !isArchivedLedger ? (
             <>
               <NavButton
                 $active={store.activeView === "calendar"}
@@ -247,7 +252,7 @@ const DashboardContent = observer(function DashboardContent() {
           >
             <Settings2 size={17} /> 가계부 관리
           </NavButton>
-          {isLocalDevelopment && !isArchivedLedger ? (
+          {isLocalDevelopment && hasCurrentLedger && !isArchivedLedger ? (
             <NavButton
               $active={store.activeView === "connection"}
               aria-current={
@@ -258,7 +263,7 @@ const DashboardContent = observer(function DashboardContent() {
               <Database size={17} /> 앱 관리
             </NavButton>
           ) : null}
-          {!isArchivedLedger ? (
+          {hasCurrentLedger && !isArchivedLedger ? (
             <NavButton
               $active={store.activeView === "trust"}
               aria-current={store.activeView === "trust" ? "page" : undefined}
@@ -281,27 +286,41 @@ const DashboardContent = observer(function DashboardContent() {
               가계부 /{" "}
               {isArchivedLedger
                 ? "보관중"
-                : store.currentLedger?.type === "shared"
-                  ? "공동"
-                  : "개인"}
+                : !hasCurrentLedger
+                  ? "준비"
+                  : store.currentLedger?.type === "shared"
+                    ? "공동"
+                    : "개인"}
             </Eyebrow>
-            <PageTitle>{store.currentLedger?.name ?? "가계부"}</PageTitle>
+            <PageTitle>
+              {store.currentLedger?.name ?? "가계부 시작하기"}
+            </PageTitle>
           </div>
           <MobileAuth>
             <AuthControls />
           </MobileAuth>
         </Topline>
 
-        {!isArchivedLedger ? <OnboardingChecklist /> : null}
+        {hasCurrentLedger && !isArchivedLedger ? <OnboardingChecklist /> : null}
 
-        {store.activeView === "calendar" ? <CalendarGrid /> : null}
-        {store.activeView === "transactions" ? <TransactionListPanel /> : null}
-        {store.activeView === "categories" ? <CategoryManager /> : null}
-        {store.activeView === "cards" ? <CardManager /> : null}
-        {store.activeView === "accounts" ? (
+        {hasCurrentLedger && store.activeView === "calendar" ? (
+          <CalendarGrid />
+        ) : null}
+        {hasCurrentLedger && store.activeView === "transactions" ? (
+          <TransactionListPanel />
+        ) : null}
+        {hasCurrentLedger && store.activeView === "categories" ? (
+          <CategoryManager />
+        ) : null}
+        {hasCurrentLedger && store.activeView === "cards" ? (
+          <CardManager />
+        ) : null}
+        {hasCurrentLedger && store.activeView === "accounts" ? (
           <AccountManager key={store.selectedLedgerId} />
         ) : null}
-        {store.activeView === "settlement" ? <SettlementPanel /> : null}
+        {hasCurrentLedger && store.activeView === "settlement" ? (
+          <SettlementPanel />
+        ) : null}
         {store.activeView === "trust" ? <TrustCenter /> : null}
         {store.activeView === "ledger" ? (
           <LedgerManagementPanel key={store.selectedLedgerId} />
@@ -314,7 +333,7 @@ const DashboardContent = observer(function DashboardContent() {
         ) : null}
       </Workspace>
 
-      {store.activeView === "calendar" ? (
+      {hasCurrentLedger && store.activeView === "calendar" ? (
         <TransactionPanel
           key={`${store.selectedLedgerId}-${store.selectedDate}`}
         />

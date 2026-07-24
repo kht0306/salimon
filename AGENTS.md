@@ -162,6 +162,15 @@ When responding:
 - Explain tradeoffs clearly.
 - Do not hide uncertainty.
 - Mention risks or assumptions before implementation.
+- The project owner is a frontend developer. When explaining backend concepts,
+  define backend-specific terms on first use and translate them into familiar
+  frontend concepts such as API calls, request/response flow, client state, and
+  UI behavior.
+- Do not rely on unexplained terms such as RPC, database function, transaction,
+  trigger, RLS, or migration. For example, describe a Supabase RPC as
+  "a frontend call to a backend function, similar to calling an API endpoint,"
+  then explain what the frontend sends, what the backend changes, and what the
+  frontend receives.
 
 # Development environments
 
