@@ -73,19 +73,13 @@ export function observeAuthSession(
   return () => data.subscription.unsubscribe()
 }
 
-export async function ensureAuthenticatedWorkspace(): Promise<string> {
+export async function ensureAuthenticatedProfile(): Promise<void> {
   const client = requireSupabaseClient()
-  const { data, error } = await client.rpc("ensure_user_workspace")
+  const { error } = await client.rpc("ensure_user_profile")
 
   if (error) {
     throw error
   }
-
-  if (typeof data !== "string") {
-    throw new Error("기본 가계부 초기화 결과를 확인할 수 없습니다.")
-  }
-
-  return data
 }
 
 export async function completeAuthCallback(): Promise<AuthSessionInfo> {

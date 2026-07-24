@@ -1,7 +1,7 @@
 import {
   checkSupabaseConnection,
   createEmptyFinanceData,
-  ensureAuthenticatedWorkspace,
+  ensureAuthenticatedProfile,
   getCurrentAuthSession,
   observeAuthSession,
   signInWithKakao,
@@ -119,8 +119,8 @@ export class AppStore {
     | "archiving"
     | "restoring"
     | "syncing-payment-methods" = "idle"
-  private initializedWorkspaceUserId: string | null = null
-  private workspaceInitialization: Promise<void> | null = null
+  private initializedProfileUserId: string | null = null
+  private profileInitialization: Promise<void> | null = null
   supabaseConnection: SupabaseConnectionCheck = {
     state: "idle",
     hasUrl: false,
@@ -381,7 +381,10 @@ export class AppStore {
       )?.ledgerId
       this.selectedLedgerId = defaultLedgerId ?? this.activeLedgers[0]?.id ?? ""
     }
-    if (this.currentLedger?.archivedAt) {
+    if (
+      this.currentLedger?.archivedAt ||
+      (this.authUser && this.selectableLedgers.length === 0)
+    ) {
       this.activeView = "ledger"
     }
   }
@@ -414,7 +417,8 @@ export class AppStore {
   }
 
   setView(view: AppStore["activeView"]): void {
-    this.activeView = this.currentLedger?.archivedAt ? "ledger" : view
+    this.activeView =
+      !this.currentLedger || this.currentLedger.archivedAt ? "ledger" : view
   }
 
   setCalendarRegistrant(registrantId: string): void {
@@ -508,8 +512,8 @@ export class AppStore {
       runInAction(() => {
         this.authUser = null
         this.authState = "anonymous"
-        this.initializedWorkspaceUserId = null
-        this.workspaceInitialization = null
+        this.initializedProfileUserId = null
+        this.profileInitialization = null
         this.hydrate(createEmptyFinanceData())
         this.dataState = "idle"
       })
@@ -1760,8 +1764,8 @@ export class AppStore {
     if (!session) {
       this.authUser = null
       this.authState = "anonymous"
-      this.initializedWorkspaceUserId = null
-      this.workspaceInitialization = null
+      this.initializedProfileUserId = null
+      this.profileInitialization = null
       this.hydrate(createEmptyFinanceData())
       this.dataState = "idle"
       return
@@ -1772,7 +1776,7 @@ export class AppStore {
     this.authError = null
 
     try {
-      await this.ensureWorkspace(session.user.id)
+      await this.ensureProfile(session.user.id)
     } catch (error) {
       this.setAuthError(error)
       return
@@ -1798,28 +1802,28 @@ export class AppStore {
     this.notify(this.dataError, "error")
   }
 
-  private async ensureWorkspace(userId: string): Promise<void> {
-    if (this.initializedWorkspaceUserId !== userId) {
-      this.initializedWorkspaceUserId = userId
-      this.workspaceInitialization = ensureAuthenticatedWorkspace().then(
+  private async ensureProfile(userId: string): Promise<void> {
+    if (this.initializedProfileUserId !== userId) {
+      this.initializedProfileUserId = userId
+      this.profileInitialization = ensureAuthenticatedProfile().then(
         () => undefined,
       )
     }
 
-    const initialization = this.workspaceInitialization
+    const initialization = this.profileInitialization
     try {
       await initialization
     } catch (error) {
       runInAction(() => {
-        if (this.initializedWorkspaceUserId === userId) {
-          this.initializedWorkspaceUserId = null
+        if (this.initializedProfileUserId === userId) {
+          this.initializedProfileUserId = null
         }
       })
       throw error
     } finally {
       runInAction(() => {
-        if (this.workspaceInitialization === initialization) {
-          this.workspaceInitialization = null
+        if (this.profileInitialization === initialization) {
+          this.profileInitialization = null
         }
       })
     }

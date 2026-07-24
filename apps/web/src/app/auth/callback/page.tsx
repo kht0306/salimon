@@ -1,6 +1,9 @@
 "use client"
 
-import { completeAuthCallback, ensureAuthenticatedWorkspace } from "@salimon/api-client"
+import {
+  completeAuthCallback,
+  ensureAuthenticatedProfile,
+} from "@salimon/api-client"
 import { colors, radii, shadows } from "@salimon/ui-tokens"
 import styled from "@emotion/styled"
 import { CheckCircle2, LoaderCircle, TriangleAlert } from "lucide-react"
@@ -19,10 +22,10 @@ export default function AuthCallbackPage() {
     async function finishLogin() {
       try {
         await completeAuthCallback()
-        await ensureAuthenticatedWorkspace()
+        await ensureAuthenticatedProfile()
         if (!active) return
 
-        setMessage("로그인이 완료되었습니다. 가계부로 이동합니다.")
+        setMessage("로그인이 완료되었습니다. 살림온으로 이동합니다.")
         redirectTimer = window.setTimeout(() => router.replace("/"), 350)
       } catch (error) {
         if (!active) return

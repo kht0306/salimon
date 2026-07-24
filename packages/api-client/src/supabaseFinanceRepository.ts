@@ -888,9 +888,12 @@ export class SupabaseFinanceRepository {
 
   async acceptInvite(inviteCode: string): Promise<AcceptLedgerInviteResult> {
     const client = requireSupabaseClient()
-    const { data, error } = await client.rpc("accept_ledger_invite", {
-      submitted_code: inviteCode,
-    })
+    const { data, error } = await client.rpc(
+      "accept_ledger_invite_and_set_default",
+      {
+        submitted_code: inviteCode,
+      },
+    )
     throwIfError(error)
     if (!data || typeof data !== "object" || !("status" in data)) {
       throw new Error("초대 코드 확인 결과를 읽을 수 없습니다.")
