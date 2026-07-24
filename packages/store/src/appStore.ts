@@ -1,5 +1,6 @@
 import {
   checkSupabaseConnection,
+  clearLocalAuthSession,
   createEmptyFinanceData,
   ensureAuthenticatedProfile,
   getCurrentAuthSession,
@@ -483,7 +484,12 @@ export class AppStore {
     try {
       await this.applyAuthSession(await getCurrentAuthSession())
     } catch (error) {
-      this.setAuthError(error)
+      const failedUserId = this.authUser?.id
+      if (failedUserId) {
+        await this.rejectAuthSession(failedUserId, error)
+      } else {
+        this.setAuthError(error)
+      }
     }
   }
 
@@ -1778,7 +1784,7 @@ export class AppStore {
     try {
       await this.ensureProfile(session.user.id)
     } catch (error) {
-      this.setAuthError(error)
+      await this.rejectAuthSession(session.user.id, error)
       return
     }
 
@@ -1800,6 +1806,28 @@ export class AppStore {
         ? error.message
         : "가계부 데이터를 저장하지 못했습니다."
     this.notify(this.dataError, "error")
+  }
+
+  private async rejectAuthSession(
+    userId: string,
+    error: unknown,
+  ): Promise<void> {
+    try {
+      await clearLocalAuthSession()
+    } catch {
+      // Keep the original initialization error visible.
+    }
+
+    runInAction(() => {
+      if (this.authUser && this.authUser.id !== userId) return
+
+      this.authUser = null
+      this.initializedProfileUserId = null
+      this.profileInitialization = null
+      this.hydrate(createEmptyFinanceData())
+      this.dataState = "idle"
+      this.setAuthError(error)
+    })
   }
 
   private async ensureProfile(userId: string): Promise<void> {

@@ -27,7 +27,7 @@ export async function signInWithKakao(): Promise<void> {
   })
 
   if (error) {
-    throw error
+    throw new Error(error.message)
   }
 }
 
@@ -36,7 +36,16 @@ export async function signOutFromSupabase(): Promise<void> {
   const { error } = await client.auth.signOut()
 
   if (error) {
-    throw error
+    throw new Error(error.message)
+  }
+}
+
+export async function clearLocalAuthSession(): Promise<void> {
+  const client = requireSupabaseClient()
+  const { error } = await client.auth.signOut({ scope: "local" })
+
+  if (error) {
+    throw new Error(error.message)
   }
 }
 
@@ -45,7 +54,7 @@ export async function getCurrentAuthSession(): Promise<AuthSessionInfo | null> {
   const { data, error } = await client.auth.getSession()
 
   if (error) {
-    throw error
+    throw new Error(error.message)
   }
 
   return toAuthSessionInfo(data.session)
@@ -54,7 +63,7 @@ export async function getCurrentAuthSession(): Promise<AuthSessionInfo | null> {
 export async function getCurrentAccessToken(): Promise<string | null> {
   const client = requireSupabaseClient()
   const { data, error } = await client.auth.getSession()
-  if (error) throw error
+  if (error) throw new Error(error.message)
   return data.session?.access_token ?? null
 }
 
@@ -89,7 +98,7 @@ export async function completeAuthCallback(): Promise<AuthSessionInfo> {
   if (code) {
     const { data, error } = await client.auth.exchangeCodeForSession(code)
     if (error) {
-      throw error
+      throw new Error(error.message)
     }
 
     const session = toAuthSessionInfo(data.session)
