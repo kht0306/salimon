@@ -78,7 +78,7 @@ export async function ensureAuthenticatedProfile(): Promise<void> {
   const { error } = await client.rpc("ensure_user_profile")
 
   if (error) {
-    throw error
+    throw new Error(error.message)
   }
 }
 

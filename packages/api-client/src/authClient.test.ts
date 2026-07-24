@@ -21,4 +21,15 @@ describe("ensureAuthenticatedProfile", () => {
     await expect(ensureAuthenticatedProfile()).resolves.toBeUndefined()
     expect(rpc).toHaveBeenCalledWith("ensure_user_profile")
   })
+
+  it("surfaces the profile initialization error message", async () => {
+    rpc.mockResolvedValue({
+      data: null,
+      error: { message: "프로필 생성에 실패했습니다." },
+    })
+
+    await expect(ensureAuthenticatedProfile()).rejects.toThrow(
+      "프로필 생성에 실패했습니다.",
+    )
+  })
 })
