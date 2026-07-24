@@ -199,7 +199,7 @@ export class SupabaseFinanceRepository {
     ]
     const failed = results.find((result) => result.error)
     if (failed?.error) {
-      throw failed.error
+      throw toError(failed.error, "가계부 데이터를 불러오지 못했습니다.")
     }
 
     const profile = mapProfile(profileResult.data as Row)
@@ -1041,6 +1041,19 @@ function throwIfError(error: { message: string } | null): void {
   if (error) {
     throw new Error(error.message)
   }
+}
+
+function toError(error: unknown, fallbackMessage: string): Error {
+  if (error instanceof Error) return error
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return new Error(error.message)
+  }
+  return new Error(fallbackMessage)
 }
 
 function mapProfile(row: Row): Profile {

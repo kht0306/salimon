@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  clearLocalAuthSession,
   completeAuthCallback,
   ensureAuthenticatedProfile,
 } from "@salimon/api-client"
@@ -28,9 +29,20 @@ export default function AuthCallbackPage() {
         setMessage("로그인이 완료되었습니다. 살림온으로 이동합니다.")
         redirectTimer = window.setTimeout(() => router.replace("/"), 350)
       } catch (error) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "로그인 처리 중 오류가 발생했습니다."
+
+        try {
+          await clearLocalAuthSession()
+        } catch {
+          // The login error is more useful to the user than a cleanup error.
+        }
+
         if (!active) return
         setState("error")
-        setMessage(error instanceof Error ? error.message : "로그인 처리 중 오류가 발생했습니다.")
+        setMessage(errorMessage)
       }
     }
 
@@ -52,7 +64,7 @@ export default function AuthCallbackPage() {
           <p>{message}</p>
         </div>
         {state === "error" ? (
-          <HomeLink href="/">가계부로 돌아가기</HomeLink>
+          <HomeLink href="/login">로그인 화면으로 돌아가기</HomeLink>
         ) : (
           <CheckCircle2 className="complete" size={18} />
         )}

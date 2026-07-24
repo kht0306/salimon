@@ -65,12 +65,15 @@ const DashboardContent = observer(function DashboardContent() {
   const isArchivedLedger = Boolean(store.currentLedger?.archivedAt)
 
   useEffect(() => {
-    if (store.authState !== "loading" && !store.authUser) {
+    if (
+      store.authState !== "loading" &&
+      (store.authState !== "authenticated" || !store.authUser)
+    ) {
       router.replace("/login")
     }
   }, [router, store.authState, store.authUser])
 
-  if (!store.authUser) {
+  if (store.authState !== "authenticated" || !store.authUser) {
     return (
       <AuthLoading>
         {store.authState === "loading"

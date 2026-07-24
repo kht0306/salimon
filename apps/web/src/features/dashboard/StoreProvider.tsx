@@ -17,7 +17,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const refresh = () => {
-      if (!store.authUser || store.dataState === "loading") return
+      if (
+        store.authState !== "authenticated" ||
+        !store.authUser ||
+        store.dataState === "loading"
+      ) {
+        return
+      }
       void store.refreshFinanceData()
     }
     const refreshWhenVisible = () => {
