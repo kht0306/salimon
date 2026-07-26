@@ -132,10 +132,14 @@ async function prepareReceiptImage(file: File): Promise<Blob> {
 }
 
 const ReceiptControl = styled.div`
+  width: 100%;
   display: grid;
   justify-items: end;
   gap: 5px;
-  max-width: 280px;
+
+  > button {
+    width: 100%;
+  }
 
   .spin {
     animation: spin 1s linear infinite;
@@ -146,6 +150,7 @@ const ReceiptControl = styled.div`
   }
 `
 const Consent = styled.label`
+  max-width: 280px;
   display: flex;
   align-items: flex-start;
   gap: 6px;
