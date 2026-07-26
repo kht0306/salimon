@@ -5,6 +5,7 @@ export const runtime = "nodejs"
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
+const DEFAULT_RECEIPT_MODEL = "gemini-3.1-flash-lite"
 const recentRequests = new Map<string, number[]>()
 
 export async function POST(request: NextRequest) {
@@ -46,68 +47,76 @@ export async function POST(request: NextRequest) {
     return errorResponse("파일 내용과 이미지 형식이 일치하지 않습니다.", 415)
   }
 
-  const model = process.env.GEMINI_RECEIPT_MODEL || "gemini-3.1-flash-lite"
-  const googleResponse = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [
+  const primaryModel =
+    process.env.GEMINI_RECEIPT_MODEL?.trim() || DEFAULT_RECEIPT_MODEL
+  const configuredFallbackModel =
+    process.env.GEMINI_RECEIPT_FALLBACK_MODEL?.trim()
+  const fallbackModel =
+    configuredFallbackModel && configuredFallbackModel !== primaryModel
+      ? configuredFallbackModel
+      : undefined
+  const requestBody = JSON.stringify({
+    contents: [
+      {
+        role: "user",
+        parts: [
           {
-            role: "user",
-            parts: [
-              {
-                text: [
-                  "대한민국에서 발행된 결제 영수증 이미지에서 가계부 초안을 추출하세요.",
-                  "총 결제금액만 amount에 정수 원 단위로 넣고, 승인·과세·부가세·잔액은 제외하세요.",
-                  "merchantName은 실제 상호, transactionAt은 영수증의 결제 일시를 ISO 8601 형식으로 반환하세요.",
-                  "categoryHint는 식비, 교통, 생활비, 기타 중 가장 가까운 값으로 정하세요.",
-                  "카드 끝 4자리가 명확할 때만 paymentLast4를 반환하세요.",
-                  "보이지 않거나 불확실한 내용을 추측하지 말고 warnings에 한국어로 적으세요.",
-                  "이 결과는 자동 저장되지 않으며 사용자가 검토할 초안입니다.",
-                ].join("\n"),
-              },
-              {
-                inline_data: {
-                  mime_type: contentType,
-                  data: Buffer.from(image).toString("base64"),
-                },
-              },
-            ],
+            text: [
+              "대한민국에서 발행된 결제 영수증 이미지에서 가계부 초안을 추출하세요.",
+              "총 결제금액만 amount에 정수 원 단위로 넣고, 승인·과세·부가세·잔액은 제외하세요.",
+              "merchantName은 실제 상호, transactionAt은 영수증의 결제 일시를 ISO 8601 형식으로 반환하세요.",
+              "categoryHint는 식비, 교통, 생활비, 기타 중 가장 가까운 값으로 정하세요.",
+              "카드 끝 4자리가 명확할 때만 paymentLast4를 반환하세요.",
+              "보이지 않거나 불확실한 내용을 추측하지 말고 warnings에 한국어로 적으세요.",
+              "이 결과는 자동 저장되지 않으며 사용자가 검토할 초안입니다.",
+            ].join("\n"),
           },
-        ],
-        generationConfig: {
-          temperature: 0,
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "OBJECT",
-            required: [
-              "amount",
-              "merchantName",
-              "transactionAt",
-              "confidence",
-              "warnings",
-            ],
-            properties: {
-              amount: { type: "INTEGER", minimum: 0 },
-              merchantName: { type: "STRING" },
-              transactionAt: { type: "STRING" },
-              categoryHint: { type: "STRING" },
-              memo: { type: "STRING" },
-              paymentLast4: { type: "STRING" },
-              confidence: { type: "NUMBER", minimum: 0, maximum: 1 },
-              warnings: { type: "ARRAY", items: { type: "STRING" } },
+          {
+            inline_data: {
+              mime_type: contentType,
+              data: Buffer.from(image).toString("base64"),
             },
           },
+        ],
+      },
+    ],
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "OBJECT",
+        required: [
+          "amount",
+          "merchantName",
+          "transactionAt",
+          "confidence",
+          "warnings",
+        ],
+        properties: {
+          amount: { type: "INTEGER", minimum: 0 },
+          merchantName: { type: "STRING" },
+          transactionAt: { type: "STRING" },
+          categoryHint: { type: "STRING" },
+          memo: { type: "STRING" },
+          paymentLast4: { type: "STRING" },
+          confidence: { type: "NUMBER", minimum: 0, maximum: 1 },
+          warnings: { type: "ARRAY", items: { type: "STRING" } },
         },
-      }),
-      signal: AbortSignal.timeout(25_000),
+      },
     },
-  ).catch(() => null)
+  })
+
+  let model = primaryModel
+  let googleResponse = await requestGeminiModel(apiKey, model, requestBody)
+  if (googleResponse?.status === 429 && fallbackModel) {
+    const errorPayload = await googleResponse
+      .clone()
+      .json()
+      .catch(() => null)
+    if (isModelDailyQuotaError(errorPayload)) {
+      model = fallbackModel
+      googleResponse = await requestGeminiModel(apiKey, model, requestBody)
+    }
+  }
 
   if (!googleResponse) {
     return errorResponse("영수증 인식 서버가 응답하지 않습니다. 잠시 후 다시 시도해 주세요.", 504)
@@ -142,6 +151,25 @@ export async function POST(request: NextRequest) {
   } catch {
     return errorResponse("인식 결과를 안전한 가계부 초안으로 변환하지 못했습니다.", 422)
   }
+}
+
+async function requestGeminiModel(
+  apiKey: string,
+  model: string,
+  requestBody: string,
+) {
+  return fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: requestBody,
+      signal: AbortSignal.timeout(25_000),
+    },
+  ).catch(() => null)
 }
 
 async function authenticateRequest(
@@ -224,6 +252,46 @@ function optionalString(value: unknown, maxLength: number) {
   return typeof value === "string" && value.trim()
     ? value.trim().slice(0, maxLength)
     : undefined
+}
+
+export function isModelDailyQuotaError(payload: unknown) {
+  if (!isRecord(payload) || !isRecord(payload.error)) return false
+  const details = payload.error.details
+  if (!Array.isArray(details)) return false
+
+  return details.some((detail) => {
+    if (
+      !isRecord(detail) ||
+      typeof detail["@type"] !== "string" ||
+      !detail["@type"].endsWith("google.rpc.QuotaFailure") ||
+      !Array.isArray(detail.violations)
+    ) {
+      return false
+    }
+
+    return detail.violations.some((violation) => {
+      if (!isRecord(violation)) return false
+      const quotaId =
+        typeof violation.quotaId === "string" ? violation.quotaId : ""
+      const quotaMetric =
+        typeof violation.quotaMetric === "string" ? violation.quotaMetric : ""
+      const normalizedQuota = `${quotaId} ${quotaMetric}`
+        .replace(/[^a-z0-9]/gi, "")
+        .toLowerCase()
+      const dimensions = isRecord(violation.quotaDimensions)
+        ? violation.quotaDimensions
+        : undefined
+      const isModelSpecific =
+        normalizedQuota.includes("permodel") ||
+        typeof dimensions?.model === "string"
+
+      return normalizedQuota.includes("perday") && isModelSpecific
+    })
+  })
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
 }
 
 export function matchesImageSignature(bytes: Uint8Array, contentType: string) {
