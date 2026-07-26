@@ -126,6 +126,11 @@ export interface LedgerMonthNote {
 }
 
 export type RecurringRuleType = "fixed" | "installment"
+export type InstallmentDeleteScope =
+  | "single"
+  | "future"
+  | "current_and_future"
+  | "all"
 
 export interface RecurringRule {
   id: string

@@ -39,6 +39,7 @@ import type {
   Category,
   CategoryUsageType,
   IncomeKind,
+  InstallmentDeleteScope,
   Ledger,
   LedgerRole,
   LedgerType,
@@ -1288,6 +1289,32 @@ export class AppStore {
       )
     } catch (error) {
       this.setDataError(error)
+    }
+  }
+
+  async deleteInstallmentOccurrences(
+    ruleId: string,
+    installmentNumber: number,
+    scope: InstallmentDeleteScope,
+  ): Promise<boolean> {
+    try {
+      await this.repository.deleteInstallmentOccurrences(
+        ruleId,
+        installmentNumber,
+        scope,
+      )
+      await this.refreshFinanceData()
+      const message = {
+        single: "선택한 할부 회차를 삭제했습니다.",
+        future: "다음 회차부터 할부를 종료했습니다.",
+        current_and_future: "선택한 회차부터 할부를 종료했습니다.",
+        all: "할부 거래 전체를 삭제했습니다.",
+      } satisfies Record<InstallmentDeleteScope, string>
+      this.notify(message[scope])
+      return this.dataState === "ready"
+    } catch (error) {
+      this.setDataError(error)
+      return false
     }
   }
 

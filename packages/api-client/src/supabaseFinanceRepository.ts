@@ -4,6 +4,7 @@ import type {
   CategoryBudget,
   CategoryUsageType,
   IncomeKind,
+  InstallmentDeleteScope,
   Ledger,
   LedgerInvitation,
   LedgerMember,
@@ -329,7 +330,7 @@ export class SupabaseFinanceRepository {
 
     if (input.recurringType === "installment") {
       const { data, error } = await client.rpc(
-        "save_card_installment_series_v2",
+        "save_card_installment_series_v3",
         {
           p_rule_id: input.recurringRuleId ?? null,
           p_ledger_id: input.ledgerId,
@@ -635,6 +636,20 @@ export class SupabaseFinanceRepository {
     const { error } = await client.rpc("deactivate_fixed_rule_from_month", {
       p_rule_id: ruleId,
       p_month: `${month}-01`,
+    })
+    throwIfError(error)
+  }
+
+  async deleteInstallmentOccurrences(
+    ruleId: string,
+    installmentNumber: number,
+    scope: InstallmentDeleteScope,
+  ): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("delete_installment_occurrences", {
+      p_rule_id: ruleId,
+      p_installment_number: installmentNumber,
+      p_scope: scope,
     })
     throwIfError(error)
   }
