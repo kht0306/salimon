@@ -1,7 +1,16 @@
 "use client"
 
 import styled from "@emotion/styled"
-import { formatMoneyInput, isSplitCategory } from "@salimon/domain"
+import {
+  buildCategoryTree,
+  formatMoneyInput,
+  getCategoryDepth,
+  getCategoryLabel,
+  getCategoryPath,
+  getDescendantCategoryIds,
+  isSplitCategory,
+  MAX_CATEGORY_DEPTH,
+} from "@salimon/domain"
 import type { Category, CategoryUsageType } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import {
@@ -44,7 +53,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { observer } from "mobx-react-lite"
-import { type DragEvent, useState } from "react"
+import { type DragEvent, useEffect, useState } from "react"
 import { useAppStore } from "../StoreProvider"
 import {
   Button,
@@ -248,14 +257,46 @@ function ColorPicker({
   )
 }
 
-const CategoryCreateForm = observer(function CategoryCreateForm() {
+interface CategoryCreateFormProps {
+  parentCategoryId: string
+  onParentCategoryChange: (categoryId: string) => void
+}
+
+const CategoryCreateForm = observer(function CategoryCreateForm({
+  parentCategoryId,
+  onParentCategoryChange,
+}: CategoryCreateFormProps) {
   const store = useAppStore()
   const [name, setName] = useState("")
   const [icon, setIcon] = useState(iconOptions[0].value)
   const [color, setColor] = useState(colorOptions[0])
   const [budget, setBudget] = useState("")
   const [usageTypes, setUsageTypes] = useState<CategoryUsageType[]>(["expense"])
-  const [parentCategoryId, setParentCategoryId] = useState("")
+
+  useEffect(() => {
+    if (!parentCategoryId) return
+    const parent = store.currentCategories.find(
+      (category) => category.id === parentCategoryId,
+    )
+    if (parent) setUsageTypes(parent.usageTypes)
+  }, [parentCategoryId, store])
+
+  const selectedParent = parentCategoryId
+    ? store.currentCategories.find(
+        (category) => category.id === parentCategoryId,
+      )
+    : undefined
+  const parentSelectionIsValid =
+    !parentCategoryId ||
+    Boolean(
+      selectedParent &&
+        !isSplitCategory(selectedParent) &&
+        getCategoryDepth(store.currentCategories, selectedParent.id) <
+          MAX_CATEGORY_DEPTH &&
+        usageTypes.every((usageType) =>
+          selectedParent.usageTypes.includes(usageType),
+        ),
+    )
 
   async function create() {
     if (
@@ -270,8 +311,16 @@ const CategoryCreateForm = observer(function CategoryCreateForm() {
     ) {
       setName("")
       setBudget("")
-      setParentCategoryId("")
+      onParentCategoryChange("")
     }
+  }
+
+  function selectParent(categoryId: string) {
+    onParentCategoryChange(categoryId)
+    const parent = store.currentCategories.find(
+      (category) => category.id === categoryId,
+    )
+    if (parent) setUsageTypes(parent.usageTypes)
   }
 
   return (
@@ -285,7 +334,8 @@ const CategoryCreateForm = observer(function CategoryCreateForm() {
             !name.trim() ||
             !store.authUser ||
             !hexColorPattern.test(color) ||
-            usageTypes.length === 0
+            usageTypes.length === 0 ||
+            !parentSelectionIsValid
           }
         >
           <Plus size={16} /> 추가
@@ -298,6 +348,7 @@ const CategoryCreateForm = observer(function CategoryCreateForm() {
             이름<RequiredMark>*</RequiredMark>
           </span>
           <Input
+            id="category-create-name"
             required
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -307,18 +358,24 @@ const CategoryCreateForm = observer(function CategoryCreateForm() {
           상위 카테고리 (선택)
           <Select
             value={parentCategoryId}
-            onChange={(event) => setParentCategoryId(event.target.value)}
+            onChange={(event) => selectParent(event.target.value)}
           >
             <option value="">최상위 카테고리</option>
-            {store.currentCategories
+            {buildCategoryTree(store.currentCategories)
               .filter(
-                (category) =>
-                  !category.parentCategoryId &&
-                  category.usageTypes.some((type) => usageTypes.includes(type)),
+                ({ category, depth }) =>
+                  depth < MAX_CATEGORY_DEPTH && !isSplitCategory(category),
               )
-              .map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
+              .map(({ category }) => (
+                <option
+                  key={category.id}
+                  value={category.id}
+                  disabled={usageTypes.some(
+                    (usageType) =>
+                      !category.usageTypes.includes(usageType),
+                  )}
+                >
+                  {getCategoryLabel(store.currentCategories, category.id)}
                 </option>
               ))}
           </Select>
@@ -370,8 +427,34 @@ const CategoryCreateForm = observer(function CategoryCreateForm() {
   )
 })
 
+function canMoveCategoryUnder(
+  categories: Category[],
+  category: Category,
+  parent: Category,
+  usageTypes: CategoryUsageType[],
+): boolean {
+  if (isSplitCategory(parent)) return false
+  const descendants = getDescendantCategoryIds(categories, category.id)
+  if (descendants.has(parent.id)) return false
+
+  const categoryDepth = getCategoryDepth(categories, category.id)
+  const subtreeHeight = Math.max(
+    1,
+    ...[...descendants].map(
+      (descendantId) =>
+        getCategoryDepth(categories, descendantId) - categoryDepth + 1,
+    ),
+  )
+  return (
+    getCategoryDepth(categories, parent.id) + subtreeHeight <=
+      MAX_CATEGORY_DEPTH &&
+    usageTypes.every((usageType) => parent.usageTypes.includes(usageType))
+  )
+}
+
 export const CategoryManager = observer(function CategoryManager() {
   const store = useAppStore()
+  const [createParentCategoryId, setCreateParentCategoryId] = useState("")
   const [budgets, setBudgets] = useState<Record<string, string>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState("")
@@ -394,41 +477,57 @@ export const CategoryManager = observer(function CategoryManager() {
   const budgetByCategoryId = new Map(
     store.selectedMonthBudgets.map((item) => [item.category.id, item.amount]),
   )
-  const visibleCategories = store.currentCategories
-    .filter(
-      (category) =>
-        usageFilter === "all" || category.usageTypes.includes(usageFilter),
-    )
-    .filter((category) =>
-      normalizedQuery
-        ? `${category.name} ${iconLabels[category.icon] ?? category.icon}`
-            .toLocaleLowerCase("ko-KR")
-            .includes(normalizedQuery)
-        : true,
-    )
-    .sort((first, second) => {
-      if (sortMode === "name-asc") {
-        return first.name.localeCompare(second.name, "ko-KR")
-      }
-      if (sortMode === "name-desc") {
-        return second.name.localeCompare(first.name, "ko-KR")
-      }
-      if (sortMode === "budget-asc") {
-        return (
-          (budgetByCategoryId.get(first.id) ?? 0) -
-            (budgetByCategoryId.get(second.id) ?? 0) ||
-          first.sortOrder - second.sortOrder
-        )
-      }
-      if (sortMode === "budget-desc") {
-        return (
-          (budgetByCategoryId.get(second.id) ?? 0) -
-            (budgetByCategoryId.get(first.id) ?? 0) ||
-          first.sortOrder - second.sortOrder
-        )
-      }
-      return first.sortOrder - second.sortOrder
-    })
+  const compareCategories = (first: Category, second: Category) => {
+    if (sortMode === "name-asc") {
+      return first.name.localeCompare(second.name, "ko-KR")
+    }
+    if (sortMode === "name-desc") {
+      return second.name.localeCompare(first.name, "ko-KR")
+    }
+    if (sortMode === "budget-asc") {
+      return (
+        (budgetByCategoryId.get(first.id) ?? 0) -
+          (budgetByCategoryId.get(second.id) ?? 0) ||
+        first.sortOrder - second.sortOrder
+      )
+    }
+    if (sortMode === "budget-desc") {
+      return (
+        (budgetByCategoryId.get(second.id) ?? 0) -
+          (budgetByCategoryId.get(first.id) ?? 0) ||
+        first.sortOrder - second.sortOrder
+      )
+    }
+    return first.sortOrder - second.sortOrder
+  }
+  const categoryTree = buildCategoryTree(
+    store.currentCategories,
+    compareCategories,
+  )
+  const matchedCategoryIds = new Set(
+    categoryTree
+      .filter(({ category }) => {
+        const usageMatches =
+          usageFilter === "all" || category.usageTypes.includes(usageFilter)
+        const searchMatches = normalizedQuery
+          ? `${getCategoryLabel(store.currentCategories, category.id)} ${iconLabels[category.icon] ?? category.icon}`
+              .toLocaleLowerCase("ko-KR")
+              .includes(normalizedQuery)
+          : true
+        return usageMatches && searchMatches
+      })
+      .map(({ category }) => category.id),
+  )
+  const visibleCategoryIds = new Set(
+    [...matchedCategoryIds].flatMap((categoryId) =>
+      getCategoryPath(store.currentCategories, categoryId).map(
+        (category) => category.id,
+      ),
+    ),
+  )
+  const visibleCategoryItems = categoryTree.filter(({ category }) =>
+    visibleCategoryIds.has(category.id),
+  )
 
   function startEditing(category: Category) {
     setEditingId(category.id)
@@ -470,6 +569,19 @@ export const CategoryManager = observer(function CategoryManager() {
     categoryId: string,
   ) {
     if (!dndEnabled || !draggingId || draggingId === categoryId) return
+    const draggingCategory = store.currentCategories.find(
+      (category) => category.id === draggingId,
+    )
+    const targetCategory = store.currentCategories.find(
+      (category) => category.id === categoryId,
+    )
+    if (
+      !draggingCategory ||
+      !targetCategory ||
+      draggingCategory.parentCategoryId !== targetCategory.parentCategoryId
+    ) {
+      return
+    }
 
     event.preventDefault()
     event.dataTransfer.dropEffect = "move"
@@ -504,6 +616,19 @@ export const CategoryManager = observer(function CategoryManager() {
     setDraggingId(null)
     setDragOverId(null)
     if (!sourceCategoryId || sourceCategoryId === categoryId) return
+    const sourceCategory = store.currentCategories.find(
+      (category) => category.id === sourceCategoryId,
+    )
+    const targetCategory = store.currentCategories.find(
+      (category) => category.id === categoryId,
+    )
+    if (
+      !sourceCategory ||
+      !targetCategory ||
+      sourceCategory.parentCategoryId !== targetCategory.parentCategoryId
+    ) {
+      return
+    }
 
     setSavingOrder(true)
     try {
@@ -515,7 +640,10 @@ export const CategoryManager = observer(function CategoryManager() {
 
   return (
     <Panel>
-      <CategoryCreateForm />
+      <CategoryCreateForm
+        parentCategoryId={createParentCategoryId}
+        onParentCategoryChange={setCreateParentCategoryId}
+      />
 
       <CategoryListToolbar>
         <CategorySearchField>
@@ -570,8 +698,12 @@ export const CategoryManager = observer(function CategoryManager() {
       </CategoryListToolbar>
 
       <CategoryList>
-        {visibleCategories.map((category) => (
-          <CategoryRow
+        {visibleCategoryItems.map(({ category, depth }) => {
+          const hasChildren = store.currentCategories.some(
+            (item) => item.parentCategoryId === category.id,
+          )
+          return (
+            <CategoryRow
             key={category.id}
             $isDragging={draggingId === category.id}
             $isDragOver={dragOverId === category.id}
@@ -638,30 +770,29 @@ export const CategoryManager = observer(function CategoryManager() {
                 >
                   <option value="">최상위 카테고리</option>
                   {store.currentCategories
-                    .filter(
-                      (parent) =>
-                        parent.id !== category.id &&
-                        !parent.parentCategoryId &&
-                        parent.usageTypes.some((type) =>
-                          editUsageTypes.includes(type),
-                        ),
+                    .filter((parent) =>
+                      canMoveCategoryUnder(
+                        store.currentCategories,
+                        category,
+                        parent,
+                        editUsageTypes,
+                      ),
                     )
                     .map((parent) => (
                       <option key={parent.id} value={parent.id}>
-                        {parent.name}
+                        {getCategoryLabel(store.currentCategories, parent.id)}
                       </option>
                     ))}
                 </Select>
               </CategoryEditor>
             ) : (
-              <CategorySummary>
+              <CategorySummary $depth={depth}>
                 <CategoryIcon icon={category.icon} color={category.color} />
                 <CategoryInfo>
                   <strong>{category.name}</strong>
                   <span>
-                    {category.parentCategoryId
-                      ? `${store.currentCategories.find((parent) => parent.id === category.parentCategoryId)?.name ?? "상위"} › `
-                      : ""}
+                    {depth}단계 ·{" "}
+                    {getCategoryLabel(store.currentCategories, category.id)} ·{" "}
                     {category.usageTypes
                       .map(
                         (usageType) =>
@@ -713,6 +844,18 @@ export const CategoryManager = observer(function CategoryManager() {
               <BudgetUnavailable>예산 미적용</BudgetUnavailable>
             )}
             <CategoryActions>
+              {depth < MAX_CATEGORY_DEPTH && !isSplitCategory(category) ? (
+                <IconButton
+                  title={`${category.name} 하위 카테고리 추가`}
+                  aria-label={`${category.name} 하위 카테고리 추가`}
+                  onClick={() => {
+                    setCreateParentCategoryId(category.id)
+                    document.getElementById("category-create-name")?.focus()
+                  }}
+                >
+                  <Plus size={15} />
+                </IconButton>
+              ) : null}
               {editingId === category.id ? (
                 <>
                   <IconButton
@@ -753,20 +896,27 @@ export const CategoryManager = observer(function CategoryManager() {
               <IconButton
                 $variant="danger"
                 title={
-                  category.name === "기타" || isSplitCategory(category)
-                    ? `${category.name} 카테고리는 제거할 수 없습니다`
-                    : "카테고리 제거"
+                  hasChildren
+                    ? "하위 카테고리를 먼저 이동하거나 제거해 주세요"
+                    : category.name === "기타" || isSplitCategory(category)
+                      ? `${category.name} 카테고리는 제거할 수 없습니다`
+                      : "카테고리 제거"
                 }
                 aria-label={`${category.name} 제거`}
-                disabled={category.name === "기타" || isSplitCategory(category)}
+                disabled={
+                  hasChildren ||
+                  category.name === "기타" ||
+                  isSplitCategory(category)
+                }
                 onClick={() => void store.archiveCategory(category.id)}
               >
                 <Archive size={15} />
               </IconButton>
             </CategoryActions>
-          </CategoryRow>
-        ))}
-        {visibleCategories.length === 0 ? (
+            </CategoryRow>
+          )
+        })}
+        {visibleCategoryItems.length === 0 ? (
           <EmptyCategoryList>검색 결과가 없습니다.</EmptyCategoryList>
         ) : null}
       </CategoryList>
@@ -1057,11 +1207,12 @@ const DragHandle = styled.button`
   }
 `
 
-const CategorySummary = styled.div`
+const CategorySummary = styled.div<{ $depth: number }>`
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
+  padding-left: ${({ $depth }) => ($depth - 1) * 22}px;
 `
 
 const CategoryEditor = styled.div`

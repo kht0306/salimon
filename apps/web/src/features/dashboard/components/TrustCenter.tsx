@@ -1,7 +1,8 @@
 "use client"
 
 import styled from "@emotion/styled"
-import type { Transaction } from "@salimon/types"
+import { getCategoryLabel } from "@salimon/domain"
+import type { Category, Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import {
   Download,
@@ -278,17 +279,12 @@ function spreadsheetSafeText(value: string) {
 }
 
 function transactionCategoryLabel(
-  categories: Array<{ id: string; name: string; parentCategoryId?: string }>,
+  categories: Category[],
   splits: Array<{ transactionId: string; categoryId: string; amount: number }>,
   transaction: Transaction,
 ) {
-  const label = (categoryId?: string) => {
-    const category = categories.find((item) => item.id === categoryId)
-    const parent = category?.parentCategoryId
-      ? categories.find((item) => item.id === category.parentCategoryId)
-      : undefined
-    return category ? `${parent ? `${parent.name} › ` : ""}${category.name}` : "기타"
-  }
+  const label = (categoryId?: string) =>
+    getCategoryLabel(categories, categoryId)
   const transactionSplits = splits.filter(
     (split) => split.transactionId === transaction.id,
   )

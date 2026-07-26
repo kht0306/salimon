@@ -1,7 +1,12 @@
 "use client"
 
 import styled from "@emotion/styled"
-import { formatKrw, toDateKey } from "@salimon/domain"
+import {
+  formatKrw,
+  getCategoryLabel,
+  getDescendantCategoryIds,
+  toDateKey,
+} from "@salimon/domain"
 import type { Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import { ListFilter } from "lucide-react"
@@ -58,6 +63,15 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
   const transactions = useMemo(() => {
     const range = resolveRange(period, startDate, endDate)
     const query = keyword.trim().toLowerCase()
+    const selectedCategoryIds = categoryId
+      ? getDescendantCategoryIds(
+          store.data.categories.filter(
+            (category) =>
+              category.ledgerId === store.selectedLedgerId,
+          ),
+          categoryId,
+        )
+      : undefined
 
     return store.data.transactions
       .filter(
@@ -73,13 +87,13 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
       .filter((item) => !type || item.type === type)
       .filter((item) => !status || item.status === status)
       .filter((item) => {
-        if (!categoryId) return true
+        if (!selectedCategoryIds) return true
         const splits = store.data.transactionSplits.filter(
           (split) => split.transactionId === item.id,
         )
         return splits.length > 0
-          ? splits.some((split) => split.categoryId === categoryId)
-          : item.categoryId === categoryId
+          ? splits.some((split) => selectedCategoryIds.has(split.categoryId))
+          : Boolean(item.categoryId && selectedCategoryIds.has(item.categoryId))
       })
       .filter((item) => matchesPaymentMethodFilter(item, paymentMethodIds))
       .filter(
@@ -112,6 +126,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
     status,
     store.data.transactions,
     store.data.transactionSplits,
+    store.data.categories,
     store.selectedLedgerId,
     type,
   ])
@@ -228,10 +243,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
             <option value="">전체</option>
             {store.currentCategories.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.parentCategoryId
-                  ? `${store.currentCategories.find((item) => item.id === category.parentCategoryId)?.name ?? "상위"} › `
-                  : ""}
-                {category.name}
+                {getCategoryLabel(store.currentCategories, category.id)}
               </option>
             ))}
           </Select>
@@ -349,6 +361,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
                 <TransactionMetadataChips
                   transaction={transaction}
                   category={category}
+                  categories={store.data.categories}
                   paymentMethod={paymentMethod}
                   splitCategories={splitCategories}
                 />

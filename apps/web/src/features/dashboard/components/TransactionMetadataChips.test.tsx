@@ -1,4 +1,4 @@
-import type { Transaction } from "@salimon/types"
+import type { Category, Transaction } from "@salimon/types"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { TransactionMetadataChips } from "./TransactionMetadataChips"
@@ -30,4 +30,41 @@ describe("TransactionMetadataChips", () => {
 
     expect(markup).toContain(label)
   })
+
+  it("renders a category's full three-level path", () => {
+    const categories: Category[] = [
+      createCategory("food", "식비"),
+      createCategory("dining", "외식", "food"),
+      createCategory("korean", "한식", "dining"),
+    ]
+    const markup = renderToStaticMarkup(
+      <TransactionMetadataChips
+        transaction={transaction}
+        category={categories[2]}
+        categories={categories}
+      />,
+    )
+
+    expect(markup).toContain("식비 › 외식 › 한식")
+  })
 })
+
+function createCategory(
+  id: string,
+  name: string,
+  parentCategoryId?: string,
+): Category {
+  return {
+    id,
+    ledgerId: "ledger-1",
+    type: "expense",
+    usageTypes: ["expense"],
+    name,
+    icon: "circle",
+    color: "#2d6a4f",
+    sortOrder: 0,
+    isDefault: false,
+    isArchived: false,
+    parentCategoryId,
+  }
+}

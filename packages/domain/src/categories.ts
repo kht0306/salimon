@@ -1,8 +1,19 @@
 import type {
   Category,
   CategoryUsageType,
+  Transaction,
+  TransactionSplit,
   TransactionType,
 } from "@salimon/types"
+
+export const MAX_CATEGORY_DEPTH = 3
+
+export type CategoryDepth = 1 | 2 | 3
+
+export interface CategoryTreeItem {
+  category: Category
+  depth: CategoryDepth
+}
 
 export const expenseCategorySeeds = [
   { name: "식비", icon: "utensils", color: "#d65a3a" },
@@ -130,11 +141,158 @@ export function findOtherCategory(
   )
 
   return (
-    expenseCategories.find((category) => category.name === "기타") ??
+    expenseCategories.find(
+      (category) => category.name === "기타" && !category.parentCategoryId,
+    ) ??
     expenseCategories
-      .filter((category) => category.isDefault && !isSplitCategory(category))
+      .filter(
+        (category) =>
+          category.isDefault &&
+          !category.parentCategoryId &&
+          !isSplitCategory(category),
+      )
       .sort((a, b) => b.sortOrder - a.sortOrder)[0]
   )
+}
+
+export function getCategoryPath(
+  categories: Category[],
+  categoryId: string,
+): Category[] {
+  const categoryById = new Map(
+    categories.map((category) => [category.id, category]),
+  )
+  const path: Category[] = []
+  const visited = new Set<string>()
+  let current = categoryById.get(categoryId)
+
+  while (current && !visited.has(current.id)) {
+    path.unshift(current)
+    visited.add(current.id)
+    current = current.parentCategoryId
+      ? categoryById.get(current.parentCategoryId)
+      : undefined
+  }
+
+  return path
+}
+
+export function getCategoryDepth(
+  categories: Category[],
+  categoryId: string,
+): number {
+  return getCategoryPath(categories, categoryId).length
+}
+
+export function getCategoryLabel(
+  categories: Category[],
+  categoryId: string | undefined,
+  fallback = "기타",
+): string {
+  if (!categoryId) return fallback
+  const path = getCategoryPath(categories, categoryId)
+  return path.length > 0
+    ? path.map((category) => category.name).join(" › ")
+    : fallback
+}
+
+export function getDescendantCategoryIds(
+  categories: Category[],
+  categoryId: string,
+  includeSelf = true,
+): Set<string> {
+  const childrenByParentId = new Map<string, Category[]>()
+  categories.forEach((category) => {
+    if (!category.parentCategoryId) return
+    childrenByParentId.set(category.parentCategoryId, [
+      ...(childrenByParentId.get(category.parentCategoryId) ?? []),
+      category,
+    ])
+  })
+
+  const descendants = new Set<string>(includeSelf ? [categoryId] : [])
+  const pending = [...(childrenByParentId.get(categoryId) ?? [])]
+
+  while (pending.length > 0) {
+    const category = pending.pop()
+    if (!category || descendants.has(category.id)) continue
+    descendants.add(category.id)
+    pending.push(...(childrenByParentId.get(category.id) ?? []))
+  }
+
+  return descendants
+}
+
+export function buildCategoryTree(
+  categories: Category[],
+  compareCategories?: (first: Category, second: Category) => number,
+): CategoryTreeItem[] {
+  const categoryById = new Map(
+    categories.map((category) => [category.id, category]),
+  )
+  const childrenByParentId = new Map<string, Category[]>()
+  const roots: Category[] = []
+  const ordered: CategoryTreeItem[] = []
+  const visited = new Set<string>()
+  const sortCategories = (items: Category[]) =>
+    [...items].sort(
+      compareCategories ??
+        ((first, second) =>
+          first.sortOrder - second.sortOrder ||
+          first.name.localeCompare(second.name, "ko-KR") ||
+          first.id.localeCompare(second.id)),
+    )
+
+  categories.forEach((category) => {
+    if (
+      !category.parentCategoryId ||
+      !categoryById.has(category.parentCategoryId)
+    ) {
+      roots.push(category)
+      return
+    }
+    childrenByParentId.set(category.parentCategoryId, [
+      ...(childrenByParentId.get(category.parentCategoryId) ?? []),
+      category,
+    ])
+  })
+
+  const visit = (category: Category, depth: number) => {
+    if (visited.has(category.id)) return
+    visited.add(category.id)
+    ordered.push({
+      category,
+      depth: Math.min(depth, MAX_CATEGORY_DEPTH) as CategoryDepth,
+    })
+    sortCategories(childrenByParentId.get(category.id) ?? []).forEach((child) =>
+      visit(child, depth + 1),
+    )
+  }
+
+  sortCategories(roots).forEach((category) => visit(category, 1))
+  sortCategories(
+    categories.filter((category) => !visited.has(category.id)),
+  ).forEach((category) => visit(category, 1))
+
+  return ordered
+}
+
+export function transactionAmountForCategoryIds(
+  transaction: Transaction,
+  splits: TransactionSplit[],
+  categoryIds: Set<string>,
+): number {
+  const transactionSplits = splits.filter(
+    (split) => split.transactionId === transaction.id,
+  )
+  if (transactionSplits.length > 0) {
+    return transactionSplits
+      .filter((split) => categoryIds.has(split.categoryId))
+      .reduce((sum, split) => sum + split.amount, 0)
+  }
+  return transaction.categoryId && categoryIds.has(transaction.categoryId)
+    ? transaction.amount
+    : 0
 }
 
 function slugify(value: string): string {

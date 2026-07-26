@@ -657,91 +657,64 @@ export class SupabaseFinanceRepository {
 
   async createCategory(input: {
     ledgerId: string
-    userId: string
     name: string
     icon: string
     color: string
-    sortOrder: number
     usageTypes: CategoryUsageType[]
     parentCategoryId?: string
   }): Promise<string> {
     const client = requireSupabaseClient()
-    const { data, error } = await client
-      .from("categories")
-      .insert({
-        ledger_id: input.ledgerId,
-        created_by: input.userId,
-        type: input.usageTypes[0],
-        name: input.name,
-        icon: input.icon,
-        color: input.color,
-        sort_order: input.sortOrder,
-        is_default: false,
-        parent_category_id: input.parentCategoryId ?? null,
-      })
-      .select("id")
-      .single()
+    const { data, error } = await client.rpc("create_category_v2", {
+      p_ledger_id: input.ledgerId,
+      p_name: input.name,
+      p_icon: input.icon,
+      p_color: input.color,
+      p_usage_types: input.usageTypes,
+      p_parent_category_id: input.parentCategoryId ?? null,
+    })
     throwIfError(error)
-    if (!data || typeof data.id !== "string") {
+    if (typeof data !== "string") {
       throw new Error("생성한 카테고리를 확인할 수 없습니다.")
     }
-    await this.setCategoryUsageTypes(data.id, input.usageTypes)
-    return data.id
+    return data
   }
 
   async updateCategory(
     categoryId: string,
-    patch: Partial<
-      Pick<
-        Category,
-        | "name"
-        | "icon"
-        | "color"
-        | "isArchived"
-        | "usageTypes"
-        | "parentCategoryId"
-      >
+    category: Pick<
+      Category,
+      "name" | "icon" | "color" | "usageTypes" | "parentCategoryId"
     >,
   ): Promise<void> {
     const client = requireSupabaseClient()
-    const payload: Record<string, unknown> = {
-      updated_at: new Date().toISOString(),
-    }
-    if (patch.name !== undefined) payload.name = patch.name
-    if (patch.icon !== undefined) payload.icon = patch.icon
-    if (patch.color !== undefined) payload.color = patch.color
-    if (patch.isArchived !== undefined) payload.is_archived = patch.isArchived
-    if (patch.parentCategoryId !== undefined) {
-      payload.parent_category_id = patch.parentCategoryId || null
-    }
-
-    const { error } = await client
-      .from("categories")
-      .update(payload)
-      .eq("id", categoryId)
-    throwIfError(error)
-    if (patch.usageTypes !== undefined) {
-      await this.setCategoryUsageTypes(categoryId, patch.usageTypes)
-    }
-  }
-
-  private async setCategoryUsageTypes(
-    categoryId: string,
-    usageTypes: CategoryUsageType[],
-  ): Promise<void> {
-    const client = requireSupabaseClient()
-    const { error } = await client.rpc("set_category_usage_types", {
+    const { error } = await client.rpc("update_category_v2", {
       p_category_id: categoryId,
-      p_usage_types: usageTypes,
+      p_name: category.name,
+      p_icon: category.icon,
+      p_color: category.color,
+      p_usage_types: category.usageTypes,
+      p_parent_category_id: category.parentCategoryId ?? null,
     })
     throwIfError(error)
   }
 
-  async updateCategoryOrder(categoryIds: string[]): Promise<void> {
+  async archiveCategory(categoryId: string): Promise<void> {
+    const client = requireSupabaseClient()
+    const { error } = await client.rpc("archive_category_v2", {
+      p_category_id: categoryId,
+    })
+    throwIfError(error)
+  }
+
+  async updateCategoryOrder(
+    parentCategoryId: string | undefined,
+    categoryIds: string[],
+  ): Promise<void> {
     if (categoryIds.length === 0) return
 
     const client = requireSupabaseClient()
-    const { error } = await client.rpc("reorder_categories", {
+    const { error } = await client.rpc("reorder_category_siblings", {
+      p_parent_category_id: parentCategoryId ?? null,
       p_category_ids: categoryIds,
     })
     throwIfError(error)

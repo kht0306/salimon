@@ -1,7 +1,12 @@
 "use client"
 
 import styled from "@emotion/styled"
-import { formatKrw } from "@salimon/domain"
+import {
+  formatKrw,
+  getCategoryLabel,
+  getDescendantCategoryIds,
+  transactionAmountForCategoryIds,
+} from "@salimon/domain"
 import type { Category, Transaction, TransactionSplit } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import {
@@ -41,17 +46,24 @@ export const SettlementPanel = observer(function SettlementPanel() {
   const excludedTransactions = store.monthTransactions.filter(
     (item) => item.status === "excluded",
   )
-  const rows = store.expenseCategories
+  const categoryRows = store.expenseCategories
+    .filter((category) => !category.parentCategoryId)
     .map((category) => {
+      const categoryIds = getDescendantCategoryIds(
+        store.data.categories.filter(
+          (item) => item.ledgerId === store.selectedLedgerId,
+        ),
+        category.id,
+      )
       const spent = confirmedTransactions
         .filter((item) => item.type === "expense")
         .reduce(
           (sum, item) =>
             sum +
-            categoryAmount(
+            transactionAmountForCategoryIds(
               item,
-              category.id,
               store.data.transactionSplits,
+              categoryIds,
             ),
           0,
         )
@@ -62,8 +74,15 @@ export const SettlementPanel = observer(function SettlementPanel() {
       return { category, spent, budget }
     })
     .filter((item) => item.spent > 0 || item.budget > 0)
-  const max = Math.max(1, ...rows.map((item) => item.spent))
-  const pieRows = rows.filter((item) => item.spent > 0)
+  const budgetRows = store.selectedMonthBudgets.map(
+    ({ category, amount, spent }) => ({
+      category,
+      budget: amount,
+      spent,
+    }),
+  )
+  const max = Math.max(1, ...categoryRows.map((item) => item.spent))
+  const pieRows = categoryRows.filter((item) => item.spent > 0)
   const expenseTotal = sumType(confirmedTransactions, "expense")
   const fixedExpense = confirmedTransactions
     .filter((item) => item.type === "expense" && item.recurringType === "fixed")
@@ -95,7 +114,7 @@ export const SettlementPanel = observer(function SettlementPanel() {
     }))
     .filter((item) => item.amount > 0)
     .sort((a, b) => b.amount - a.amount)
-  const overBudgetCount = rows.filter(
+  const overBudgetCount = budgetRows.filter(
     (item) => item.budget > 0 && item.spent > item.budget,
   ).length
   const trendRows = [-2, -1, 0].map((offset) => {
@@ -319,9 +338,11 @@ export const SettlementPanel = observer(function SettlementPanel() {
           <h3>{store.selectedMonth} 카테고리별 지출</h3>
           {chart === "bar" ? (
             <Bars>
-              {rows.map(({ category, spent }) => (
+              {categoryRows.map(({ category, spent }) => (
                 <BarRow key={category.id}>
-                  <span>{categoryLabel(store.data.categories, category)}</span>
+                  <span>
+                    {getCategoryLabel(store.data.categories, category.id)}
+                  </span>
                   <Bar>
                     <i
                       style={{
@@ -346,7 +367,7 @@ export const SettlementPanel = observer(function SettlementPanel() {
                   <PieLegendItem key={category.id}>
                     <LegendLabel>
                       <LegendDot $color={category.color} />
-                      {categoryLabel(store.data.categories, category)}
+                      {getCategoryLabel(store.data.categories, category.id)}
                     </LegendLabel>
                     <strong>{formatKrw(spent)}</strong>
                   </PieLegendItem>
@@ -354,7 +375,9 @@ export const SettlementPanel = observer(function SettlementPanel() {
               </PieLegend>
             </PieChartLayout>
           )}
-          {rows.length === 0 ? <Empty>확정 지출 또는 예산이 없습니다.</Empty> : null}
+          {categoryRows.length === 0 ? (
+            <Empty>확정 지출 또는 예산이 없습니다.</Empty>
+          ) : null}
         </Section>
 
         <Section>
@@ -370,9 +393,11 @@ export const SettlementPanel = observer(function SettlementPanel() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ category, budget, spent }) => (
+                {budgetRows.map(({ category, budget, spent }) => (
                   <tr key={category.id}>
-                    <td>{categoryLabel(store.data.categories, category)}</td>
+                    <td>
+                      {getCategoryLabel(store.data.categories, category.id)}
+                    </td>
                     <td>{formatKrw(budget)}</td>
                     <td>{formatKrw(spent)}</td>
                     <td data-negative={budget > 0 && budget - spent < 0}>
@@ -471,38 +496,11 @@ function categoryName(
     return transactionSplits
       .map(
         (split) =>
-          `${categoryLabel(categories, categories.find((item) => item.id === split.categoryId))} ${formatKrw(split.amount)}`,
+          `${getCategoryLabel(categories, split.categoryId)} ${formatKrw(split.amount)}`,
       )
       .join(" / ")
   }
-  return categoryLabel(
-    categories,
-    categories.find((entry) => entry.id === transaction.categoryId),
-  )
-}
-
-function categoryLabel(categories: Category[], category?: Category) {
-  if (!category) return "기타"
-  const parent = category.parentCategoryId
-    ? categories.find((item) => item.id === category.parentCategoryId)
-    : undefined
-  return `${parent ? `${parent.name} › ` : ""}${category.name}`
-}
-
-function categoryAmount(
-  transaction: Transaction,
-  categoryId: string,
-  splits: TransactionSplit[],
-) {
-  const transactionSplits = splits.filter(
-    (split) => split.transactionId === transaction.id,
-  )
-  if (transactionSplits.length > 0) {
-    return transactionSplits
-      .filter((split) => split.categoryId === categoryId)
-      .reduce((sum, split) => sum + split.amount, 0)
-  }
-  return transaction.categoryId === categoryId ? transaction.amount : 0
+  return getCategoryLabel(categories, transaction.categoryId)
 }
 
 function actorName(

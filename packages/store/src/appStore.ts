@@ -16,14 +16,19 @@ import {
   type SupabaseConnectionCheck,
 } from "@salimon/api-client"
 import {
+  buildCategoryTree,
   findOtherCategory,
   fromDateTimeLocalValue,
+  getCategoryDepth,
+  getDescendantCategoryIds,
   isSplitCategory,
   maskSensitiveText,
+  MAX_CATEGORY_DEPTH,
   moveMonth,
   parseCardSmsText,
   toDateKey,
   toMonthKey,
+  transactionAmountForCategoryIds,
 } from "@salimon/domain"
 import { makeAutoObservable, runInAction } from "mobx"
 import {
@@ -195,12 +200,11 @@ export class AppStore {
   }
 
   get currentCategories(): Category[] {
-    return this.data.categories
-      .filter(
-        (category) =>
-          category.ledgerId === this.selectedLedgerId && !category.isArchived,
-      )
-      .sort((a, b) => a.sortOrder - b.sortOrder)
+    const categories = this.data.categories.filter(
+      (category) =>
+        category.ledgerId === this.selectedLedgerId && !category.isArchived,
+    )
+    return buildCategoryTree(categories).map(({ category }) => category)
   }
 
   get expenseCategories(): Category[] {
@@ -254,6 +258,12 @@ export class AppStore {
 
   get selectedMonthBudgets() {
     return this.expenseCategories.flatMap((category) => {
+      const categoryIds = getDescendantCategoryIds(
+        this.data.categories.filter(
+          (item) => item.ledgerId === this.selectedLedgerId,
+        ),
+        category.id,
+      )
       const budget = this.data.categoryBudgets
         .filter(
           (item) =>
@@ -269,18 +279,13 @@ export class AppStore {
             item.status === "confirmed",
         )
         .reduce((sum, item) => {
-          const splits = this.data.transactionSplits.filter(
-            (split) => split.transactionId === item.id,
-          )
           return (
             sum +
-            (splits.length > 0
-              ? splits
-                  .filter((split) => split.categoryId === category.id)
-                  .reduce((splitSum, split) => splitSum + split.amount, 0)
-              : item.categoryId === category.id
-                ? item.amount
-                : 0)
+            transactionAmountForCategoryIds(
+              item,
+              this.data.transactionSplits,
+              categoryIds,
+            )
           )
         }, 0)
       return [{ category, amount: budget.amount, spent }]
@@ -740,8 +745,29 @@ export class AppStore {
       return false
     }
 
+    const parent = parentCategoryId
+      ? this.currentCategories.find(
+          (category) => category.id === parentCategoryId,
+        )
+      : undefined
+    if (
+      parentCategoryId &&
+      (!parent ||
+        isSplitCategory(parent) ||
+        getCategoryDepth(this.currentCategories, parent.id) >=
+          MAX_CATEGORY_DEPTH ||
+        usageTypes.some(
+          (usageType) => !parent.usageTypes.includes(usageType),
+        ))
+    ) {
+      this.notify("상위 카테고리와 적용 용도를 확인해 주세요.", "error")
+      return false
+    }
+
     const duplicate = this.currentCategories.some(
-      (category) => category.name.toLowerCase() === trimmed.toLowerCase(),
+      (category) =>
+        category.parentCategoryId === parentCategoryId &&
+        category.name.toLowerCase() === trimmed.toLowerCase(),
     )
     if (duplicate) {
       this.notify("이미 같은 이름의 카테고리가 있습니다.", "error")
@@ -751,11 +777,9 @@ export class AppStore {
     try {
       const categoryId = await this.repository.createCategory({
         ledgerId: this.selectedLedgerId,
-        userId: this.authUser.id,
         name: trimmed,
         icon,
         color,
-        sortOrder: this.currentCategories.length,
         usageTypes,
         parentCategoryId,
       })
@@ -814,14 +838,69 @@ export class AppStore {
       return false
     }
 
+    const nextName = name ?? category.name
+    const nextUsageTypes = patch.usageTypes ?? category.usageTypes
+    const nextParentCategoryId =
+      patch.parentCategoryId !== undefined
+        ? patch.parentCategoryId || undefined
+        : category.parentCategoryId
+    const descendants = getDescendantCategoryIds(
+      this.currentCategories,
+      category.id,
+    )
+    const parent = nextParentCategoryId
+      ? this.currentCategories.find(
+          (item) => item.id === nextParentCategoryId,
+        )
+      : undefined
+    const currentDepth = getCategoryDepth(this.currentCategories, category.id)
+    const subtreeHeight = Math.max(
+      1,
+      ...[...descendants].map(
+        (descendantId) =>
+          getCategoryDepth(this.currentCategories, descendantId) -
+          currentDepth +
+          1,
+      ),
+    )
+    const nextDepth = parent
+      ? getCategoryDepth(this.currentCategories, parent.id) + 1
+      : 1
+
     if (
-      name &&
+      nextParentCategoryId &&
+      (!parent ||
+        isSplitCategory(parent) ||
+        descendants.has(nextParentCategoryId) ||
+        nextDepth + subtreeHeight - 1 > MAX_CATEGORY_DEPTH ||
+        nextUsageTypes.some(
+          (usageType) => !parent.usageTypes.includes(usageType),
+        ))
+    ) {
+      this.notify("상위 카테고리 또는 카테고리 단계를 확인해 주세요.", "error")
+      return false
+    }
+    if (
+      this.currentCategories.some(
+        (child) =>
+          child.parentCategoryId === category.id &&
+          child.usageTypes.some(
+            (usageType) => !nextUsageTypes.includes(usageType),
+          ),
+      )
+    ) {
+      this.notify("하위 카테고리에서 사용하는 용도는 제거할 수 없습니다.", "error")
+      return false
+    }
+
+    if (
       this.data.categories.some(
         (item) =>
           item.id !== categoryId &&
           item.ledgerId === category.ledgerId &&
           !item.isArchived &&
-          item.name.toLowerCase() === name.toLowerCase(),
+          item.parentCategoryId === nextParentCategoryId &&
+          item.name.toLowerCase() === nextName.toLowerCase(),
       )
     ) {
       this.notify("이미 같은 이름의 카테고리가 있습니다.", "error")
@@ -830,8 +909,11 @@ export class AppStore {
 
     try {
       await this.repository.updateCategory(categoryId, {
-        ...patch,
-        ...(name ? { name } : {}),
+        name: nextName,
+        icon: patch.icon ?? category.icon,
+        color: patch.color ?? category.color,
+        usageTypes: nextUsageTypes,
+        parentCategoryId: nextParentCategoryId,
       })
       await this.refreshFinanceData()
       this.notify("카테고리를 수정했습니다.")
@@ -849,9 +931,17 @@ export class AppStore {
       this.notify("기본 카테고리는 제거할 수 없습니다.", "error")
       return
     }
+    if (
+      this.currentCategories.some(
+        (item) => item.parentCategoryId === categoryId,
+      )
+    ) {
+      this.notify("하위 카테고리를 먼저 이동하거나 제거해 주세요.", "error")
+      return
+    }
 
     try {
-      await this.repository.updateCategory(categoryId, { isArchived: true })
+      await this.repository.archiveCategory(categoryId)
       await this.refreshFinanceData()
       this.notify("카테고리를 제거했습니다.")
     } catch (error) {
@@ -865,35 +955,42 @@ export class AppStore {
   ): Promise<boolean> {
     if (sourceCategoryId === targetCategoryId) return true
 
-    const visibleCategories = this.currentCategories
-    const sourceIndex = visibleCategories.findIndex(
+    const sourceCategory = this.currentCategories.find(
       (category) => category.id === sourceCategoryId,
     )
-    const targetIndex = visibleCategories.findIndex(
+    const targetCategory = this.currentCategories.find(
+      (category) => category.id === targetCategoryId,
+    )
+    if (
+      !sourceCategory ||
+      !targetCategory ||
+      sourceCategory.parentCategoryId !== targetCategory.parentCategoryId
+    ) {
+      this.notify("같은 단계의 카테고리끼리만 순서를 변경할 수 있습니다.", "error")
+      return false
+    }
+
+    const siblingCategories = this.currentCategories.filter(
+      (category) =>
+        category.parentCategoryId === sourceCategory.parentCategoryId,
+    )
+    const sourceIndex = siblingCategories.findIndex(
+      (category) => category.id === sourceCategoryId,
+    )
+    const targetIndex = siblingCategories.findIndex(
       (category) => category.id === targetCategoryId,
     )
     if (sourceIndex < 0 || targetIndex < 0) return false
 
-    const reorderedVisibleCategories = [...visibleCategories]
-    const [movedCategory] = reorderedVisibleCategories.splice(sourceIndex, 1)
+    const reorderedSiblings = [...siblingCategories]
+    const [movedCategory] = reorderedSiblings.splice(sourceIndex, 1)
     if (!movedCategory) return false
-    reorderedVisibleCategories.splice(targetIndex, 0, movedCategory)
-
-    const archivedCategories = this.data.categories
-      .filter(
-        (category) =>
-          category.ledgerId === this.selectedLedgerId && category.isArchived,
-      )
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-    const orderedCategories = [
-      ...reorderedVisibleCategories,
-      ...archivedCategories,
-    ]
+    reorderedSiblings.splice(targetIndex, 0, movedCategory)
 
     const previousOrders = new Map(
-      orderedCategories.map((category) => [category.id, category.sortOrder]),
+      siblingCategories.map((category) => [category.id, category.sortOrder]),
     )
-    const updates = orderedCategories.map((category, index) => ({
+    const updates = reorderedSiblings.map((category, index) => ({
       categoryId: category.id,
       sortOrder: index,
     }))
@@ -908,6 +1005,7 @@ export class AppStore {
         })
       })
       await this.repository.updateCategoryOrder(
+        sourceCategory.parentCategoryId,
         updates.map((update) => update.categoryId),
       )
       await this.refreshFinanceData()
