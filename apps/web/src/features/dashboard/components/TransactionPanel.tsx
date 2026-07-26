@@ -6,6 +6,7 @@ import {
   formatKoreanDate,
   formatMoneyInput,
   formatKrw,
+  getCategoryLabel,
   getDateTimeLocalValue,
   isSplitCategory,
   splitInstallmentPrincipal,
@@ -179,19 +180,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const splitSelectableCategories = selectableCategories.filter(
     (category) => !isSplitCategory(category),
   )
-  const categoryLabel = (categoryId: string): string => {
-    const category = store.currentCategories.find(
-      (item) => item.id === categoryId,
+  const categoryLabel = (categoryId: string): string =>
+    getCategoryLabel(
+      store.currentCategories,
+      categoryId,
+      "삭제된 카테고리",
     )
-    const parent = category?.parentCategoryId
-      ? store.currentCategories.find(
-          (item) => item.id === category.parentCategoryId,
-        )
-      : undefined
-    return category
-      ? `${parent ? `${parent.name} › ` : ""}${category.name}`
-      : "삭제된 카테고리"
-  }
   const savingAccountIsValid =
     draft.type !== "saving" ||
     store.currentAccounts.some(
@@ -1206,6 +1200,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
                             <TransactionMetadataChips
                               transaction={transaction}
                               category={category}
+                              categories={store.data.categories}
                               paymentMethod={paymentMethod}
                               splitCategories={splitCategories}
                             />

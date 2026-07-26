@@ -129,6 +129,69 @@ describe("deactivateFixedRule", () => {
   })
 })
 
+describe("category hierarchy mutations", () => {
+  it("creates a category and its usage types atomically", async () => {
+    rpc.mockResolvedValue({ data: "category-2", error: null })
+    const repository = new SupabaseFinanceRepository()
+
+    await repository.createCategory({
+      ledgerId: "ledger-1",
+      name: "한식",
+      icon: "utensils",
+      color: "#2d6a4f",
+      usageTypes: ["expense"],
+      parentCategoryId: "category-1",
+    })
+
+    expect(rpc).toHaveBeenCalledWith("create_category_v2", {
+      p_ledger_id: "ledger-1",
+      p_name: "한식",
+      p_icon: "utensils",
+      p_color: "#2d6a4f",
+      p_usage_types: ["expense"],
+      p_parent_category_id: "category-1",
+    })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it("updates category presentation, usage, and parent atomically", async () => {
+    rpc.mockResolvedValue({ data: null, error: null })
+    const repository = new SupabaseFinanceRepository()
+
+    await repository.updateCategory("category-2", {
+      name: "집밥",
+      icon: "home",
+      color: "#277da1",
+      usageTypes: ["expense"],
+      parentCategoryId: "category-1",
+    })
+
+    expect(rpc).toHaveBeenCalledWith("update_category_v2", {
+      p_category_id: "category-2",
+      p_name: "집밥",
+      p_icon: "home",
+      p_color: "#277da1",
+      p_usage_types: ["expense"],
+      p_parent_category_id: "category-1",
+    })
+  })
+
+  it("reorders only categories with the same parent", async () => {
+    rpc.mockResolvedValue({ data: null, error: null })
+    const repository = new SupabaseFinanceRepository()
+
+    await repository.updateCategoryOrder("category-1", [
+      "category-3",
+      "category-2",
+    ])
+
+    expect(rpc).toHaveBeenCalledWith("reorder_category_siblings", {
+      p_parent_category_id: "category-1",
+      p_category_ids: ["category-3", "category-2"],
+    })
+  })
+})
+
 describe("createLedger", () => {
   it("passes selected instruments and shared visibility separately", async () => {
     rpc.mockResolvedValue({ data: "ledger-2", error: null })

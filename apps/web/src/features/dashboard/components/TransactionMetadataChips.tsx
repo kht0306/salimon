@@ -1,4 +1,5 @@
 import styled from "@emotion/styled"
+import { getCategoryLabel } from "@salimon/domain"
 import type { Category, PaymentMethod, Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import {
@@ -19,6 +20,7 @@ type PaymentChipKind = "credit" | "debit" | "bank" | "cash"
 interface TransactionMetadataChipsProps {
   transaction: Transaction
   category?: Category
+  categories?: Category[]
   paymentMethod?: PaymentMethod
   splitCategories?: Category[]
 }
@@ -26,6 +28,7 @@ interface TransactionMetadataChipsProps {
 export function TransactionMetadataChips({
   transaction,
   category,
+  categories = category ? [category] : [],
   paymentMethod,
   splitCategories = [],
 }: TransactionMetadataChipsProps) {
@@ -53,11 +56,11 @@ export function TransactionMetadataChips({
         </FixedChip>
       ) : null}
       <CategoryChip $color={category?.color ?? colors.subtle}>
-        {category?.name ?? "기타"}
+        {getCategoryLabel(categories, category?.id)}
       </CategoryChip>
       {splitCategories.map((splitCategory) => (
         <CategoryChip key={splitCategory.id} $color={splitCategory.color}>
-          {splitCategory.name}
+          {getCategoryLabel(categories, splitCategory.id, splitCategory.name)}
         </CategoryChip>
       ))}
       {paymentLabel ? (

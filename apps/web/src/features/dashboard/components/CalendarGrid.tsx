@@ -5,6 +5,7 @@ import {
   buildMonthCalendar,
   formatKrw,
   fromMonthKey,
+  getCategoryLabel,
   toDateKey,
 } from "@salimon/domain"
 import { colors, radii } from "@salimon/ui-tokens"
@@ -56,7 +57,7 @@ export const CalendarGrid = observer(function CalendarGrid() {
             <BudgetCard key={category.id} $color={category.color}>
               <strong>
                 <CategoryDot $color={category.color} />
-                {category.name}
+                {getCategoryLabel(store.data.categories, category.id)}
               </strong>
               <span>
                 {formatKrw(spent)} / {formatKrw(amount)}
