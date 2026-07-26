@@ -9,10 +9,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 GEMINI_API_KEY=
 GEMINI_RECEIPT_MODEL=gemini-3.1-flash-lite
+GEMINI_RECEIPT_FALLBACK_MODEL=gemini-3.5-flash-lite
 GEMINI_DATA_TIER=free
 ```
 
 `GEMINI_API_KEY`는 서버 전용이며 `NEXT_PUBLIC_` 접두사를 붙이지 않는다.
+기본 모델의 모델별 일일 한도가 소진되면
+`GEMINI_RECEIPT_FALLBACK_MODEL`을 한 번 호출한다. 두 모델이 같거나 대체 모델이
+비어 있으면 대체 호출을 하지 않는다.
 `GEMINI_DATA_TIER=free`에서는 Google 무료 서비스 데이터 사용 안내에 대한
 사용자 동의를 요구한다. 운영 환경에서는 민감한 영수증 보호를 위해 결제 계정에
 연결된 유료 Gemini API 키와 `GEMINI_DATA_TIER=paid` 사용을 권장한다.

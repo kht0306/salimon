@@ -1,5 +1,16 @@
-import { describe, expect, it } from "vitest"
-import { matchesImageSignature, normalizeReceiptResult } from "./route"
+import { NextRequest } from "next/server"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import {
+  isModelDailyQuotaError,
+  matchesImageSignature,
+  normalizeReceiptResult,
+  POST,
+} from "./route"
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
+})
 
 describe("receipt parser safeguards", () => {
   it("accepts only matching image signatures", () => {
@@ -56,5 +67,127 @@ describe("receipt parser safeguards", () => {
         "paid",
       ),
     ).toThrow("invalid receipt result")
+  })
+
+  it("recognizes only model-specific daily quota errors", () => {
+    expect(
+      isModelDailyQuotaError({
+        error: {
+          details: [
+            {
+              "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+              violations: [
+                {
+                  quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+                  quotaDimensions: { model: "gemini-3.1-flash-lite" },
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ).toBe(true)
+    expect(
+      isModelDailyQuotaError({
+        error: {
+          details: [
+            {
+              "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+              violations: [
+                {
+                  quotaId:
+                    "GenerateRequestsPerMinutePerProjectPerModel-FreeTier",
+                  quotaDimensions: { model: "gemini-3.1-flash-lite" },
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ).toBe(false)
+  })
+
+  it("uses the configured fallback after the primary model reaches its daily quota", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co")
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-anon-key")
+    vi.stubEnv("GEMINI_API_KEY", "test-gemini-key")
+    vi.stubEnv("GEMINI_RECEIPT_MODEL", "primary-model")
+    vi.stubEnv("GEMINI_RECEIPT_FALLBACK_MODEL", "fallback-model")
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ id: "test-user" }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: 429,
+              status: "RESOURCE_EXHAUSTED",
+              details: [
+                {
+                  "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+                  violations: [
+                    {
+                      quotaId:
+                        "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+                      quotaDimensions: { model: "primary-model" },
+                    },
+                  ],
+                },
+              ],
+            },
+          }),
+          { status: 429 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        amount: 12_000,
+                        merchantName: "테스트 상점",
+                        transactionAt: "2026-07-26T12:34:00+09:00",
+                        confidence: 0.9,
+                        warnings: [],
+                      }),
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      )
+    vi.stubGlobal("fetch", fetchMock)
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/receipts/parse", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer test-token",
+          "Content-Type": "image/jpeg",
+          "x-receipt-free-tier-consent": "true",
+        },
+        body: new Uint8Array([0xff, 0xd8, 0xff, 0x00]),
+      }),
+    )
+    const result = (await response.json()) as { model?: string }
+
+    expect(response.status).toBe(200)
+    expect(result.model).toBe("fallback-model")
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain(
+      "/models/primary-model:generateContent",
+    )
+    expect(String(fetchMock.mock.calls[2]?.[0])).toContain(
+      "/models/fallback-model:generateContent",
+    )
   })
 })
