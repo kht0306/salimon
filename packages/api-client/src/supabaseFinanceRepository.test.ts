@@ -31,6 +31,39 @@ describe("mapPaymentMethodType", () => {
 })
 
 describe("saveTransaction", () => {
+  it("creates new installments with the purchase-first schedule RPC", async () => {
+    rpc.mockResolvedValue({ data: "rule-1", error: null })
+    const repository = new SupabaseFinanceRepository()
+
+    await repository.saveTransaction("user-1", {
+      ledgerId: "ledger-1",
+      type: "expense",
+      status: "confirmed",
+      amount: 300000,
+      transactionAt: "2026-07-24T07:30:00.000Z",
+      recurringType: "installment",
+      installmentMonths: 3,
+      installmentAmountType: "principal",
+      paymentMethodId: "card-1",
+    })
+
+    expect(rpc).toHaveBeenCalledWith("save_card_installment_series_v3", {
+      p_rule_id: null,
+      p_ledger_id: "ledger-1",
+      p_amount: 300000,
+      p_amount_type: "principal",
+      p_transaction_at: "2026-07-24T07:30:00.000Z",
+      p_installment_months: 3,
+      p_category_id: null,
+      p_merchant_name: null,
+      p_memo: null,
+      p_actor_user_id: null,
+      p_status: "confirmed",
+      p_type: "expense",
+      p_payment_method_id: "card-1",
+    })
+  })
+
   it("routes every existing transaction through the atomic recurrence RPC", async () => {
     rpc.mockResolvedValue({ data: null, error: null })
     const repository = new SupabaseFinanceRepository()
@@ -124,6 +157,26 @@ describe("deactivateFixedRule", () => {
     expect(rpc).toHaveBeenCalledWith("deactivate_fixed_rule_from_month", {
       p_rule_id: "rule-1",
       p_month: "2026-07-01",
+    })
+    expect(from).not.toHaveBeenCalled()
+  })
+})
+
+describe("deleteInstallmentOccurrences", () => {
+  it("passes the selected occurrence and deletion scope atomically", async () => {
+    rpc.mockResolvedValue({ data: null, error: null })
+    const repository = new SupabaseFinanceRepository()
+
+    await repository.deleteInstallmentOccurrences(
+      "rule-1",
+      3,
+      "current_and_future",
+    )
+
+    expect(rpc).toHaveBeenCalledWith("delete_installment_occurrences", {
+      p_rule_id: "rule-1",
+      p_installment_number: 3,
+      p_scope: "current_and_future",
     })
     expect(from).not.toHaveBeenCalled()
   })

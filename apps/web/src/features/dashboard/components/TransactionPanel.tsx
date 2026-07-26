@@ -14,6 +14,7 @@ import {
 import type { TransactionGrouping } from "@salimon/store"
 import type {
   CategoryUsageType,
+  InstallmentDeleteScope,
   ReceiptParseResult,
   Transaction,
 } from "@salimon/types"
@@ -56,6 +57,8 @@ import {
 } from "./transactionEditorDraft"
 import { TransactionMetadataChips } from "./TransactionMetadataChips"
 import { ReceiptImporter } from "./ReceiptImporter"
+import { InstallmentDeleteDialog } from "./InstallmentDeleteDialog"
+import { buildInstallmentSchedulePreview } from "./installmentSchedule"
 import {
   getPaymentMethodTypeLabel,
   groupTransactionsByActor,
@@ -70,6 +73,9 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const [copySource, setCopySource] = useState<Transaction | null>(null)
   const [isAdding, setAdding] = useState(false)
   const [isSaving, setSaving] = useState(false)
+  const [deletingInstallment, setDeletingInstallment] =
+    useState<Transaction | null>(null)
+  const [isDeletingInstallment, setDeletingInstallmentBusy] = useState(false)
   const [receiptWarnings, setReceiptWarnings] = useState<string[]>([])
   const [tagsInput, setTagsInput] = useState("")
   const [splits, setSplits] = useState<
@@ -174,6 +180,26 @@ export const TransactionPanel = observer(function TransactionPanel() {
   const [transactionDate = "", transactionTimeValue = "12:00"] =
     draft.transactionAt.split("T")
   const transactionTime = transactionTimeValue.slice(0, 5)
+  const installmentCard = store.currentCards.find(
+    (card) => card.id === draft.paymentMethodId,
+  )
+  const installmentSchedule = buildInstallmentSchedulePreview({
+    purchaseDate: transactionDate,
+    paymentDay: installmentCard?.paymentDay,
+    installmentMonths,
+  })
+  const installmentScheduleSummary =
+    installmentSchedule.length <= 4
+      ? installmentSchedule
+      : installmentSchedule.filter(
+          (_, index) => index < 3 || index === installmentSchedule.length - 1,
+        )
+  const deletingInstallmentSeries = deletingInstallment?.recurringRuleId
+    ? store.data.transactions.filter(
+        (transaction) =>
+          transaction.recurringRuleId === deletingInstallment.recurringRuleId,
+      )
+    : []
   const selectableCategories = store.currentCategories.filter((category) =>
     category.usageTypes.includes(draft.type as CategoryUsageType),
   )
@@ -208,6 +234,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
         installmentMonths <= 120 &&
         Boolean(draft.paymentMethodId) &&
         store.currentCards.length > 0 &&
+        (isEditingInstallment || Boolean(installmentCard?.paymentDay)) &&
         (isEditingInstallment ||
           draft.installmentAmountType !== "principal" ||
           amount >= installmentMonths)))
@@ -420,6 +447,31 @@ export const TransactionPanel = observer(function TransactionPanel() {
     setEditing(null)
     setCopySource(null)
     store.setTransactionEditorOpen(false)
+  }
+
+  async function deleteInstallment(
+    transaction: Transaction,
+    scope: InstallmentDeleteScope,
+  ) {
+    if (
+      isDeletingInstallment ||
+      !transaction.recurringRuleId ||
+      !transaction.installmentNumber
+    ) {
+      return
+    }
+
+    setDeletingInstallmentBusy(true)
+    try {
+      const deleted = await store.deleteInstallmentOccurrences(
+        transaction.recurringRuleId,
+        transaction.installmentNumber,
+        scope,
+      )
+      if (deleted) setDeletingInstallment(null)
+    } finally {
+      setDeletingInstallmentBusy(false)
+    }
   }
 
   async function save() {
@@ -821,6 +873,12 @@ export const TransactionPanel = observer(function TransactionPanel() {
                 <CardRequired role="alert">
                   내 카드 메뉴에서 카드를 먼저 등록하고 가계부에 연결해 주세요.
                 </CardRequired>
+              ) : draft.recurringType === "installment" &&
+                draft.paymentMethodId &&
+                !installmentCard?.paymentDay ? (
+                <CardRequired role="alert">
+                  선택한 카드에 결제일을 먼저 등록해 주세요.
+                </CardRequired>
               ) : null}
               {draft.type === "saving" && store.currentAccounts.length === 0 ? (
                 <CardRequired role="alert">
@@ -919,7 +977,10 @@ export const TransactionPanel = observer(function TransactionPanel() {
 
           <Field>
             <span>
-              거래일시<RequiredMark>*</RequiredMark>
+              {draft.recurringType === "installment"
+                ? "카드 구매일시"
+                : "거래일시"}
+              <RequiredMark>*</RequiredMark>
             </span>
             <DateTimeInputs>
               <Input
@@ -950,6 +1011,37 @@ export const TransactionPanel = observer(function TransactionPanel() {
               />
             </DateTimeInputs>
           </Field>
+
+          {draft.recurringType === "installment" &&
+          !isEditingInstallment &&
+          installmentScheduleSummary.length > 0 ? (
+            <InstallmentScheduleCard>
+              <strong>할부 일정</strong>
+              <small>
+                1회차는 구매일에 반영하고, 다음 달부터 카드 결제일에 반영합니다.
+              </small>
+              <InstallmentScheduleList>
+                {installmentScheduleSummary.map((item, index) => (
+                  <li key={item.installmentNumber}>
+                    <span>
+                      {item.installmentNumber}/{installmentMonths}회
+                    </span>
+                    <strong>{formatKoreanDate(item.date)}</strong>
+                    <small>
+                      {item.installmentNumber === 1
+                        ? "구매일 반영"
+                        : "카드 결제 예정"}
+                    </small>
+                    {index === 2 && installmentSchedule.length > 4 ? (
+                      <ScheduleEllipsis aria-hidden="true">
+                        ···
+                      </ScheduleEllipsis>
+                    ) : null}
+                  </li>
+                ))}
+              </InstallmentScheduleList>
+            </InstallmentScheduleCard>
+          ) : null}
 
           <Field>
             {isSalaryIncome ? "근로자" : "행위자"}
@@ -1264,18 +1356,49 @@ export const TransactionPanel = observer(function TransactionPanel() {
                                   <CircleStop size={14} />
                                 </CompactAction>
                               ) : null}
+                              {transaction.recurringType === "installment" &&
+                              transaction.recurringRuleId &&
+                              (transaction.installmentNumber ?? 0) <
+                                (transaction.installmentTotal ?? 0) ? (
+                                <CompactAction
+                                  title="이 회차까지만 유지하고 할부 종료"
+                                  aria-label="이 회차까지만 유지하고 할부 종료"
+                                  disabled={isDeletingInstallment}
+                                  onClick={() => {
+                                    if (
+                                      window.confirm(
+                                        "선택한 회차는 유지하고 다음 회차부터 할부를 종료할까요?",
+                                      )
+                                    ) {
+                                      void deleteInstallment(
+                                        transaction,
+                                        "future",
+                                      )
+                                    }
+                                  }}
+                                >
+                                  <CircleStop size={14} />
+                                </CompactAction>
+                              ) : null}
                               <CompactAction
                                 $variant="danger"
                                 aria-label={
                                   transaction.recurringType === "fixed"
                                     ? "이번 달부터 고정 거래와 반복 종료"
-                                    : "삭제"
+                                    : transaction.recurringType ===
+                                        "installment"
+                                      ? "할부 삭제 범위 선택"
+                                      : "삭제"
                                 }
                                 title={
                                   transaction.recurringType === "fixed"
                                     ? "이번 달부터 고정 거래와 반복 종료"
-                                    : "삭제"
+                                    : transaction.recurringType ===
+                                        "installment"
+                                      ? "할부 삭제 범위 선택"
+                                      : "삭제"
                                 }
+                                disabled={isDeletingInstallment}
                                 onClick={() => {
                                   if (
                                     transaction.recurringType === "fixed" &&
@@ -1291,6 +1414,15 @@ export const TransactionPanel = observer(function TransactionPanel() {
                                         "current",
                                       )
                                     }
+                                    return
+                                  }
+                                  if (
+                                    transaction.recurringType ===
+                                      "installment" &&
+                                    transaction.recurringRuleId &&
+                                    transaction.installmentNumber
+                                  ) {
+                                    setDeletingInstallment(transaction)
                                     return
                                   }
                                   void store.softDeleteTransaction(
@@ -1379,6 +1511,18 @@ export const TransactionPanel = observer(function TransactionPanel() {
           </strong>
         </SettlementRow>
       </DailySummary>
+
+      {deletingInstallment?.recurringRuleId ? (
+        <InstallmentDeleteDialog
+          transaction={deletingInstallment}
+          seriesTransactions={deletingInstallmentSeries}
+          busy={isDeletingInstallment}
+          onClose={() => setDeletingInstallment(null)}
+          onSelect={(scope) => {
+            void deleteInstallment(deletingInstallment, scope)
+          }}
+        />
+      ) : null}
     </SidePanel>
   )
 })
@@ -1615,6 +1759,60 @@ const InstallmentPreview = styled.small`
   color: ${colors.muted};
   font-size: 11px;
   font-weight: 400;
+`
+
+const InstallmentScheduleCard = styled.section`
+  display: grid;
+  gap: 5px;
+  border: 1px solid ${colors.focus};
+  border-radius: ${radii.sm};
+  background: ${colors.tealSoft};
+  color: ${colors.ink};
+  padding: 10px 11px;
+
+  > strong {
+    font-size: 12px;
+  }
+
+  > small {
+    color: ${colors.muted};
+    font-size: 10px;
+    line-height: 1.4;
+  }
+`
+
+const InstallmentScheduleList = styled.ul`
+  display: grid;
+  gap: 5px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 7px;
+    color: ${colors.muted};
+    font-size: 10px;
+  }
+
+  li > span {
+    color: ${colors.teal};
+    font-weight: 750;
+  }
+
+  li > strong {
+    color: ${colors.ink};
+    font-size: 10px;
+    font-weight: 650;
+  }
+`
+
+const ScheduleEllipsis = styled.span`
+  grid-column: 1 / -1;
+  color: ${colors.muted} !important;
+  text-align: center;
 `
 
 const FutureAmountScope = styled.label<{ $checked: boolean }>`
