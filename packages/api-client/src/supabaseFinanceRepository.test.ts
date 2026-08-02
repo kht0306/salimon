@@ -100,6 +100,33 @@ describe("saveTransaction", () => {
     expect(from).not.toHaveBeenCalled()
   })
 
+  it.each(["fixed", "installment"] as const)(
+    "uses the transaction id when clearing splits after a %s edit",
+    async (recurringType) => {
+      rpc
+        .mockResolvedValueOnce({ data: "rule-1", error: null })
+        .mockResolvedValueOnce({ data: null, error: null })
+      const repository = new SupabaseFinanceRepository()
+
+      await repository.saveTransaction("user-1", {
+        id: "transaction-1",
+        ledgerId: "ledger-1",
+        type: "expense",
+        status: "confirmed",
+        amount: 12000,
+        transactionAt: "2026-07-14T03:30:00.000Z",
+        recurringType,
+        recurringRuleId: "rule-1",
+        splits: [],
+      })
+
+      expect(rpc).toHaveBeenNthCalledWith(2, "replace_transaction_splits", {
+        p_transaction_id: "transaction-1",
+        p_splits: [],
+      })
+    },
+  )
+
   it("passes a current-month-only recurring amount scope", async () => {
     rpc.mockResolvedValue({ data: "rule-1", error: null })
     const repository = new SupabaseFinanceRepository()

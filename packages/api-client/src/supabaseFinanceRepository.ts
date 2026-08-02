@@ -292,7 +292,7 @@ export class SupabaseFinanceRepository {
     }
 
     if (input.id) {
-      const { data, error } = await client.rpc(
+      const { error } = await client.rpc(
         "update_transaction_with_recurrence_v3",
         {
           p_transaction_id: input.id,
@@ -314,7 +314,7 @@ export class SupabaseFinanceRepository {
         },
       )
       throwIfError(error)
-      const transactionId = typeof data === "string" ? data : input.id
+      const transactionId = input.id
       if (input.tags !== undefined) {
         const { error: tagError } = await client
           .from("transactions")
