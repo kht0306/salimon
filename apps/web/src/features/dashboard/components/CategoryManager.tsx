@@ -278,7 +278,11 @@ const CategoryCreateForm = observer(function CategoryCreateForm({
     const parent = store.currentCategories.find(
       (category) => category.id === parentCategoryId,
     )
-    if (parent) setUsageTypes(parent.usageTypes)
+    if (parent) {
+      setIcon(parent.icon)
+      setColor(parent.color)
+      setUsageTypes(parent.usageTypes)
+    }
   }, [parentCategoryId, store])
 
   const selectedParent = parentCategoryId
