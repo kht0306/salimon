@@ -706,6 +706,18 @@ const DataTable = styled.table`
   }
   &.transaction-table th:nth-of-type(4),
   &.transaction-table td:nth-of-type(4) { width: 36%; }
+  @media print {
+    &.transaction-table th:nth-of-type(4),
+    &.transaction-table td:nth-of-type(4) {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    &.transaction-table th:nth-of-type(5),
+    &.transaction-table td:nth-of-type(5) {
+      width: 1%;
+      white-space: nowrap;
+    }
+  }
   @media (max-width: 640px) { &.desktop-table { display: none; } }
 `
 const StatusBadge = styled.span<{ $excluded: boolean }>`
