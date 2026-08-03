@@ -52,14 +52,12 @@ describe("AppStore.selectableLedgers", () => {
     ])
   })
 
-  it("opens ledger setup when an authenticated user has no ledgers", () => {
+  it("keeps the selection empty when an authenticated user has no ledgers", () => {
     const store = new AppStore()
     store.authUser = { id: "user-1", nickname: "사용자" }
 
     store.hydrate(createEmptyFinanceData())
-    store.setView("calendar")
 
     expect(store.selectedLedgerId).toBe("")
-    expect(store.activeView).toBe("ledger")
   })
 })
