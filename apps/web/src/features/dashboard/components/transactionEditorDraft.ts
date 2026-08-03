@@ -21,6 +21,11 @@ export interface TransactionEditorDraft {
   parseConfidence?: number
 }
 
+export interface TransactionSplitDraft {
+  categoryId: string
+  amount: string
+}
+
 export function createNewTransactionDraft(input: {
   selectedDate: string
   expenseCategoryId?: string
