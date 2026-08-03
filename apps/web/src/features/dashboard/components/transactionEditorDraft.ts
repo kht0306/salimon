@@ -117,6 +117,15 @@ export function isInstallmentEditLocked(
   return transaction?.recurringType === "installment"
 }
 
+export function getTransactionAtForSave(
+  draftTransactionAt: string,
+  editing: Pick<Transaction, "recurringType" | "transactionAt"> | null,
+): string {
+  return editing?.recurringType
+    ? editing.transactionAt
+    : draftTransactionAt
+}
+
 export function getInstallmentPaymentMethodId(input: {
   currentPaymentMethodId: string
   activeCardIds: ReadonlySet<string>
