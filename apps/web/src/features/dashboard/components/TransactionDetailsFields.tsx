@@ -1,12 +1,7 @@
 "use client"
 
 import styled from "@emotion/styled"
-import {
-  formatMoneyInput,
-  formatKrw,
-  getCategoryLabel,
-  isSplitCategory,
-} from "@salimon/domain"
+import { formatMoneyInput, formatKrw, isSplitCategory } from "@salimon/domain"
 import type { CategoryUsageType } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
 import { ListPlus, X } from "lucide-react"
@@ -17,6 +12,7 @@ import type {
   TransactionEditorDraft,
   TransactionSplitDraft,
 } from "./transactionEditorDraft"
+import { buildTransactionCategoryOptions } from "./transactionPresentation"
 
 interface TransactionDetailsFieldsProps {
   draft: TransactionEditorDraft
@@ -55,14 +51,13 @@ export const TransactionDetailsFields = observer(
         (category) => category.id === draft.categoryId,
       ),
     )
-    const selectableCategories = store.currentCategories.filter((category) =>
-      category.usageTypes.includes(draft.type as CategoryUsageType),
+    const selectableCategoryOptions = buildTransactionCategoryOptions(
+      store.currentCategories,
+      draft.type as CategoryUsageType,
     )
-    const splitSelectableCategories = selectableCategories.filter(
-      (category) => !isSplitCategory(category),
+    const splitSelectableCategoryOptions = selectableCategoryOptions.filter(
+      ({ category }) => !isSplitCategory(category),
     )
-    const categoryLabel = (categoryId: string): string =>
-      getCategoryLabel(store.currentCategories, categoryId, "삭제된 카테고리")
 
     return (
       <>
@@ -102,9 +97,9 @@ export const TransactionDetailsFields = observer(
             }}
           >
             <option value="">기본 카테고리 자동 적용</option>
-            {selectableCategories.map((category) => (
+            {selectableCategoryOptions.map(({ category, label }) => (
               <option key={category.id} value={category.id}>
-                {categoryLabel(category.id)}
+                {label}
               </option>
             ))}
           </Select>
@@ -120,13 +115,15 @@ export const TransactionDetailsFields = observer(
               <Button
                 type="button"
                 disabled={
-                  splits.length >= 10 || splitSelectableCategories.length === 0
+                  splits.length >= 10 ||
+                  splitSelectableCategoryOptions.length === 0
                 }
                 onClick={() =>
                   onSplitsChange([
                     ...splits,
                     {
-                      categoryId: splitSelectableCategories[0]?.id || "",
+                      categoryId:
+                        splitSelectableCategoryOptions[0]?.category.id || "",
                       amount: "",
                     },
                   ])
@@ -150,9 +147,9 @@ export const TransactionDetailsFields = observer(
                     )
                   }
                 >
-                  {splitSelectableCategories.map((category) => (
+                  {splitSelectableCategoryOptions.map(({ category, label }) => (
                     <option key={category.id} value={category.id}>
-                      {categoryLabel(category.id)}
+                      {label}
                     </option>
                   ))}
                 </Select>

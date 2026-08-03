@@ -1,6 +1,7 @@
-import type { PaymentMethod, Transaction } from "@salimon/types"
+import type { Category, PaymentMethod, Transaction } from "@salimon/types"
 import { describe, expect, it } from "vitest"
 import {
+  buildTransactionCategoryOptions,
   getInstallmentLabel,
   getPaymentLabel,
   getPaymentMetadataLabel,
@@ -44,6 +45,56 @@ const account: PaymentMethod = {
   name: "급여 계좌",
   type: "bank",
   issuer: "국민은행",
+}
+
+describe("buildTransactionCategoryOptions", () => {
+  it("shows only active categories for the selected usage in hierarchy order", () => {
+    const categories: Category[] = [
+      category("food", "식비", 0),
+      category("dining", "외식, 배달", 0, "food"),
+      category("delivery", "배달의 민족", 0, "dining"),
+      { ...category("archived", "제거한 카테고리", 1), isArchived: true },
+      {
+        ...category("income", "급여", 2),
+        type: "income",
+        usageTypes: ["income"],
+      },
+    ]
+
+    const options = buildTransactionCategoryOptions(categories, "expense")
+
+    expect(options.map(({ category: item }) => item.id)).toEqual([
+      "food",
+      "dining",
+      "delivery",
+    ])
+    expect(options.map(({ label }) => label)).toEqual([
+      "식비",
+      "\u00a0\u00a0\u00a0↳ 외식, 배달",
+      "\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0↳ 배달의 민족",
+    ])
+  })
+})
+
+function category(
+  id: string,
+  name: string,
+  sortOrder: number,
+  parentCategoryId?: string,
+): Category {
+  return {
+    id,
+    ledgerId: "ledger-1",
+    type: "expense",
+    usageTypes: ["expense"],
+    name,
+    icon: "circle",
+    color: "#000000",
+    sortOrder,
+    isDefault: false,
+    isArchived: false,
+    parentCategoryId,
+  }
 }
 
 describe("getPaymentMethodTypeLabel", () => {
