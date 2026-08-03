@@ -52,6 +52,7 @@ import {
   createNewTransactionDraft,
   getIncomeRecurringType,
   getInstallmentPaymentMethodId,
+  getTransactionAtForSave,
   isInstallmentEditLocked,
   type TransactionEditorDraft,
 } from "./transactionEditorDraft"
@@ -500,7 +501,7 @@ export const TransactionPanel = observer(function TransactionPanel() {
         incomeKind: draft.type === "income" ? draft.incomeKind : undefined,
         status: draft.status,
         amount,
-        transactionAt: draft.transactionAt,
+        transactionAt: getTransactionAtForSave(draft.transactionAt, editing),
         categoryId: draft.categoryId || undefined,
         merchantName: draft.merchantName || undefined,
         memo: draft.memo || undefined,

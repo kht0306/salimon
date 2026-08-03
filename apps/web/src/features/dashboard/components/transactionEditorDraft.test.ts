@@ -6,6 +6,7 @@ import {
   createNewTransactionDraft,
   getIncomeRecurringType,
   getInstallmentPaymentMethodId,
+  getTransactionAtForSave,
   isInstallmentEditLocked,
 } from "./transactionEditorDraft"
 
@@ -119,6 +120,27 @@ describe("transaction editor drafts", () => {
     expect(
       isInstallmentEditLocked({ recurringType: "installment" }),
     ).toBe(true)
+  })
+
+  it.each(["fixed", "installment"] as const)(
+    "preserves the original timestamp when saving an existing %s transaction",
+    (recurringType) => {
+      expect(
+        getTransactionAtForSave("2026-07-14T12:30", {
+          recurringType,
+          transactionAt: "2026-07-14T03:30:45.123Z",
+        }),
+      ).toBe("2026-07-14T03:30:45.123Z")
+    },
+  )
+
+  it("uses the edited timestamp for an ordinary transaction", () => {
+    expect(
+      getTransactionAtForSave("2026-07-15T09:10", {
+        recurringType: undefined,
+        transactionAt: "2026-07-14T03:30:45.123Z",
+      }),
+    ).toBe("2026-07-15T09:10")
   })
 
   it("keeps an existing card when converting an ordinary transaction", () => {
