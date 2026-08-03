@@ -20,8 +20,10 @@ import {
   Users,
 } from "lucide-react"
 import { observer } from "mobx-react-lite"
+import { useRouter } from "next/navigation"
 import { useEffect, useId, useState } from "react"
 import { useAppStore } from "../StoreProvider"
+import { dashboardRoutes } from "../routes"
 import {
   Button,
   Field,
@@ -49,6 +51,7 @@ const invitationLabels = {
 
 export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
   const store = useAppStore()
+  const router = useRouter()
   const ledger = store.currentLedger
   const [renameName, setRenameName] = useState(ledger?.name ?? "")
   const [newName, setNewName] = useState("")
@@ -351,7 +354,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
             $variant="soft"
             disabled={!newName.trim() || isMutating || !store.authUser}
             onClick={async () => {
-              await store.createLedger({
+              const created = await store.createLedger({
                 name: newName,
                 type: newType,
                 setDefault: setAsDefault,
@@ -359,6 +362,7 @@ export const LedgerManagementPanel = observer(function LedgerManagementPanel() {
                 ledgerVisibleInstrumentIds:
                   newType === "shared" ? newLedgerVisibleMethodIds : [],
               })
+              if (created) router.replace(dashboardRoutes.calendar)
             }}
           >
             <Plus size={16} />

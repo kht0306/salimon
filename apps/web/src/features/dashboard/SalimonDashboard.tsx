@@ -14,7 +14,7 @@ import {
   WalletCards,
   ChartNoAxesCombined,
 } from "lucide-react"
-import { StoreProvider, useAppStore } from "./StoreProvider"
+import { useAppStore } from "./StoreProvider"
 import { CalendarGrid } from "./components/CalendarGrid"
 import { AuthControls } from "./components/AuthControls"
 import { AccountManager } from "./components/AccountManager"
@@ -41,23 +41,32 @@ import { formatKrw } from "@salimon/domain"
 import styled from "@emotion/styled"
 import { colors, radii, spacing } from "@salimon/ui-tokens"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { useEffect } from "react"
 import {
   CURRENT_PRIVACY_VERSION,
   CURRENT_TERMS_VERSION,
 } from "@salimon/types"
+import {
+  dashboardRoutes,
+  getLedgerSelectionRoute,
+  shouldRedirectToLedgerManagement,
+  type DashboardView,
+} from "./routes"
 
 const isLocalDevelopment = process.env.NODE_ENV === "development"
 
-export function SalimonDashboard() {
-  return (
-    <StoreProvider>
-      <DashboardContent />
-    </StoreProvider>
-  )
+interface SalimonDashboardProps {
+  view: DashboardView
 }
 
-const DashboardContent = observer(function DashboardContent() {
+export function SalimonDashboard({ view }: SalimonDashboardProps) {
+  return <DashboardContent view={view} />
+}
+
+const DashboardContent = observer(function DashboardContent({
+  view,
+}: SalimonDashboardProps) {
   const store = useAppStore()
   const router = useRouter()
   const currentMembership = store.currentMembership
@@ -70,8 +79,33 @@ const DashboardContent = observer(function DashboardContent() {
       (store.authState !== "authenticated" || !store.authUser)
     ) {
       router.replace("/login")
+      return
     }
-  }, [router, store.authState, store.authUser])
+
+    if (
+      store.authState === "authenticated" &&
+      store.dataState === "ready" &&
+      shouldRedirectToLedgerManagement(view, store.currentLedger)
+    ) {
+      router.replace(dashboardRoutes.ledger)
+      return
+    }
+
+    if (
+      store.authState === "authenticated" &&
+      view === "connection" &&
+      !isLocalDevelopment
+    ) {
+      router.replace(dashboardRoutes.calendar)
+    }
+  }, [
+    router,
+    store.authState,
+    store.authUser,
+    store.currentLedger,
+    store.dataState,
+    view,
+  ])
 
   if (store.authState !== "authenticated" || !store.authUser) {
     return (
@@ -94,13 +128,12 @@ const DashboardContent = observer(function DashboardContent() {
   return (
     <Shell
       $showTransactionPanel={
-        hasCurrentLedger && store.activeView === "calendar"
+        hasCurrentLedger && !isArchivedLedger && view === "calendar"
       }
     >
       <Sidebar>
         <Brand
-          type="button"
-          onClick={() => store.setView("calendar")}
+          href={dashboardRoutes.calendar}
           aria-label="기본 대시보드로 이동"
         >
           <BrandMark aria-hidden="true">S</BrandMark>
@@ -114,7 +147,13 @@ const DashboardContent = observer(function DashboardContent() {
           <LedgerControl>
             <LedgerSelect
               value={store.selectedLedgerId}
-              onChange={(event) => store.switchLedger(event.target.value)}
+              onChange={(event) => {
+                const ledger = store.selectableLedgers.find(
+                  (item) => item.id === event.target.value,
+                )
+                store.switchLedger(event.target.value)
+                router.replace(getLedgerSelectionRoute(ledger))
+              }}
               aria-label="가계부 선택"
               disabled={store.selectableLedgers.length === 0}
             >
@@ -157,11 +196,9 @@ const DashboardContent = observer(function DashboardContent() {
               />
             </DefaultLedgerButton>
             <LedgerManageButton
-              type="button"
-              $active={false}
+              href={dashboardRoutes.ledger}
               title="새 가계부 만들기"
               aria-label="새 가계부 만들기"
-              onClick={() => store.setView("ledger")}
             >
               <Plus size={15} />
             </LedgerManageButton>
@@ -195,82 +232,70 @@ const DashboardContent = observer(function DashboardContent() {
           {hasCurrentLedger && !isArchivedLedger ? (
             <>
               <NavButton
-                $active={store.activeView === "calendar"}
-                aria-current={
-                  store.activeView === "calendar" ? "page" : undefined
-                }
-                onClick={() => store.setView("calendar")}
+                href={dashboardRoutes.calendar}
+                $active={view === "calendar"}
+                aria-current={view === "calendar" ? "page" : undefined}
               >
                 <CalendarDays size={17} /> 캘린더
               </NavButton>
               <NavButton
-                $active={store.activeView === "transactions"}
-                aria-current={
-                  store.activeView === "transactions" ? "page" : undefined
-                }
-                onClick={() => store.setView("transactions")}
+                href={dashboardRoutes.transactions}
+                $active={view === "transactions"}
+                aria-current={view === "transactions" ? "page" : undefined}
               >
                 <ListFilter size={17} /> 내역 검색
               </NavButton>
               <NavButton
-                $active={store.activeView === "settlement"}
-                aria-current={
-                  store.activeView === "settlement" ? "page" : undefined
-                }
-                onClick={() => store.setView("settlement")}
+                href={dashboardRoutes.settlement}
+                $active={view === "settlement"}
+                aria-current={view === "settlement" ? "page" : undefined}
               >
                 <ChartNoAxesCombined size={17} /> 정산
               </NavButton>
               <NavButton
-                $active={store.activeView === "categories"}
-                aria-current={
-                  store.activeView === "categories" ? "page" : undefined
-                }
-                onClick={() => store.setView("categories")}
+                href={dashboardRoutes.categories}
+                $active={view === "categories"}
+                aria-current={view === "categories" ? "page" : undefined}
               >
                 <Tags size={17} /> 카테고리
               </NavButton>
               <NavButton
-                $active={store.activeView === "cards"}
-                aria-current={store.activeView === "cards" ? "page" : undefined}
-                onClick={() => store.setView("cards")}
+                href={dashboardRoutes.cards}
+                $active={view === "cards"}
+                aria-current={view === "cards" ? "page" : undefined}
               >
                 <WalletCards size={17} /> 내 카드
               </NavButton>
               <NavButton
-                $active={store.activeView === "accounts"}
-                aria-current={
-                  store.activeView === "accounts" ? "page" : undefined
-                }
-                onClick={() => store.setView("accounts")}
+                href={dashboardRoutes.accounts}
+                $active={view === "accounts"}
+                aria-current={view === "accounts" ? "page" : undefined}
               >
                 <Landmark size={17} /> 내 계좌
               </NavButton>
             </>
           ) : null}
           <NavButton
-            $active={store.activeView === "ledger"}
-            aria-current={store.activeView === "ledger" ? "page" : undefined}
-            onClick={() => store.setView("ledger")}
+            href={dashboardRoutes.ledger}
+            $active={view === "ledger"}
+            aria-current={view === "ledger" ? "page" : undefined}
           >
             <Settings2 size={17} /> 가계부 관리
           </NavButton>
           {isLocalDevelopment && hasCurrentLedger && !isArchivedLedger ? (
             <NavButton
-              $active={store.activeView === "connection"}
-              aria-current={
-                store.activeView === "connection" ? "page" : undefined
-              }
-              onClick={() => store.setView("connection")}
+              href={dashboardRoutes.connection}
+              $active={view === "connection"}
+              aria-current={view === "connection" ? "page" : undefined}
             >
               <Database size={17} /> 앱 관리
             </NavButton>
           ) : null}
           {hasCurrentLedger && !isArchivedLedger ? (
             <NavButton
-              $active={store.activeView === "trust"}
-              aria-current={store.activeView === "trust" ? "page" : undefined}
-              onClick={() => store.setView("trust")}
+              href={dashboardRoutes.trust}
+              $active={view === "trust"}
+              aria-current={view === "trust" ? "page" : undefined}
             >
               <ShieldCheck size={17} /> 개인정보·데이터
             </NavButton>
@@ -306,29 +331,34 @@ const DashboardContent = observer(function DashboardContent() {
 
         {hasCurrentLedger && !isArchivedLedger ? <OnboardingChecklist /> : null}
 
-        {hasCurrentLedger && store.activeView === "calendar" ? (
+        {hasCurrentLedger && !isArchivedLedger && view === "calendar" ? (
           <CalendarGrid />
         ) : null}
-        {hasCurrentLedger && store.activeView === "transactions" ? (
+        {hasCurrentLedger && !isArchivedLedger && view === "transactions" ? (
           <TransactionListPanel />
         ) : null}
-        {hasCurrentLedger && store.activeView === "categories" ? (
+        {hasCurrentLedger && !isArchivedLedger && view === "categories" ? (
           <CategoryManager />
         ) : null}
-        {hasCurrentLedger && store.activeView === "cards" ? (
+        {hasCurrentLedger && !isArchivedLedger && view === "cards" ? (
           <CardManager />
         ) : null}
-        {hasCurrentLedger && store.activeView === "accounts" ? (
+        {hasCurrentLedger && !isArchivedLedger && view === "accounts" ? (
           <AccountManager key={store.selectedLedgerId} />
         ) : null}
-        {hasCurrentLedger && store.activeView === "settlement" ? (
+        {hasCurrentLedger && !isArchivedLedger && view === "settlement" ? (
           <SettlementPanel />
         ) : null}
-        {store.activeView === "trust" ? <TrustCenter /> : null}
-        {store.activeView === "ledger" ? (
+        {hasCurrentLedger && !isArchivedLedger && view === "trust" ? (
+          <TrustCenter />
+        ) : null}
+        {view === "ledger" ? (
           <LedgerManagementPanel key={store.selectedLedgerId} />
         ) : null}
-        {isLocalDevelopment && store.activeView === "connection" ? (
+        {isLocalDevelopment &&
+        hasCurrentLedger &&
+        !isArchivedLedger &&
+        view === "connection" ? (
           <ConnectionPanel />
         ) : null}
         {store.dataError ? (
@@ -336,7 +366,7 @@ const DashboardContent = observer(function DashboardContent() {
         ) : null}
       </Workspace>
 
-      {hasCurrentLedger && store.activeView === "calendar" ? (
+      {hasCurrentLedger && !isArchivedLedger && view === "calendar" ? (
         <TransactionPanel
           key={`${store.selectedLedgerId}-${store.selectedDate}`}
         />
@@ -362,7 +392,7 @@ const AuthLoading = styled.main`
   color: ${colors.muted};
 `
 
-const Brand = styled.button`
+const Brand = styled(Link)`
   display: flex;
   align-items: center;
   gap: ${spacing[3]};
@@ -371,6 +401,7 @@ const Brand = styled.button`
   background: transparent;
   color: inherit;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 
   @media (max-width: 820px) {
@@ -422,9 +453,16 @@ const DefaultLedgerButton = styled.button<{ $active: boolean }>`
   }
 `
 
-const LedgerManageButton = styled(DefaultLedgerButton)`
+const LedgerManageButton = styled(Link)`
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid ${colors.borderStrong};
+  border-radius: ${radii.sm};
   background: ${colors.panel};
   color: ${colors.muted};
+  text-decoration: none;
 
   &:hover {
     background: ${colors.panelSubtle};
@@ -464,7 +502,7 @@ const Nav = styled.nav`
   }
 `
 
-const NavButton = styled.button<{ $active: boolean }>`
+const NavButton = styled(Link)<{ $active: boolean }>`
   min-height: 36px;
   display: flex;
   align-items: center;
@@ -478,6 +516,7 @@ const NavButton = styled.button<{ $active: boolean }>`
   font-size: 13px;
   font-weight: ${({ $active }) => ($active ? 600 : 500)};
   text-align: left;
+  text-decoration: none;
   white-space: nowrap;
   transition:
     background-color 140ms ease,

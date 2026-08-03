@@ -101,18 +101,6 @@ export class AppStore {
   collapsedTransactionGroupKeys = new Set<string>()
   transactionEditorOpen = false
   transactionEditorDirty = false
-  activeView:
-    | "calendar"
-    | "transactions"
-    | "categories"
-    | "cards"
-    | "accounts"
-    | "settlement"
-    | "ledger"
-    | "sms"
-    | "samples"
-    | "connection"
-    | "trust" = "calendar"
   authState: "loading" | "authenticated" | "anonymous" | "error" = "loading"
   authUser: AuthUserInfo | null = null
   authError: string | null = null
@@ -388,12 +376,6 @@ export class AppStore {
       )?.ledgerId
       this.selectedLedgerId = defaultLedgerId ?? this.activeLedgers[0]?.id ?? ""
     }
-    if (
-      this.currentLedger?.archivedAt ||
-      (this.authUser && this.selectableLedgers.length === 0)
-    ) {
-      this.activeView = "ledger"
-    }
   }
 
   async refreshFinanceData(): Promise<void> {
@@ -421,11 +403,6 @@ export class AppStore {
             : "가계부 데이터를 불러오지 못했습니다."
       })
     }
-  }
-
-  setView(view: AppStore["activeView"]): void {
-    this.activeView =
-      !this.currentLedger || this.currentLedger.archivedAt ? "ledger" : view
   }
 
   setCalendarRegistrant(registrantId: string): void {
@@ -538,7 +515,6 @@ export class AppStore {
   switchLedger(ledgerId: string): void {
     this.selectedLedgerId = ledgerId
     this.calendarRegistrantId = ""
-    this.activeView = this.currentLedger?.archivedAt ? "ledger" : "calendar"
   }
 
   async setDefaultLedger(ledgerId: string): Promise<boolean> {
@@ -1346,7 +1322,6 @@ export class AppStore {
       if (this.dataState !== "ready") return false
       runInAction(() => {
         this.selectedLedgerId = ledgerId
-        this.activeView = "calendar"
       })
       this.notify(
         `${input.type === "shared" ? "공동" : "개인"} 가계부를 만들었습니다.`,
@@ -1442,9 +1417,6 @@ export class AppStore {
     try {
       await this.repository.archiveLedger(ledger.id)
       await this.refreshFinanceData()
-      runInAction(() => {
-        this.activeView = "ledger"
-      })
       this.notify("가계부를 제거했습니다. 30일 동안 복구할 수 있습니다.")
       return this.dataState === "ready"
     } catch (error) {
@@ -1465,7 +1437,6 @@ export class AppStore {
       await this.refreshFinanceData()
       runInAction(() => {
         this.selectedLedgerId = ledgerId
-        this.activeView = "ledger"
       })
       this.notify("가계부를 복구했습니다.")
       return this.dataState === "ready"
