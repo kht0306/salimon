@@ -1,4 +1,18 @@
-import type { LedgerMember, PaymentMethod, Transaction } from "@salimon/types"
+import { buildCategoryTree } from "@salimon/domain"
+import type {
+  Category,
+  CategoryUsageType,
+  LedgerMember,
+  PaymentMethod,
+  Transaction,
+} from "@salimon/types"
+
+const CATEGORY_OPTION_INDENT = "\u00a0\u00a0\u00a0"
+
+export interface TransactionCategoryOption {
+  category: Category
+  label: string
+}
 
 export interface TransactionActorGroup {
   key: string
@@ -10,6 +24,24 @@ export interface TransactionRecurrenceGroup {
   key: "recurring" | "general"
   label: string
   transactions: Transaction[]
+}
+
+export function buildTransactionCategoryOptions(
+  categories: Category[],
+  usageType: CategoryUsageType,
+): TransactionCategoryOption[] {
+  return buildCategoryTree(
+    categories.filter(
+      (category) =>
+        !category.isArchived && category.usageTypes.includes(usageType),
+    ),
+  ).map(({ category, depth }) => ({
+    category,
+    label:
+      depth === 1
+        ? category.name
+        : `${CATEGORY_OPTION_INDENT.repeat(depth - 1)}↳ ${category.name}`,
+  }))
 }
 
 export function groupTransactionsByActor(
