@@ -1,5 +1,10 @@
-import { SalimonDashboard } from "@/features/dashboard/SalimonDashboard"
+import { DashboardShell } from "@/features/dashboard/DashboardShell"
+import { TransactionListPanel } from "@/features/dashboard/components/TransactionListPanel"
 
 export default function TransactionsPage() {
-  return <SalimonDashboard view="transactions" />
+  return (
+    <DashboardShell view="transactions">
+      <TransactionListPanel />
+    </DashboardShell>
+  )
 }
