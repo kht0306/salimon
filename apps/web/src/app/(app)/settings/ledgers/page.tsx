@@ -1,5 +1,10 @@
-import { SalimonDashboard } from "@/features/dashboard/SalimonDashboard"
+import { DashboardShell } from "@/features/dashboard/DashboardShell"
+import { LedgerManagementPanel } from "@/features/dashboard/components/LedgerManagementPanel"
 
 export default function LedgersPage() {
-  return <SalimonDashboard view="ledger" />
+  return (
+    <DashboardShell view="ledger">
+      <LedgerManagementPanel />
+    </DashboardShell>
+  )
 }

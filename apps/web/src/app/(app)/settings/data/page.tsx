@@ -1,5 +1,10 @@
-import { SalimonDashboard } from "@/features/dashboard/SalimonDashboard"
+import { DashboardShell } from "@/features/dashboard/DashboardShell"
+import { TrustCenter } from "@/features/dashboard/components/TrustCenter"
 
 export default function DataSettingsPage() {
-  return <SalimonDashboard view="trust" />
+  return (
+    <DashboardShell view="trust">
+      <TrustCenter />
+    </DashboardShell>
+  )
 }

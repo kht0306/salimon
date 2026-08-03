@@ -1,5 +1,10 @@
-import { SalimonDashboard } from "@/features/dashboard/SalimonDashboard"
+import { DashboardShell } from "@/features/dashboard/DashboardShell"
+import { CategoryManager } from "@/features/dashboard/components/CategoryManager"
 
 export default function CategoriesPage() {
-  return <SalimonDashboard view="categories" />
+  return (
+    <DashboardShell view="categories">
+      <CategoryManager />
+    </DashboardShell>
+  )
 }

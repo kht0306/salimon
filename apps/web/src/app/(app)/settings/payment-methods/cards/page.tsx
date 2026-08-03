@@ -1,5 +1,10 @@
-import { SalimonDashboard } from "@/features/dashboard/SalimonDashboard"
+import { DashboardShell } from "@/features/dashboard/DashboardShell"
+import { CardManager } from "@/features/dashboard/components/CardManager"
 
 export default function CardsPage() {
-  return <SalimonDashboard view="cards" />
+  return (
+    <DashboardShell view="cards">
+      <CardManager />
+    </DashboardShell>
+  )
 }

@@ -1,5 +1,10 @@
-import { SalimonDashboard } from "@/features/dashboard/SalimonDashboard"
+import { DashboardShell } from "@/features/dashboard/DashboardShell"
+import { ConnectionPanel } from "@/features/dashboard/components/ConnectionPanel"
 
 export default function ConnectionPage() {
-  return <SalimonDashboard view="connection" />
+  return (
+    <DashboardShell view="connection">
+      <ConnectionPanel />
+    </DashboardShell>
+  )
 }

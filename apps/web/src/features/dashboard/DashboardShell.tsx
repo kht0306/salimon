@@ -15,17 +15,7 @@ import {
   ChartNoAxesCombined,
 } from "lucide-react"
 import { useAppStore } from "./StoreProvider"
-import { CalendarGrid } from "./components/CalendarGrid"
 import { AuthControls } from "./components/AuthControls"
-import { AccountManager } from "./components/AccountManager"
-import { CategoryManager } from "./components/CategoryManager"
-import { CardManager } from "./components/CardManager"
-import { ConnectionPanel } from "./components/ConnectionPanel"
-import { LedgerManagementPanel } from "./components/LedgerManagementPanel"
-import { TransactionPanel } from "./components/TransactionPanel"
-import { TransactionListPanel } from "./components/TransactionListPanel"
-import { SettlementPanel } from "./components/SettlementPanel"
-import { TrustCenter } from "./components/TrustCenter"
 import { OnboardingChecklist } from "./components/OnboardingChecklist"
 import { LegalConsentGate } from "./components/LegalConsentGate"
 import {
@@ -42,7 +32,7 @@ import styled from "@emotion/styled"
 import { colors, radii, spacing } from "@salimon/ui-tokens"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { useEffect } from "react"
+import { Fragment, useEffect } from "react"
 import {
   CURRENT_PRIVACY_VERSION,
   CURRENT_TERMS_VERSION,
@@ -56,22 +46,31 @@ import {
 
 const isLocalDevelopment = process.env.NODE_ENV === "development"
 
-interface SalimonDashboardProps {
+interface DashboardShellProps {
   view: DashboardView
+  children: React.ReactNode
+  sidePanel?: React.ReactNode
 }
 
-export function SalimonDashboard({ view }: SalimonDashboardProps) {
-  return <DashboardContent view={view} />
-}
-
-const DashboardContent = observer(function DashboardContent({
+export const DashboardShell = observer(function DashboardShell({
   view,
-}: SalimonDashboardProps) {
+  children,
+  sidePanel,
+}: DashboardShellProps) {
   const store = useAppStore()
   const router = useRouter()
   const currentMembership = store.currentMembership
   const hasCurrentLedger = Boolean(store.currentLedger)
   const isArchivedLedger = Boolean(store.currentLedger?.archivedAt)
+  const canRenderContent =
+    (view === "ledger" || (hasCurrentLedger && !isArchivedLedger)) &&
+    (view !== "connection" || isLocalDevelopment)
+  const showSidePanel =
+    canRenderContent && view === "calendar" && Boolean(sidePanel)
+  const contentKey =
+    view === "ledger" || view === "accounts"
+      ? `${view}-${store.selectedLedgerId}`
+      : view
 
   useEffect(() => {
     if (
@@ -126,11 +125,7 @@ const DashboardContent = observer(function DashboardContent({
   }
 
   return (
-    <Shell
-      $showTransactionPanel={
-        hasCurrentLedger && !isArchivedLedger && view === "calendar"
-      }
-    >
+    <Shell $showTransactionPanel={showSidePanel}>
       <Sidebar>
         <Brand
           href={dashboardRoutes.calendar}
@@ -331,45 +326,18 @@ const DashboardContent = observer(function DashboardContent({
 
         {hasCurrentLedger && !isArchivedLedger ? <OnboardingChecklist /> : null}
 
-        {hasCurrentLedger && !isArchivedLedger && view === "calendar" ? (
-          <CalendarGrid />
-        ) : null}
-        {hasCurrentLedger && !isArchivedLedger && view === "transactions" ? (
-          <TransactionListPanel />
-        ) : null}
-        {hasCurrentLedger && !isArchivedLedger && view === "categories" ? (
-          <CategoryManager />
-        ) : null}
-        {hasCurrentLedger && !isArchivedLedger && view === "cards" ? (
-          <CardManager />
-        ) : null}
-        {hasCurrentLedger && !isArchivedLedger && view === "accounts" ? (
-          <AccountManager key={store.selectedLedgerId} />
-        ) : null}
-        {hasCurrentLedger && !isArchivedLedger && view === "settlement" ? (
-          <SettlementPanel />
-        ) : null}
-        {hasCurrentLedger && !isArchivedLedger && view === "trust" ? (
-          <TrustCenter />
-        ) : null}
-        {view === "ledger" ? (
-          <LedgerManagementPanel key={store.selectedLedgerId} />
-        ) : null}
-        {isLocalDevelopment &&
-        hasCurrentLedger &&
-        !isArchivedLedger &&
-        view === "connection" ? (
-          <ConnectionPanel />
+        {canRenderContent ? (
+          <Fragment key={contentKey}>{children}</Fragment>
         ) : null}
         {store.dataError ? (
           <DataError role="alert">{store.dataError}</DataError>
         ) : null}
       </Workspace>
 
-      {hasCurrentLedger && !isArchivedLedger && view === "calendar" ? (
-        <TransactionPanel
-          key={`${store.selectedLedgerId}-${store.selectedDate}`}
-        />
+      {showSidePanel ? (
+        <Fragment key={`${store.selectedLedgerId}-${store.selectedDate}`}>
+          {sidePanel}
+        </Fragment>
       ) : null}
       {store.toast ? (
         <Toast
