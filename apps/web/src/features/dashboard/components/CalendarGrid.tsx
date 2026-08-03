@@ -11,7 +11,7 @@ import {
 import { colors, radii } from "@salimon/ui-tokens"
 import { CalendarCheck2, ChevronLeft, ChevronRight } from "lucide-react"
 import { observer } from "mobx-react-lite"
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useAppStore } from "../StoreProvider"
 import {
   Button,
@@ -21,15 +21,22 @@ import {
   PanelTitle,
   Select,
 } from "../styles"
+import { BudgetTransactionsDialog } from "./BudgetTransactionsDialog"
 
 export const CalendarGrid = observer(function CalendarGrid() {
   const store = useAppStore()
+  const [selectedBudgetCategoryId, setSelectedBudgetCategoryId] = useState<
+    string | null
+  >(null)
   const days = useMemo(
     () => buildMonthCalendar(store.selectedMonth),
     [store.selectedMonth],
   )
   const baseMonth = fromMonthKey(store.selectedMonth)
   const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"]
+  const selectedBudget = store.selectedMonthBudgets.find(
+    ({ category }) => category.id === selectedBudgetCategoryId,
+  )
 
   function selectDate(date: string) {
     if (
@@ -54,7 +61,14 @@ export const CalendarGrid = observer(function CalendarGrid() {
       {store.selectedMonthBudgets.length > 0 ? (
         <BudgetStrip>
           {store.selectedMonthBudgets.map(({ category, amount, spent }) => (
-            <BudgetCard key={category.id} $color={category.color}>
+            <BudgetCard
+              key={category.id}
+              type="button"
+              $color={category.color}
+              aria-haspopup="dialog"
+              aria-label={`${getCategoryLabel(store.data.categories, category.id)} 예산 포함 거래 보기`}
+              onClick={() => setSelectedBudgetCategoryId(category.id)}
+            >
               <strong>
                 <CategoryDot $color={category.color} />
                 {getCategoryLabel(store.data.categories, category.id)}
@@ -189,6 +203,21 @@ export const CalendarGrid = observer(function CalendarGrid() {
           </CalendarBody>
         </CalendarViewport>
       </Panel>
+      {selectedBudget ? (
+        <BudgetTransactionsDialog
+          category={selectedBudget.category}
+          categories={store.data.categories.filter(
+            (category) => category.ledgerId === store.selectedLedgerId,
+          )}
+          transactions={store.monthTransactions}
+          transactionSplits={store.data.transactionSplits}
+          paymentMethods={store.data.paymentMethods}
+          members={store.currentMembers}
+          budgetAmount={selectedBudget.amount}
+          selectedMonth={store.selectedMonth}
+          onClose={() => setSelectedBudgetCategoryId(null)}
+        />
+      ) : null}
     </CalendarStack>
   )
 })
@@ -202,7 +231,8 @@ const BudgetStrip = styled.div`
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 8px;
 `
-const BudgetCard = styled.div<{ $color: string }>`
+const BudgetCard = styled.button<{ $color: string }>`
+  width: 100%;
   display: grid;
   gap: 5px;
   padding: 12px;
@@ -210,6 +240,27 @@ const BudgetCard = styled.div<{ $color: string }>`
   border-left-width: 4px;
   border-radius: ${radii.sm};
   background: ${colors.panel};
+  color: ${colors.ink};
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+
+  &:hover {
+    background: ${colors.panelSubtle};
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${colors.focus};
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+
   strong {
     display: flex;
     align-items: center;
