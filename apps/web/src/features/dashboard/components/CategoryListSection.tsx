@@ -2,26 +2,16 @@
 
 import styled from "@emotion/styled"
 import {
-  buildCategoryTree,
   formatMoneyInput,
   getCategoryDepth,
   getCategoryLabel,
-  getCategoryPath,
   getDescendantCategoryIds,
   isSplitCategory,
   MAX_CATEGORY_DEPTH,
 } from "@salimon/domain"
 import type { Category, CategoryUsageType } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
-import {
-  Archive,
-  Check,
-  GripVertical,
-  Pencil,
-  Plus,
-  Search,
-  X,
-} from "lucide-react"
+import { Archive, Check, GripVertical, Pencil, Plus, X } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { type DragEvent, useState } from "react"
 import { useAppStore } from "../StoreProvider"
@@ -36,14 +26,12 @@ import {
   iconLabels,
   iconOptions,
 } from "./categoryEditorFields"
-
-type CategorySortMode =
-  | "manual"
-  | "name-asc"
-  | "name-desc"
-  | "budget-asc"
-  | "budget-desc"
-type CategoryUsageFilter = "all" | CategoryUsageType
+import { CategoryListToolbar } from "./CategoryListToolbar"
+import {
+  buildCategoryListPresentation,
+  type CategorySortMode,
+  type CategoryUsageFilter,
+} from "./categoryListPresentation"
 function canMoveCategoryUnder(
   categories: Category[],
   category: Category,
@@ -91,65 +79,15 @@ export const CategoryListSection = observer(function CategoryListSection({
   const [sortMode, setSortMode] = useState<CategorySortMode>("manual")
   const [usageFilter, setUsageFilter] = useState<CategoryUsageFilter>("all")
 
-  const normalizedQuery = searchQuery.trim().toLocaleLowerCase("ko-KR")
-  const dndEnabled =
-    usageFilter === "all" &&
-    sortMode === "manual" &&
-    normalizedQuery.length === 0
-  const budgetByCategoryId = new Map(
-    store.selectedMonthBudgets.map((item) => [item.category.id, item.amount]),
-  )
-  const compareCategories = (first: Category, second: Category) => {
-    if (sortMode === "name-asc") {
-      return first.name.localeCompare(second.name, "ko-KR")
-    }
-    if (sortMode === "name-desc") {
-      return second.name.localeCompare(first.name, "ko-KR")
-    }
-    if (sortMode === "budget-asc") {
-      return (
-        (budgetByCategoryId.get(first.id) ?? 0) -
-          (budgetByCategoryId.get(second.id) ?? 0) ||
-        first.sortOrder - second.sortOrder
-      )
-    }
-    if (sortMode === "budget-desc") {
-      return (
-        (budgetByCategoryId.get(second.id) ?? 0) -
-          (budgetByCategoryId.get(first.id) ?? 0) ||
-        first.sortOrder - second.sortOrder
-      )
-    }
-    return first.sortOrder - second.sortOrder
-  }
-  const categoryTree = buildCategoryTree(
-    store.currentCategories,
-    compareCategories,
-  )
-  const matchedCategoryIds = new Set(
-    categoryTree
-      .filter(({ category }) => {
-        const usageMatches =
-          usageFilter === "all" || category.usageTypes.includes(usageFilter)
-        const searchMatches = normalizedQuery
-          ? `${getCategoryLabel(store.currentCategories, category.id)} ${iconLabels[category.icon] ?? category.icon}`
-              .toLocaleLowerCase("ko-KR")
-              .includes(normalizedQuery)
-          : true
-        return usageMatches && searchMatches
-      })
-      .map(({ category }) => category.id),
-  )
-  const visibleCategoryIds = new Set(
-    [...matchedCategoryIds].flatMap((categoryId) =>
-      getCategoryPath(store.currentCategories, categoryId).map(
-        (category) => category.id,
-      ),
-    ),
-  )
-  const visibleCategoryItems = categoryTree.filter(({ category }) =>
-    visibleCategoryIds.has(category.id),
-  )
+  const { budgetByCategoryId, dndEnabled, visibleCategoryItems } =
+    buildCategoryListPresentation({
+      categories: store.currentCategories,
+      budgets: store.selectedMonthBudgets,
+      searchQuery,
+      sortMode,
+      usageFilter,
+      iconLabels,
+    })
 
   function startEditing(category: Category) {
     setEditingId(category.id)
@@ -262,57 +200,27 @@ export const CategoryListSection = observer(function CategoryListSection({
 
   return (
     <>
-      <CategoryListToolbar>
-        <CategorySearchField>
-          <Search size={15} aria-hidden="true" />
-          <Input
-            type="search"
-            aria-label="카테고리 검색"
-            placeholder="카테고리 검색"
-            value={searchQuery}
-            onChange={(event) => {
-              setSearchQuery(event.target.value)
-              setDraggingId(null)
-              setDragOverId(null)
-            }}
-          />
-        </CategorySearchField>
-        <CategoryFilterSelect
-          aria-label="카테고리 용도 조회"
-          value={usageFilter}
-          onChange={(event) => {
-            setUsageFilter(event.target.value as CategoryUsageFilter)
-            setDraggingId(null)
-            setDragOverId(null)
-          }}
-        >
-          <option value="all">전체</option>
-          <option value="expense">지출용</option>
-          <option value="income">수입용</option>
-          <option value="saving">저축용</option>
-        </CategoryFilterSelect>
-        <CategorySortSelect
-          aria-label="카테고리 정렬"
-          value={sortMode}
-          onChange={(event) => {
-            setSortMode(event.target.value as CategorySortMode)
-            setDraggingId(null)
-            setDragOverId(null)
-          }}
-        >
-          <option value="manual">사용자 지정 순서</option>
-          <option value="name-asc">이름 오름차순</option>
-          <option value="name-desc">이름 내림차순</option>
-          <option value="budget-asc">예산 낮은 순</option>
-          <option value="budget-desc">예산 높은 순</option>
-        </CategorySortSelect>
-        {!dndEnabled ? (
-          <ReorderHint>
-            전체 조회·사용자 지정 순서이며 검색어가 없을 때만 순서를 변경할 수
-            있습니다.
-          </ReorderHint>
-        ) : null}
-      </CategoryListToolbar>
+      <CategoryListToolbar
+        searchQuery={searchQuery}
+        sortMode={sortMode}
+        usageFilter={usageFilter}
+        dndEnabled={dndEnabled}
+        onSearchQueryChange={(query) => {
+          setSearchQuery(query)
+          setDraggingId(null)
+          setDragOverId(null)
+        }}
+        onSortModeChange={(mode) => {
+          setSortMode(mode)
+          setDraggingId(null)
+          setDragOverId(null)
+        }}
+        onUsageFilterChange={(filter) => {
+          setUsageFilter(filter)
+          setDraggingId(null)
+          setDragOverId(null)
+        }}
+      />
 
       <CategoryList>
         {visibleCategoryItems.map(({ category, depth }) => {
@@ -544,54 +452,6 @@ export const CategoryListSection = observer(function CategoryListSection({
 const CategoryList = styled.div`
   display: grid;
   padding: 4px 18px 12px;
-`
-
-const CategoryListToolbar = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 18px 8px;
-
-  @media (max-width: 720px) {
-    align-items: stretch;
-    flex-direction: column;
-  }
-`
-
-const CategorySearchField = styled.div`
-  position: relative;
-  flex: 1;
-
-  svg {
-    position: absolute;
-    top: 50%;
-    left: 11px;
-    z-index: 1;
-    color: ${colors.muted};
-    pointer-events: none;
-    transform: translateY(-50%);
-  }
-
-  input {
-    padding-left: 34px;
-  }
-`
-
-const CategorySortSelect = styled(Select)`
-  width: 180px;
-
-  @media (max-width: 720px) {
-    width: 100%;
-  }
-`
-
-const CategoryFilterSelect = styled(CategorySortSelect)`
-  width: 120px;
-`
-
-const ReorderHint = styled.span`
-  color: ${colors.muted};
-  font-size: 12px;
 `
 
 const EmptyCategoryList = styled.div`
