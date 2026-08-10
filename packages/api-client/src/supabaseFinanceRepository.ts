@@ -24,7 +24,10 @@ import type {
   TransactionType,
 } from "@salimon/types"
 import type { FinanceData } from "./financeData"
-import { getSupabaseBrowserClient } from "./supabaseClient"
+import {
+  getSupabaseBrowserClient,
+  type SalimonSupabaseClient,
+} from "./supabaseClient"
 
 type Row = Record<string, unknown>
 
@@ -73,9 +76,24 @@ export type AcceptLedgerInviteResult =
   | { status: "already_member"; ledgerId: string }
   | { status: "invalid_or_expired" }
 
+export interface TransactionDateRange {
+  start: string
+  endExclusive: string
+}
+
+export interface FinanceLoadOptions {
+  transactionDateRange?: TransactionDateRange
+}
+
 export class SupabaseFinanceRepository {
-  async load(userId: string): Promise<FinanceData> {
-    const client = requireSupabaseClient()
+  constructor(private readonly client?: SalimonSupabaseClient) {}
+
+  async load(
+    userId: string,
+    options: FinanceLoadOptions = {},
+  ): Promise<FinanceData> {
+    const client = this.requireClient()
+    validateTransactionDateRange(options.transactionDateRange)
     const [
       profileResult,
       ledgersResult,
@@ -93,7 +111,6 @@ export class SupabaseFinanceRepository {
       deletionRequestResult,
       legalConsentResult,
       monthNotesResult,
-      transactionSplitsResult,
     ] = await Promise.all([
       client
         .from("profiles")
@@ -151,7 +168,7 @@ export class SupabaseFinanceRepository {
         )
         .in("type", ["card", "bank"])
         .order("created_at"),
-      fetchAllTransactionRows(client),
+      fetchAllTransactionRows(client, options.transactionDateRange),
       client
         .from("ledger_invitations")
         .select(
@@ -176,7 +193,6 @@ export class SupabaseFinanceRepository {
         .from("ledger_month_notes")
         .select("id, ledger_id, month, note, updated_by, updated_at")
         .order("month", { ascending: false }),
-      fetchAllTransactionSplitRows(client),
     ])
 
     const results = [
@@ -196,11 +212,26 @@ export class SupabaseFinanceRepository {
       deletionRequestResult,
       legalConsentResult,
       monthNotesResult,
-      transactionSplitsResult,
     ]
     const failed = results.find((result) => result.error)
     if (failed?.error) {
       throw toError(failed.error, "가계부 데이터를 불러오지 못했습니다.")
+    }
+
+    const transactionIds = options.transactionDateRange
+      ? ((transactionsResult.data ?? []) as Row[])
+          .map((row) => stringValue(row.id))
+          .filter((id) => id.length > 0)
+      : undefined
+    const transactionSplitsResult = await fetchAllTransactionSplitRows(
+      client,
+      transactionIds,
+    )
+    if (transactionSplitsResult.error) {
+      throw toError(
+        transactionSplitsResult.error,
+        "거래 분할 데이터를 불러오지 못했습니다.",
+      )
     }
 
     const profile = mapProfile(profileResult.data as Row)
@@ -267,11 +298,15 @@ export class SupabaseFinanceRepository {
     }
   }
 
+  private requireClient(): SalimonSupabaseClient {
+    return this.client ?? requireSupabaseClient()
+  }
+
   async saveTransaction(
     userId: string,
     input: RemoteTransactionInput,
   ): Promise<string | undefined> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const payload = {
       ledger_id: input.ledgerId,
       type: input.type,
@@ -402,7 +437,7 @@ export class SupabaseFinanceRepository {
     transactionId: string,
     splits: Array<{ categoryId: string; amount: number }>,
   ): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("replace_transaction_splits", {
       p_transaction_id: transactionId,
       p_splits: splits.map((split) => ({
@@ -432,7 +467,7 @@ export class SupabaseFinanceRepository {
       >
     >,
   ): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const rows = transactions.map((transaction) => ({
       ledger_id: ledgerId,
       created_by: userId,
@@ -458,7 +493,7 @@ export class SupabaseFinanceRepository {
   }
 
   async materializeMonth(month: string): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("materialize_finance_month", {
       target_month: `${month}-01`,
     })
@@ -472,7 +507,7 @@ export class SupabaseFinanceRepository {
     amount: number
     userId: string
   }): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("set_secure_category_budget", {
       p_ledger_id: input.ledgerId,
       p_category_id: input.categoryId,
@@ -488,7 +523,7 @@ export class SupabaseFinanceRepository {
     note: string,
     existingId?: string,
   ): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     if (existingId) {
       const { error } = await client
         .from("ledger_month_notes")
@@ -514,7 +549,7 @@ export class SupabaseFinanceRepository {
     billingPeriodEndMonthOffset: -1 | 0
     isDebit: boolean
   }): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("create_user_payment_instrument", {
       p_type: "card",
       p_name: input.name,
@@ -533,7 +568,7 @@ export class SupabaseFinanceRepository {
     bank: string
     last4?: string
   }): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("create_user_payment_instrument", {
       p_type: "bank",
       p_name: input.name,
@@ -555,7 +590,7 @@ export class SupabaseFinanceRepository {
       last4?: string
     },
   ): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("update_user_payment_instrument", {
       p_id: accountId,
       p_type: "bank",
@@ -571,7 +606,7 @@ export class SupabaseFinanceRepository {
   }
 
   async setAccountActive(accountId: string, isActive: boolean): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("set_user_payment_instrument_active", {
       p_id: accountId,
       p_is_active: isActive,
@@ -580,7 +615,7 @@ export class SupabaseFinanceRepository {
   }
 
   async deleteAccount(accountId: string): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("delete_user_payment_instrument", {
       p_id: accountId,
     })
@@ -599,7 +634,7 @@ export class SupabaseFinanceRepository {
       isDebit: boolean
     },
   ): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("update_user_payment_instrument", {
       p_id: cardId,
       p_type: "card",
@@ -615,7 +650,7 @@ export class SupabaseFinanceRepository {
   }
 
   async setCardActive(cardId: string, isActive: boolean): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("set_user_payment_instrument_active", {
       p_id: cardId,
       p_is_active: isActive,
@@ -624,7 +659,7 @@ export class SupabaseFinanceRepository {
   }
 
   async deleteCard(cardId: string): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("delete_user_payment_instrument", {
       p_id: cardId,
     })
@@ -632,7 +667,7 @@ export class SupabaseFinanceRepository {
   }
 
   async deactivateFixedRule(ruleId: string, month: string): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("deactivate_fixed_rule_from_month", {
       p_rule_id: ruleId,
       p_month: `${month}-01`,
@@ -645,7 +680,7 @@ export class SupabaseFinanceRepository {
     installmentNumber: number,
     scope: InstallmentDeleteScope,
   ): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("delete_installment_occurrences", {
       p_rule_id: ruleId,
       p_installment_number: installmentNumber,
@@ -658,7 +693,7 @@ export class SupabaseFinanceRepository {
     transactionId: string,
     userId: string,
   ): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client
       .from("transactions")
       .update({
@@ -678,7 +713,7 @@ export class SupabaseFinanceRepository {
     usageTypes: CategoryUsageType[]
     parentCategoryId?: string
   }): Promise<string> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { data, error } = await client.rpc("create_category_v2", {
       p_ledger_id: input.ledgerId,
       p_name: input.name,
@@ -701,7 +736,7 @@ export class SupabaseFinanceRepository {
       "name" | "icon" | "color" | "usageTypes" | "parentCategoryId"
     >,
   ): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("update_category_v2", {
       p_category_id: categoryId,
       p_name: category.name,
@@ -714,7 +749,7 @@ export class SupabaseFinanceRepository {
   }
 
   async archiveCategory(categoryId: string): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("archive_category_v2", {
       p_category_id: categoryId,
     })
@@ -727,7 +762,7 @@ export class SupabaseFinanceRepository {
   ): Promise<void> {
     if (categoryIds.length === 0) return
 
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("reorder_category_siblings", {
       p_parent_category_id: parentCategoryId ?? null,
       p_category_ids: categoryIds,
@@ -742,7 +777,7 @@ export class SupabaseFinanceRepository {
     paymentInstrumentIds: string[]
     ledgerVisibleInstrumentIds: string[]
   }): Promise<string> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { data, error } = await client.rpc("create_ledger", {
       p_name: input.name,
       p_type: input.type,
@@ -759,7 +794,7 @@ export class SupabaseFinanceRepository {
   }
 
   async renameLedger(ledgerId: string, name: string): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("rename_ledger", {
       p_ledger_id: ledgerId,
       p_name: name,
@@ -768,7 +803,7 @@ export class SupabaseFinanceRepository {
   }
 
   async setDefaultLedger(ledgerId: string): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("set_default_ledger", {
       p_ledger_id: ledgerId,
     })
@@ -776,7 +811,7 @@ export class SupabaseFinanceRepository {
   }
 
   async archiveLedger(ledgerId: string): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("archive_ledger", {
       p_ledger_id: ledgerId,
     })
@@ -784,7 +819,7 @@ export class SupabaseFinanceRepository {
   }
 
   async restoreLedger(ledgerId: string): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("restore_ledger", {
       p_ledger_id: ledgerId,
     })
@@ -792,7 +827,7 @@ export class SupabaseFinanceRepository {
   }
 
   async leaveSharedLedger(ledgerId: string): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("leave_shared_ledger", {
       p_ledger_id: ledgerId,
     })
@@ -800,7 +835,7 @@ export class SupabaseFinanceRepository {
   }
 
   async convertPersonalLedgerToShared(ledgerId: string): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("convert_personal_ledger_to_shared", {
       p_ledger_id: ledgerId,
       p_shared_payment_method_ids: [],
@@ -812,7 +847,7 @@ export class SupabaseFinanceRepository {
     ledgerId: string,
     roleToGrant: Exclude<LedgerRole, "owner">,
   ): Promise<CreatedLedgerInvitation> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { data, error } = await client.rpc("create_ledger_invite", {
       p_ledger_id: ledgerId,
       p_role_to_grant: roleToGrant,
@@ -841,7 +876,7 @@ export class SupabaseFinanceRepository {
     targetUserId: string,
     role: Exclude<LedgerRole, "owner">,
   ): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("update_ledger_member_role", {
       p_ledger_id: ledgerId,
       p_target_user_id: targetUserId,
@@ -854,7 +889,7 @@ export class SupabaseFinanceRepository {
     ledgerId: string,
     targetUserId: string,
   ): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("remove_ledger_member", {
       p_ledger_id: ledgerId,
       p_target_user_id: targetUserId,
@@ -866,7 +901,7 @@ export class SupabaseFinanceRepository {
     ledgerId: string,
     targetUserId: string,
   ): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("transfer_ledger_ownership", {
       p_ledger_id: ledgerId,
       p_target_user_id: targetUserId,
@@ -875,7 +910,7 @@ export class SupabaseFinanceRepository {
   }
 
   async acceptInvite(inviteCode: string): Promise<AcceptLedgerInviteResult> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { data, error } = await client.rpc(
       "accept_ledger_invite_and_set_default",
       {
@@ -905,7 +940,7 @@ export class SupabaseFinanceRepository {
     ledgerVisibleInstrumentIds: string[],
     primaryInstrumentId?: string,
   ): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("sync_my_ledger_payment_methods", {
       p_ledger_id: ledgerId,
       p_payment_instrument_ids: paymentInstrumentIds,
@@ -916,7 +951,7 @@ export class SupabaseFinanceRepository {
   }
 
   async revokeInvite(invitationId: string): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client
       .from("ledger_invitations")
       .update({ status: "revoked" })
@@ -928,7 +963,7 @@ export class SupabaseFinanceRepository {
     userId: string,
     input: RemoteSampleInput,
   ): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.from("card_message_samples").insert({
       submitted_by: userId,
       card_company_name: input.cardCompanyName ?? null,
@@ -943,7 +978,7 @@ export class SupabaseFinanceRepository {
   }
 
   async requestAccountDeletion(): Promise<string> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { data, error } = await client.rpc("request_account_deletion")
     throwIfError(error)
     if (typeof data !== "string") {
@@ -956,7 +991,7 @@ export class SupabaseFinanceRepository {
     termsVersion: string,
     privacyVersion: string,
   ): Promise<string> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { data, error } = await client.rpc("accept_current_legal_terms", {
       p_terms_version: termsVersion,
       p_privacy_version: privacyVersion,
@@ -969,7 +1004,7 @@ export class SupabaseFinanceRepository {
   }
 
   async cancelAccountDeletion(): Promise<void> {
-    const client = requireSupabaseClient()
+    const client = this.requireClient()
     const { error } = await client.rpc("cancel_account_deletion")
     throwIfError(error)
   }
@@ -987,16 +1022,25 @@ function requireSupabaseClient() {
 const DATABASE_PAGE_SIZE = 500
 
 async function fetchAllTransactionRows(
-  client: ReturnType<typeof requireSupabaseClient>,
+  client: SalimonSupabaseClient,
+  dateRange?: TransactionDateRange,
 ): Promise<{ data: Row[] | null; error: unknown }> {
   const rows: Row[] = []
   for (let from = 0; ; from += DATABASE_PAGE_SIZE) {
-    const { data, error } = await client
+    let query = client
       .from("transactions")
       .select(
         "id, ledger_id, created_by, updated_by, actor_user_id, type, status, amount, currency, transaction_at, category_id, payment_method_id, merchant_name, memo, source_type, source_app, source_sender, source_hash, parse_confidence, recurring_rule_id, recurring_type, installment_number, installment_total, created_at, updated_at, deleted_at, tags",
       )
       .is("deleted_at", null)
+
+    if (dateRange) {
+      query = query
+        .gte("transaction_at", dateRange.start)
+        .lt("transaction_at", dateRange.endExclusive)
+    }
+
+    const { data, error } = await query
       .order("transaction_at", { ascending: false })
       .order("id")
       .range(from, from + DATABASE_PAGE_SIZE - 1)
@@ -1008,13 +1052,24 @@ async function fetchAllTransactionRows(
 }
 
 async function fetchAllTransactionSplitRows(
-  client: ReturnType<typeof requireSupabaseClient>,
+  client: SalimonSupabaseClient,
+  transactionIds?: string[],
 ): Promise<{ data: Row[] | null; error: unknown }> {
+  if (transactionIds?.length === 0) {
+    return { data: [], error: null }
+  }
+
   const rows: Row[] = []
   for (let from = 0; ; from += DATABASE_PAGE_SIZE) {
-    const { data, error } = await client
+    let query = client
       .from("transaction_splits")
       .select("id, transaction_id, category_id, amount, sort_order")
+
+    if (transactionIds) {
+      query = query.in("transaction_id", transactionIds)
+    }
+
+    const { data, error } = await query
       .order("transaction_id")
       .order("sort_order")
       .range(from, from + DATABASE_PAGE_SIZE - 1)
@@ -1023,6 +1078,22 @@ async function fetchAllTransactionSplitRows(
     if ((data?.length ?? 0) < DATABASE_PAGE_SIZE) break
   }
   return { data: rows, error: null }
+}
+
+function validateTransactionDateRange(
+  dateRange: TransactionDateRange | undefined,
+): void {
+  if (!dateRange) return
+
+  const start = Date.parse(dateRange.start)
+  const endExclusive = Date.parse(dateRange.endExclusive)
+  if (
+    !Number.isFinite(start) ||
+    !Number.isFinite(endExclusive) ||
+    start >= endExclusive
+  ) {
+    throw new Error("거래 조회 기간이 올바르지 않습니다.")
+  }
 }
 
 function throwIfError(error: { message: string } | null): void {

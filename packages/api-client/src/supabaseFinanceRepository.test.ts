@@ -13,10 +13,181 @@ import {
   mapPaymentMethodType,
   SupabaseFinanceRepository,
 } from "./supabaseFinanceRepository"
+import type { SalimonSupabaseClient } from "./supabaseClient"
+
+interface QueryResult {
+  data: unknown
+  error: unknown
+}
+
+class LoadQueryDouble implements PromiseLike<QueryResult> {
+  readonly select = vi.fn(() => this)
+  readonly single = vi.fn(() => Promise.resolve(this.result))
+  readonly maybeSingle = vi.fn(() => Promise.resolve(this.result))
+  readonly order = vi.fn(() => this)
+  readonly limit = vi.fn(() => this)
+  readonly range = vi.fn(() => Promise.resolve(this.result))
+  readonly is = vi.fn(() => this)
+  readonly in = vi.fn(() => this)
+  readonly gte = vi.fn(() => this)
+  readonly lt = vi.fn(() => this)
+
+  constructor(private readonly result: QueryResult) {}
+
+  then<TResult1 = QueryResult, TResult2 = never>(
+    onfulfilled?:
+      | ((value: QueryResult) => TResult1 | PromiseLike<TResult1>)
+      | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): PromiseLike<TResult1 | TResult2> {
+    return Promise.resolve(this.result).then(onfulfilled, onrejected)
+  }
+}
+
+interface LoadClientDouble {
+  client: SalimonSupabaseClient
+  from: ReturnType<typeof vi.fn>
+  queries: Map<string, LoadQueryDouble>
+}
+
+function createLoadClientDouble(
+  overrides: Record<string, QueryResult> = {},
+): LoadClientDouble {
+  const queries = new Map<string, LoadQueryDouble>()
+  const clientFrom = vi.fn((table: string) => {
+    const result = overrides[table] ?? defaultLoadResult(table)
+    const query = new LoadQueryDouble(result)
+    queries.set(table, query)
+    return query
+  })
+
+  return {
+    client: { from: clientFrom } as unknown as SalimonSupabaseClient,
+    from: clientFrom,
+    queries,
+  }
+}
+
+function defaultLoadResult(table: string): QueryResult {
+  if (table === "profiles") {
+    return {
+      data: {
+        id: "user-1",
+        nickname: "테스트 사용자",
+        default_currency: "KRW",
+        timezone: "Asia/Seoul",
+      },
+      error: null,
+    }
+  }
+
+  if (table === "transactions") {
+    return {
+      data: [
+        {
+          id: "transaction-1",
+          ledger_id: "ledger-1",
+          type: "expense",
+          status: "confirmed",
+          amount: 12000,
+          currency: "KRW",
+          transaction_at: "2026-08-10T03:00:00.000Z",
+        },
+      ],
+      error: null,
+    }
+  }
+
+  if (table === "transaction_splits") {
+    return {
+      data: [
+        {
+          id: "split-1",
+          transaction_id: "transaction-1",
+          category_id: "category-1",
+          amount: 12000,
+          sort_order: 0,
+        },
+      ],
+      error: null,
+    }
+  }
+
+  if (table === "account_deletion_requests" || table === "legal_consents") {
+    return { data: null, error: null }
+  }
+
+  return { data: [], error: null }
+}
 
 beforeEach(() => {
   from.mockReset()
   rpc.mockReset()
+})
+
+describe("load", () => {
+  it("uses an injected client and limits transactions and splits to the requested month", async () => {
+    const { client, from: injectedFrom, queries } = createLoadClientDouble()
+    const repository = new SupabaseFinanceRepository(client)
+
+    const data = await repository.load("user-1", {
+      transactionDateRange: {
+        start: "2026-08-01T00:00:00+09:00",
+        endExclusive: "2026-09-01T00:00:00+09:00",
+      },
+    })
+
+    expect(injectedFrom).toHaveBeenCalledWith("transactions")
+    expect(from).not.toHaveBeenCalled()
+    expect(queries.get("transactions")?.gte).toHaveBeenCalledWith(
+      "transaction_at",
+      "2026-08-01T00:00:00+09:00",
+    )
+    expect(queries.get("transactions")?.lt).toHaveBeenCalledWith(
+      "transaction_at",
+      "2026-09-01T00:00:00+09:00",
+    )
+    expect(queries.get("transaction_splits")?.in).toHaveBeenCalledWith(
+      "transaction_id",
+      ["transaction-1"],
+    )
+    expect(data.transactions).toHaveLength(1)
+    expect(data.transactionSplits).toHaveLength(1)
+  })
+
+  it("surfaces an injected transaction query error", async () => {
+    const { client } = createLoadClientDouble({
+      transactions: {
+        data: null,
+        error: { message: "월 거래 조회에 실패했습니다." },
+      },
+    })
+    const repository = new SupabaseFinanceRepository(client)
+
+    await expect(
+      repository.load("user-1", {
+        transactionDateRange: {
+          start: "2026-08-01T00:00:00+09:00",
+          endExclusive: "2026-09-01T00:00:00+09:00",
+        },
+      }),
+    ).rejects.toThrow("월 거래 조회에 실패했습니다.")
+  })
+
+  it("rejects an invalid range before sending a query", async () => {
+    const { client, from: injectedFrom } = createLoadClientDouble()
+    const repository = new SupabaseFinanceRepository(client)
+
+    await expect(
+      repository.load("user-1", {
+        transactionDateRange: {
+          start: "2026-09-01T00:00:00+09:00",
+          endExclusive: "2026-08-01T00:00:00+09:00",
+        },
+      }),
+    ).rejects.toThrow("거래 조회 기간이 올바르지 않습니다.")
+    expect(injectedFrom).not.toHaveBeenCalled()
+  })
 })
 
 describe("mapPaymentMethodType", () => {

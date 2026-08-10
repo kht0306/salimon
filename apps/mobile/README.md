@@ -25,12 +25,15 @@ Git에 커밋하지 않는다. 네이티브 설정이 바뀌면 다음 명령으
 pnpm prebuild:mobile --clean
 ```
 
-## 1회차 범위
+## 현재 구현 범위 (2회차)
 
 - Expo Router와 Development Client 기반 앱 셸
 - Emotion Native와 공용 모바일 UI 토큰
-- `@salimon/types`, `@salimon/domain`, `@salimon/ui-tokens` 연결
+- `@salimon/types`, `@salimon/domain`, `@salimon/ui-tokens`,
+  `@salimon/api-client` 연결
 - Android API 29 최소 지원, API 36 대상 빌드 설정
+- 웹·모바일 Supabase 환경변수 및 클라이언트 경계 분리
+- 선택 월 거래와 해당 거래의 분할 내역만 불러오는 모바일 데이터 로더
 
-Kotlin 알림 수신 모듈, 카카오 로그인, Supabase 모바일 연결은 후속 회차에서
-구현한다.
+실제 카카오 로그인과 안전한 세션 복원은 3회차에서 구현한다. Kotlin 알림 수신
+모듈은 8회차 범위다.

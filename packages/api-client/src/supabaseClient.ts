@@ -1,10 +1,35 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+import {
+  createClient as createSupabaseJsClient,
+  type SupabaseClient,
+} from "@supabase/supabase-js"
 
 declare const process: {
   env: Record<string, string | undefined>
 }
 
 let browserClient: SupabaseClient | null = null
+
+export interface SupabaseClientAuthOptions {
+  autoRefreshToken: boolean
+  detectSessionInUrl: boolean
+  persistSession: boolean
+}
+
+export interface SupabaseClientOptions {
+  url: string
+  publishableKey: string
+  auth: SupabaseClientAuthOptions
+}
+
+export type SalimonSupabaseClient = SupabaseClient
+
+export function createSalimonSupabaseClient({
+  url,
+  publishableKey,
+  auth,
+}: SupabaseClientOptions): SalimonSupabaseClient {
+  return createSupabaseJsClient(url, publishableKey, { auth })
+}
 
 export function getSupabaseBrowserClient(): SupabaseClient | null {
   const env = getRuntimeEnv()
@@ -16,7 +41,9 @@ export function getSupabaseBrowserClient(): SupabaseClient | null {
   }
 
   if (!browserClient) {
-    browserClient = createClient(url, anonKey, {
+    browserClient = createSalimonSupabaseClient({
+      url,
+      publishableKey: anonKey,
       auth: {
         autoRefreshToken: true,
         detectSessionInUrl: true,
