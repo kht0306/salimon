@@ -1,7 +1,9 @@
+import "react-native-url-polyfill/auto"
 import {
   createSalimonSupabaseClient,
   type SalimonSupabaseClient,
 } from "@salimon/api-client"
+import { secureAuthStorage } from "./authStorage"
 
 let mobileClient: SalimonSupabaseClient | null = null
 
@@ -20,7 +22,9 @@ export function getSupabaseMobileClient(): SalimonSupabaseClient | null {
       auth: {
         autoRefreshToken: true,
         detectSessionInUrl: false,
-        persistSession: false,
+        flowType: "pkce",
+        persistSession: true,
+        storage: secureAuthStorage,
       },
     })
   }

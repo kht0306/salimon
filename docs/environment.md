@@ -30,7 +30,16 @@ GEMINI_DATA_TIER=free
 ```bash
 EXPO_PUBLIC_SUPABASE_URL=
 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+EXPO_PUBLIC_WEB_URL=
 ```
 
 `EXPO_PUBLIC_*` 값은 앱 번들에 포함될 수 있으므로 서버 비밀 키를 넣지 않는다.
 실제 값은 출력하거나 Git에 커밋하지 않는다.
+
+`EXPO_PUBLIC_WEB_URL`은 이용약관과 개인정보 처리방침이 배포된 웹 앱의 `https`
+기본 주소다. 끝의 `/`는 생략한다. 카카오 로그인 콜백을 앱으로 돌려보내려면
+Supabase Auth의 허용 리디렉션 URL에 아래 값을 추가한다.
+
+```text
+salimon://auth/callback
+```

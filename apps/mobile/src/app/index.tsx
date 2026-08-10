@@ -1,61 +1,126 @@
 import styled from "@emotion/native"
+import { Redirect } from "expo-router"
+import { observer } from "mobx-react-lite"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { AppButton } from "../components/AppButton"
 import { StatusRow } from "../components/StatusRow"
+import { useMobileAppStore } from "../stores/MobileStoreProvider"
 import { mobileTheme } from "../theme"
 
-const safeAreaEdges = ["top", "bottom"] as const
 const scrollContentStyle = { flexGrow: 1 } as const
+const safeAreaEdges = ["top", "bottom"] as const
 
-const dataBoundaryItems = [
-  {
-    label: "클라이언트 경계",
-    detail: "NEXT_PUBLIC_* · EXPO_PUBLIC_* 완전 분리",
-  },
-  {
-    label: "월별 데이터 조회",
-    detail: "선택 월 거래 · 해당 거래 분할 내역만 요청",
-  },
-  {
-    label: "웹 호환성",
-    detail: "기존 로그인 · 전체 데이터 로드 동작 유지",
-  },
-] as const
+export default observer(function MobileAuthStatusScreen() {
+  const store = useMobileAppStore()
 
-export default function MobileFoundationScreen() {
+  if (store.authState === "anonymous") {
+    return <Redirect href="./auth/login" />
+  }
+  if (store.authState !== "authenticated") {
+    return <CenteredMessage message="로그인 상태를 확인하고 있어요." />
+  }
+  if (store.dataStatus === "idle" || store.dataStatus === "loading") {
+    return <CenteredMessage message="가계부를 안전하게 불러오고 있어요." />
+  }
+  if (store.dataStatus === "error") {
+    return (
+      <CenteredMessage
+        actionLabel="다시 불러오기"
+        message={
+          store.dataErrorMessage ?? "가계부 데이터를 불러오지 못했습니다."
+        }
+        onAction={() => void store.loadSelectedMonth()}
+        secondaryActionLabel="로그아웃"
+        onSecondaryAction={() => void store.logout()}
+      />
+    )
+  }
+  if (store.requiresLegalConsent) {
+    return <Redirect href="./consent" />
+  }
+
+  const statusItems = [
+    {
+      label: "카카오 로그인",
+      detail: `${store.authUser?.nickname ?? "사용자"} 계정 연결됨`,
+    },
+    {
+      label: "보안 세션 복원",
+      detail: "Android 암호화 저장소 · 자동 갱신 연결됨",
+    },
+    {
+      label: "가계부 연결",
+      detail: `${store.currentLedgerName} · ${store.selectedMonth} 거래 ${store.financeData.transactions.length}건`,
+    },
+  ] as const
+
   return (
     <Page edges={safeAreaEdges}>
       <PageScroll contentContainerStyle={scrollContentStyle}>
         <Content>
-          <Eyebrow>살림온 모바일 · 2회차</Eyebrow>
+          <Eyebrow>살림온 모바일 · 3회차</Eyebrow>
           <Title accessibilityRole="header">
-            모바일 데이터 연결 경계를 분리했어요.
+            로그인과 세션 복원이 연결됐어요.
           </Title>
           <Description>
-            웹 동작은 그대로 유지하면서 모바일이 별도 Supabase 설정과 선택 월
-            조회를 사용할 수 있게 준비했습니다. 실제 로그인 세션 연결 전까지
-            인증 정보는 저장하지 않습니다.
+            카카오 계정으로 실제 가계부를 불러왔습니다. 앱을 다시 실행해도 인증
+            상태를 복원하며, 일반 가계부 데이터는 기기 저장소에 남기지 않습니다.
           </Description>
 
-          <StatusPanel accessibilityLabel="모바일 데이터 경계 준비 상태">
-            {dataBoundaryItems.map((item) => (
+          <StatusPanel accessibilityLabel="모바일 인증 연결 상태">
+            {statusItems.map((item) => (
               <StatusRow
                 key={item.label}
-                label={item.label}
                 detail={item.detail}
+                label={item.label}
               />
             ))}
           </StatusPanel>
 
           <NextPanel>
             <NextLabel>다음 단계</NextLabel>
-            <NextTitle>카카오 로그인과 세션 복원을 연결합니다.</NextTitle>
+            <NextTitle>4회차에서 월별 홈 화면을 구성합니다.</NextTitle>
             <NextDescription>
-              앱 딥링크를 통해 로그인 결과를 받고, 안전한 기기 저장소에서 인증
-              상태를 복원한 뒤 실제 월별 가계부를 표시합니다.
+              가계부 전환, 월 이동, 수입·지출·저축 요약과 최근 거래를 모바일
+              화면에 맞게 표시합니다.
             </NextDescription>
           </NextPanel>
+
+          <LogoutAction>
+            <AppButton label="로그아웃" onPress={() => void store.logout()} />
+          </LogoutAction>
         </Content>
       </PageScroll>
+    </Page>
+  )
+})
+
+interface CenteredMessageProps {
+  actionLabel?: string
+  message: string
+  onAction?: () => void
+  onSecondaryAction?: () => void
+  secondaryActionLabel?: string
+}
+
+function CenteredMessage({
+  actionLabel,
+  message,
+  onAction,
+  onSecondaryAction,
+  secondaryActionLabel,
+}: CenteredMessageProps) {
+  return (
+    <Page edges={safeAreaEdges}>
+      <CenteredContent>
+        <CenteredText accessibilityLiveRegion="polite">{message}</CenteredText>
+        {actionLabel && onAction ? (
+          <AppButton label={actionLabel} onPress={onAction} tone="primary" />
+        ) : null}
+        {secondaryActionLabel && onSecondaryAction ? (
+          <AppButton label={secondaryActionLabel} onPress={onSecondaryAction} />
+        ) : null}
+      </CenteredContent>
     </Page>
   )
 }
@@ -76,6 +141,23 @@ const Content = styled.View`
   flex: 1;
   justify-content: center;
   padding: ${mobileTheme.spacing[6]}px ${mobileTheme.spacing[5]}px;
+`
+
+const CenteredContent = styled.View`
+  width: 100%;
+  max-width: 420px;
+  align-self: center;
+  flex: 1;
+  justify-content: center;
+  gap: ${mobileTheme.spacing[3]}px;
+  padding: ${mobileTheme.spacing[5]}px;
+`
+
+const CenteredText = styled.Text`
+  color: ${mobileTheme.colors.muted};
+  font-size: 15px;
+  line-height: 23px;
+  text-align: center;
 `
 
 const Eyebrow = styled.Text`
@@ -139,4 +221,8 @@ const NextDescription = styled.Text`
   color: ${mobileTheme.colors.muted};
   font-size: 13px;
   line-height: 20px;
+`
+
+const LogoutAction = styled.View`
+  margin-top: ${mobileTheme.spacing[4]}px;
 `

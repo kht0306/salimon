@@ -1,23 +1,35 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { User } from "@supabase/supabase-js"
 
-const { rpc, signOut } = vi.hoisted(() => ({
-  rpc: vi.fn(),
-  signOut: vi.fn(),
-}))
+const { exchangeCodeForSession, rpc, signInWithOAuth, signOut } = vi.hoisted(
+  () => ({
+    exchangeCodeForSession: vi.fn(),
+    rpc: vi.fn(),
+    signInWithOAuth: vi.fn(),
+    signOut: vi.fn(),
+  }),
+)
 
 vi.mock("./supabaseClient", () => ({
-  getSupabaseBrowserClient: () => ({ auth: { signOut }, rpc }),
+  getSupabaseBrowserClient: () => ({
+    auth: { exchangeCodeForSession, signInWithOAuth, signOut },
+    rpc,
+  }),
 }))
 
 import {
   clearLocalAuthSession,
+  createKakaoOAuthUrl,
   ensureAuthenticatedProfile,
+  exchangeAuthCodeForSession as exchangeCode,
   mapAuthUser,
 } from "./authClient"
+import type { SalimonSupabaseClient } from "./supabaseClient"
 
 beforeEach(() => {
   rpc.mockReset()
+  exchangeCodeForSession.mockReset()
+  signInWithOAuth.mockReset()
   signOut.mockReset()
 })
 
@@ -84,5 +96,58 @@ describe("clearLocalAuthSession", () => {
     await expect(clearLocalAuthSession()).rejects.toThrow(
       "로그인 상태를 정리하지 못했습니다.",
     )
+  })
+})
+
+describe("mobile OAuth helpers", () => {
+  const client = {
+    auth: { exchangeCodeForSession, signInWithOAuth },
+  } as unknown as SalimonSupabaseClient
+
+  it("creates a Kakao authorization URL without redirecting the browser", async () => {
+    signInWithOAuth.mockResolvedValue({
+      data: { url: "https://example.supabase.co/auth/v1/authorize" },
+      error: null,
+    })
+
+    await expect(
+      createKakaoOAuthUrl(client, "salimon://auth/callback"),
+    ).resolves.toBe("https://example.supabase.co/auth/v1/authorize")
+    expect(signInWithOAuth).toHaveBeenCalledWith({
+      provider: "kakao",
+      options: {
+        redirectTo: "salimon://auth/callback",
+        skipBrowserRedirect: true,
+      },
+    })
+  })
+
+  it("exchanges the PKCE callback code for a mobile session", async () => {
+    exchangeCodeForSession.mockResolvedValue({
+      data: {
+        session: {
+          expires_at: 1_800_000_000,
+          user: {
+            id: "user-1",
+            email: "family@example.com",
+            user_metadata: { name: "살림 가족" },
+            identities: [],
+          },
+        },
+      },
+      error: null,
+    })
+
+    await expect(exchangeCode(client, "pkce-code")).resolves.toEqual({
+      user: {
+        id: "user-1",
+        email: "family@example.com",
+        nickname: "살림 가족",
+        avatarUrl: undefined,
+        kakaoId: undefined,
+      },
+      expiresAt: 1_800_000_000,
+    })
+    expect(exchangeCodeForSession).toHaveBeenCalledWith("pkce-code")
   })
 })
