@@ -1,6 +1,8 @@
 import {
   createClient as createSupabaseJsClient,
   type SupabaseClient,
+  type SupabaseClientOptions as SupabaseJsClientOptions,
+  type SupportedStorage,
 } from "@supabase/supabase-js"
 
 declare const process: {
@@ -9,11 +11,9 @@ declare const process: {
 
 let browserClient: SupabaseClient | null = null
 
-export interface SupabaseClientAuthOptions {
-  autoRefreshToken: boolean
-  detectSessionInUrl: boolean
-  persistSession: boolean
-}
+export type SupabaseClientAuthOptions = NonNullable<
+  SupabaseJsClientOptions<"public">["auth"]
+>
 
 export interface SupabaseClientOptions {
   url: string
@@ -22,6 +22,7 @@ export interface SupabaseClientOptions {
 }
 
 export type SalimonSupabaseClient = SupabaseClient
+export type SupabaseAuthStorage = SupportedStorage
 
 export function createSalimonSupabaseClient({
   url,

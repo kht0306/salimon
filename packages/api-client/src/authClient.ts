@@ -1,5 +1,8 @@
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js"
-import { getSupabaseBrowserClient } from "./supabaseClient"
+import {
+  getSupabaseBrowserClient,
+  type SalimonSupabaseClient,
+} from "./supabaseClient"
 
 declare const process: {
   env: Record<string, string | undefined>
@@ -18,6 +21,8 @@ export interface AuthSessionInfo {
   expiresAt?: number
 }
 
+export type AuthSessionEvent = AuthChangeEvent
+
 export async function signInWithKakao(): Promise<void> {
   const client = requireSupabaseClient()
   const redirectTo = getAuthCallbackUrl()
@@ -31,8 +36,10 @@ export async function signInWithKakao(): Promise<void> {
   }
 }
 
-export async function signOutFromSupabase(): Promise<void> {
-  const client = requireSupabaseClient()
+export async function signOutFromSupabase(
+  injectedClient?: SalimonSupabaseClient,
+): Promise<void> {
+  const client = injectedClient ?? requireSupabaseClient()
   const { error } = await client.auth.signOut()
 
   if (error) {
@@ -40,8 +47,10 @@ export async function signOutFromSupabase(): Promise<void> {
   }
 }
 
-export async function clearLocalAuthSession(): Promise<void> {
-  const client = requireSupabaseClient()
+export async function clearLocalAuthSession(
+  injectedClient?: SalimonSupabaseClient,
+): Promise<void> {
+  const client = injectedClient ?? requireSupabaseClient()
   const { error } = await client.auth.signOut({ scope: "local" })
 
   if (error) {
@@ -49,8 +58,10 @@ export async function clearLocalAuthSession(): Promise<void> {
   }
 }
 
-export async function getCurrentAuthSession(): Promise<AuthSessionInfo | null> {
-  const client = requireSupabaseClient()
+export async function getCurrentAuthSession(
+  injectedClient?: SalimonSupabaseClient,
+): Promise<AuthSessionInfo | null> {
+  const client = injectedClient ?? requireSupabaseClient()
   const { data, error } = await client.auth.getSession()
 
   if (error) {
@@ -60,8 +71,10 @@ export async function getCurrentAuthSession(): Promise<AuthSessionInfo | null> {
   return mapAuthSession(data.session)
 }
 
-export async function getCurrentAccessToken(): Promise<string | null> {
-  const client = requireSupabaseClient()
+export async function getCurrentAccessToken(
+  injectedClient?: SalimonSupabaseClient,
+): Promise<string | null> {
+  const client = injectedClient ?? requireSupabaseClient()
   const { data, error } = await client.auth.getSession()
   if (error) throw new Error(error.message)
   return data.session?.access_token ?? null
@@ -69,8 +82,9 @@ export async function getCurrentAccessToken(): Promise<string | null> {
 
 export function observeAuthSession(
   listener: (event: AuthChangeEvent, session: AuthSessionInfo | null) => void,
+  injectedClient?: SalimonSupabaseClient,
 ): () => void {
-  const client = getSupabaseBrowserClient()
+  const client = injectedClient ?? getSupabaseBrowserClient()
   if (!client) {
     return () => undefined
   }
@@ -82,13 +96,54 @@ export function observeAuthSession(
   return () => data.subscription.unsubscribe()
 }
 
-export async function ensureAuthenticatedProfile(): Promise<void> {
-  const client = requireSupabaseClient()
+export async function ensureAuthenticatedProfile(
+  injectedClient?: SalimonSupabaseClient,
+): Promise<void> {
+  const client = injectedClient ?? requireSupabaseClient()
   const { error } = await client.rpc("ensure_user_profile")
 
   if (error) {
     throw new Error(error.message)
   }
+}
+
+export async function createKakaoOAuthUrl(
+  client: SalimonSupabaseClient,
+  redirectTo: string,
+): Promise<string> {
+  const { data, error } = await client.auth.signInWithOAuth({
+    provider: "kakao",
+    options: {
+      redirectTo,
+      skipBrowserRedirect: true,
+    },
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+  if (!data.url) {
+    throw new Error("카카오 로그인 주소를 확인하지 못했습니다.")
+  }
+
+  return data.url
+}
+
+export async function exchangeAuthCodeForSession(
+  client: SalimonSupabaseClient,
+  code: string,
+): Promise<AuthSessionInfo> {
+  const { data, error } = await client.auth.exchangeCodeForSession(code)
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const session = mapAuthSession(data.session)
+  if (!session) {
+    throw new Error("로그인 세션을 확인할 수 없습니다.")
+  }
+
+  return session
 }
 
 export async function completeAuthCallback(): Promise<AuthSessionInfo> {
@@ -99,15 +154,7 @@ export async function completeAuthCallback(): Promise<AuthSessionInfo> {
       : new URL(window.location.href).searchParams.get("code")
 
   if (code) {
-    const { data, error } = await client.auth.exchangeCodeForSession(code)
-    if (error) {
-      throw new Error(error.message)
-    }
-
-    const session = mapAuthSession(data.session)
-    if (session) {
-      return session
-    }
+    return exchangeAuthCodeForSession(client, code)
   }
 
   const session = await getCurrentAuthSession()
