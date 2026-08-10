@@ -24,7 +24,8 @@ GEMINI_DATA_TIER=free
 ## 모바일 앱
 
 모바일 Supabase 연결에 사용할 변수 이름은 `apps/mobile/.env.local`에 둔다.
-1회차에서는 이름만 예약하며 실제 연결은 후속 회차에서 구현한다.
+2회차부터 모바일 클라이언트가 아래 값을 읽는다. 실제 로그인과 세션 복원은
+3회차에서 연결한다.
 
 ```bash
 EXPO_PUBLIC_SUPABASE_URL=

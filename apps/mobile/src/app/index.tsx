@@ -1,26 +1,23 @@
 import styled from "@emotion/native"
-import { formatKrw } from "@salimon/domain"
-import type { Currency } from "@salimon/types"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { StatusRow } from "../components/StatusRow"
 import { mobileTheme } from "../theme"
 
-const baselineCurrency: Currency = "KRW"
 const safeAreaEdges = ["top", "bottom"] as const
 const scrollContentStyle = { flexGrow: 1 } as const
 
-const foundationItems = [
+const dataBoundaryItems = [
   {
-    label: "Android 앱 기반",
-    detail: "Expo SDK 57 · React Native 0.86",
+    label: "클라이언트 경계",
+    detail: "NEXT_PUBLIC_* · EXPO_PUBLIC_* 완전 분리",
   },
   {
-    label: "공용 패키지 연결",
-    detail: `types · domain · UI tokens · ${baselineCurrency} ${formatKrw(0)}`,
+    label: "월별 데이터 조회",
+    detail: "선택 월 거래 · 해당 거래 분할 내역만 요청",
   },
   {
-    label: "개발 빌드",
-    detail: "Expo Development Client · com.salimon.app",
+    label: "웹 호환성",
+    detail: "기존 로그인 · 전체 데이터 로드 동작 유지",
   },
 ] as const
 
@@ -29,18 +26,18 @@ export default function MobileFoundationScreen() {
     <Page edges={safeAreaEdges}>
       <PageScroll contentContainerStyle={scrollContentStyle}>
         <Content>
-          <Eyebrow>살림온 모바일 · 1회차</Eyebrow>
+          <Eyebrow>살림온 모바일 · 2회차</Eyebrow>
           <Title accessibilityRole="header">
-            가족 알파를 위한 기반이 준비됐어요.
+            모바일 데이터 연결 경계를 분리했어요.
           </Title>
           <Description>
-            지금은 화면과 공용 코드가 Android 개발 빌드에서 함께 동작하는지
-            확인하는 단계입니다. 로그인과 실제 가계부 연결은 다음 회차에서
-            이어집니다.
+            웹 동작은 그대로 유지하면서 모바일이 별도 Supabase 설정과 선택 월
+            조회를 사용할 수 있게 준비했습니다. 실제 로그인 세션 연결 전까지
+            인증 정보는 저장하지 않습니다.
           </Description>
 
-          <StatusPanel accessibilityLabel="모바일 기반 준비 상태">
-            {foundationItems.map((item) => (
+          <StatusPanel accessibilityLabel="모바일 데이터 경계 준비 상태">
+            {dataBoundaryItems.map((item) => (
               <StatusRow
                 key={item.label}
                 label={item.label}
@@ -51,12 +48,10 @@ export default function MobileFoundationScreen() {
 
           <NextPanel>
             <NextLabel>다음 단계</NextLabel>
-            <NextTitle>
-              웹과 모바일의 Supabase 연결 경계를 분리합니다.
-            </NextTitle>
+            <NextTitle>카카오 로그인과 세션 복원을 연결합니다.</NextTitle>
             <NextDescription>
-              브라우저 전용 환경변수와 인증 처리를 분리한 뒤 카카오 로그인과
-              월별 가계부 조회를 연결합니다.
+              앱 딥링크를 통해 로그인 결과를 받고, 안전한 기기 저장소에서 인증
+              상태를 복원한 뒤 실제 월별 가계부를 표시합니다.
             </NextDescription>
           </NextPanel>
         </Content>

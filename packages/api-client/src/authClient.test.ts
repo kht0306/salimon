@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import type { User } from "@supabase/supabase-js"
 
 const { rpc, signOut } = vi.hoisted(() => ({
   rpc: vi.fn(),
@@ -12,11 +13,39 @@ vi.mock("./supabaseClient", () => ({
 import {
   clearLocalAuthSession,
   ensureAuthenticatedProfile,
+  mapAuthUser,
 } from "./authClient"
 
 beforeEach(() => {
   rpc.mockReset()
   signOut.mockReset()
+})
+
+describe("mapAuthUser", () => {
+  it("maps provider metadata without requiring browser state", () => {
+    const user = {
+      id: "user-1",
+      email: "family@example.com",
+      user_metadata: {
+        full_name: "살림 가족",
+        avatar_url: "https://example.com/avatar.png",
+      },
+      identities: [
+        {
+          provider: "kakao",
+          identity_data: { sub: "kakao-1" },
+        },
+      ],
+    } as unknown as User
+
+    expect(mapAuthUser(user)).toEqual({
+      id: "user-1",
+      email: "family@example.com",
+      nickname: "살림 가족",
+      avatarUrl: "https://example.com/avatar.png",
+      kakaoId: "kakao-1",
+    })
+  })
 })
 
 describe("ensureAuthenticatedProfile", () => {

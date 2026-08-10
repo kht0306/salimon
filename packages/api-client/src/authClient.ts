@@ -57,7 +57,7 @@ export async function getCurrentAuthSession(): Promise<AuthSessionInfo | null> {
     throw new Error(error.message)
   }
 
-  return toAuthSessionInfo(data.session)
+  return mapAuthSession(data.session)
 }
 
 export async function getCurrentAccessToken(): Promise<string | null> {
@@ -76,7 +76,7 @@ export function observeAuthSession(
   }
 
   const { data } = client.auth.onAuthStateChange((event, session) => {
-    listener(event, toAuthSessionInfo(session))
+    listener(event, mapAuthSession(session))
   })
 
   return () => data.subscription.unsubscribe()
@@ -93,7 +93,10 @@ export async function ensureAuthenticatedProfile(): Promise<void> {
 
 export async function completeAuthCallback(): Promise<AuthSessionInfo> {
   const client = requireSupabaseClient()
-  const code = typeof window === "undefined" ? null : new URL(window.location.href).searchParams.get("code")
+  const code =
+    typeof window === "undefined"
+      ? null
+      : new URL(window.location.href).searchParams.get("code")
 
   if (code) {
     const { data, error } = await client.auth.exchangeCodeForSession(code)
@@ -101,7 +104,7 @@ export async function completeAuthCallback(): Promise<AuthSessionInfo> {
       throw new Error(error.message)
     }
 
-    const session = toAuthSessionInfo(data.session)
+    const session = mapAuthSession(data.session)
     if (session) {
       return session
     }
@@ -133,20 +136,24 @@ function getAuthCallbackUrl(): string {
   return `${appUrl ?? "http://localhost:3000"}/auth/callback`
 }
 
-function toAuthSessionInfo(session: Session | null): AuthSessionInfo | null {
+export function mapAuthSession(
+  session: Session | null,
+): AuthSessionInfo | null {
   if (!session) {
     return null
   }
 
   return {
-    user: toAuthUserInfo(session.user),
+    user: mapAuthUser(session.user),
     expiresAt: session.expires_at,
   }
 }
 
-function toAuthUserInfo(user: User): AuthUserInfo {
+export function mapAuthUser(user: User): AuthUserInfo {
   const metadata = user.user_metadata
-  const kakaoIdentity = user.identities?.find((identity) => identity.provider === "kakao")
+  const kakaoIdentity = user.identities?.find(
+    (identity) => identity.provider === "kakao",
+  )
   const nickname = firstString(
     metadata.name,
     metadata.user_name,
@@ -167,7 +174,10 @@ function toAuthUserInfo(user: User): AuthUserInfo {
 }
 
 function firstString(...values: unknown[]): string | undefined {
-  return values.find((value): value is string => typeof value === "string" && value.trim().length > 0)
+  return values.find(
+    (value): value is string =>
+      typeof value === "string" && value.trim().length > 0,
+  )
 }
 
 function readOAuthError(): string | null {
