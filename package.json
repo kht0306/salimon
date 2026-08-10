@@ -3,7 +3,10 @@
   "private": true,
   "packageManager": "pnpm@11.7.0",
   "scripts": {
+    "dev:mobile": "pnpm --filter @salimon/mobile start",
     "dev:web": "pnpm --filter @salimon/web dev",
+    "android:mobile": "pnpm --filter @salimon/mobile android",
+    "prebuild:mobile": "pnpm --filter @salimon/mobile prebuild:android",
     "dev:seoulsys": "set \"PATH=%LOCALAPPDATA%\\Volta\\tools\\image\\node\\24.15.0;%PATH%\" && %LOCALAPPDATA%\\pnpm\\bin\\pnpm.CMD --filter @salimon/web dev",
     "build:web": "pnpm --filter @salimon/web build",
     "typecheck": "pnpm -r --if-present typecheck",

@@ -351,21 +351,21 @@ flowchart TB
 
 ```text
 apps/mobile/
-├─ app/
-│  ├─ _layout.tsx
-│  ├─ (auth)/
-│  │  ├─ login.tsx
-│  │  └─ callback.tsx
-│  ├─ (tabs)/
-│  │  ├─ index.tsx
-│  │  ├─ transactions.tsx
-│  │  ├─ inbox.tsx
-│  │  ├─ settlement.tsx
-│  │  └─ settings.tsx
-│  └─ transactions/
-│     ├─ new.tsx
-│     └─ [id].tsx
 ├─ src/
+│  ├─ app/
+│  │  ├─ _layout.tsx
+│  │  ├─ (auth)/
+│  │  │  ├─ login.tsx
+│  │  │  └─ callback.tsx
+│  │  ├─ (tabs)/
+│  │  │  ├─ index.tsx
+│  │  │  ├─ transactions.tsx
+│  │  │  ├─ inbox.tsx
+│  │  │  ├─ settlement.tsx
+│  │  │  └─ settings.tsx
+│  │  └─ transactions/
+│  │     ├─ new.tsx
+│  │     └─ [id].tsx
 │  ├─ features/
 │  │  ├─ auth/
 │  │  ├─ dashboard/
@@ -386,8 +386,7 @@ apps/mobile/
 │     ├─ android/src/main/AndroidManifest.xml
 │     ├─ android/src/main/java/.../
 │     └─ src/
-├─ app.config.ts
-├─ metro.config.js
+├─ app.json
 └─ package.json
 ```
 
@@ -444,9 +443,9 @@ apps/mobile/
 **주요 경로:**
 
 - `apps/mobile/package.json`
-- `apps/mobile/app.config.ts`
-- `apps/mobile/app/_layout.tsx`
-- `apps/mobile/app/index.tsx`
+- `apps/mobile/app.json`
+- `apps/mobile/src/app/_layout.tsx`
+- `apps/mobile/src/app/index.tsx`
 - `apps/mobile/src/theme/*`
 - `packages/ui-tokens/src/index.ts`
 - `docs/environment.md`
@@ -508,8 +507,8 @@ apps/mobile/
 
 **주요 경로:**
 
-- `apps/mobile/app/(auth)/login.tsx`
-- `apps/mobile/app/(auth)/callback.tsx`
+- `apps/mobile/src/app/(auth)/login.tsx`
+- `apps/mobile/src/app/(auth)/callback.tsx`
 - `apps/mobile/src/features/auth/*`
 - `apps/mobile/src/infrastructure/authStorage.ts`
 - `apps/mobile/src/stores/mobileAppStore.ts`
@@ -541,8 +540,8 @@ apps/mobile/
 
 **주요 경로:**
 
-- `apps/mobile/app/(tabs)/_layout.tsx`
-- `apps/mobile/app/(tabs)/index.tsx`
+- `apps/mobile/src/app/(tabs)/_layout.tsx`
+- `apps/mobile/src/app/(tabs)/index.tsx`
 - `apps/mobile/src/features/dashboard/*`
 - `apps/mobile/src/infrastructure/queryCache.ts`
 - `apps/mobile/src/stores/mobileAppStore.ts`
@@ -570,8 +569,8 @@ apps/mobile/
 
 **주요 경로:**
 
-- `apps/mobile/app/(tabs)/transactions.tsx`
-- `apps/mobile/app/transactions/[id].tsx`
+- `apps/mobile/src/app/(tabs)/transactions.tsx`
+- `apps/mobile/src/app/transactions/[id].tsx`
 - `apps/mobile/src/features/transactions/*`
 - 필요 시 `packages/domain/src/*`
 - 필요 시 `packages/domain/tests/*`
@@ -598,8 +597,8 @@ apps/mobile/
 
 **주요 경로:**
 
-- `apps/mobile/app/transactions/new.tsx`
-- `apps/mobile/app/transactions/[id].tsx`
+- `apps/mobile/src/app/transactions/new.tsx`
+- `apps/mobile/src/app/transactions/[id].tsx`
 - `apps/mobile/src/features/transactions/TransactionEditor.tsx`
 - `apps/mobile/src/features/transactions/transactionDraft.ts`
 - `apps/mobile/src/stores/mobileAppStore.ts`
@@ -626,7 +625,7 @@ apps/mobile/
 
 **주요 경로:**
 
-- `apps/mobile/app/(tabs)/settlement.tsx`
+- `apps/mobile/src/app/(tabs)/settlement.tsx`
 - `apps/mobile/src/features/settlement/*`
 - `apps/mobile/src/stores/mobileAppStore.ts`
 - 필요 시 공용 정산 계산을 `packages/domain`으로 이동
@@ -689,7 +688,7 @@ apps/mobile/
 
 **주요 경로:**
 
-- `apps/mobile/app/(tabs)/inbox.tsx`
+- `apps/mobile/src/app/(tabs)/inbox.tsx`
 - `apps/mobile/src/features/notification-inbox/*`
 - `apps/mobile/src/stores/mobileAppStore.ts`
 - `packages/domain/src/parser.ts`
@@ -775,7 +774,7 @@ apps/mobile/
 
 **주요 경로:**
 
-- `apps/mobile/app.config.ts`
+- `apps/mobile/app.json`
 - Android 빌드·서명 설정 파일 중 비밀이 아닌 부분
 - `docs/mobile-private-distribution.md`
 - `docs/mobile-family-alpha-checklist.md`

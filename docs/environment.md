@@ -20,3 +20,16 @@ GEMINI_DATA_TIER=free
 `GEMINI_DATA_TIER=free`에서는 Google 무료 서비스 데이터 사용 안내에 대한
 사용자 동의를 요구한다. 운영 환경에서는 민감한 영수증 보호를 위해 결제 계정에
 연결된 유료 Gemini API 키와 `GEMINI_DATA_TIER=paid` 사용을 권장한다.
+
+## 모바일 앱
+
+모바일 Supabase 연결에 사용할 변수 이름은 `apps/mobile/.env.local`에 둔다.
+1회차에서는 이름만 예약하며 실제 연결은 후속 회차에서 구현한다.
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+```
+
+`EXPO_PUBLIC_*` 값은 앱 번들에 포함될 수 있으므로 서버 비밀 키를 넣지 않는다.
+실제 값은 출력하거나 Git에 커밋하지 않는다.

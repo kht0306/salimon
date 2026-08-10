@@ -50,3 +50,44 @@ export const controls = {
   compact: "32px",
   default: "36px",
 } as const
+
+export const nativeColors = {
+  ink: "#18181b",
+  muted: "#71717a",
+  subtle: "#a1a1aa",
+  canvas: "#f8f8f9",
+  panel: "#ffffff",
+  panelSubtle: "#fafafa",
+  border: "#e4e4e7",
+  borderStrong: "#d4d4d8",
+  teal: "#0f766e",
+  tealSoft: "#f0fdfa",
+  green: "#15803d",
+  greenSoft: "#f0fdf4",
+  coral: "#dc2626",
+  coralSoft: "#fef2f2",
+  focus: "#2563eb",
+} as const
+
+export const nativeRadii = {
+  xs: 4,
+  sm: 6,
+  md: 8,
+  round: 999,
+} as const
+
+export const nativeSpacing = {
+  1: 4,
+  2: 8,
+  3: 12,
+  4: 16,
+  5: 20,
+  6: 24,
+  7: 28,
+  8: 32,
+} as const
+
+export const nativeControls = {
+  compact: 32,
+  default: 36,
+} as const

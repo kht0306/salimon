@@ -25,6 +25,12 @@ supabase/.env
 
 # Future React Native / Expo local state
 .expo/
-android/.gradle/
-android/app/build/
-ios/Pods/
+expo-env.d.ts
+.kotlin/
+.metro-health-check*
+apps/mobile/android/
+apps/mobile/ios/
+*.jks
+*.keystore
+*.p8
+*.mobileprovision
