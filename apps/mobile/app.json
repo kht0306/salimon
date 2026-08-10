@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "살림온",
+    "slug": "salimon",
+    "version": "0.1.0",
+    "orientation": "default",
+    "icon": "../web/public/salimon-app-icon-128.png",
+    "scheme": "salimon",
+    "android": {
+      "package": "com.salimon.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#101c18",
+        "foregroundImage": "../web/public/salimon-app-icon-128.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#f8f8f9",
+          "image": "../web/public/salimon-app-icon-128.png",
+          "imageWidth": 96
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 29,
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "36.0.0"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
