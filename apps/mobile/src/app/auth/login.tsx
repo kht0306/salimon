@@ -21,18 +21,43 @@ export default observer(function LoginScreen() {
   return (
     <Page edges={safeAreaEdges}>
       <Content>
-        <Brand>살림온</Brand>
-        <Title accessibilityRole="header">가족의 생활비를 한곳에서</Title>
-        <Description>
-          웹에서 사용하던 카카오 계정으로 로그인하면 같은 가계부를 안전하게
-          불러옵니다.
-        </Description>
+        <TopBar>
+          <BrandLockup accessibilityLabel="살림온">
+            <BrandMark>
+              <BrandInitial>S</BrandInitial>
+            </BrandMark>
+            <BrandName>살림온</BrandName>
+          </BrandLockup>
+          <ProductLabel>가족 가계부</ProductLabel>
+        </TopBar>
 
-        <LoginCard>
-          <CardTitle>카카오 계정으로 시작하기</CardTitle>
+        <Hero>
+          <Eyebrow>우리 가족의 돈 관리</Eyebrow>
+          <Title accessibilityRole="header">
+            생활비 흐름을{`\n`}가족과 함께 확인하세요
+          </Title>
+          <Description>
+            웹에서 쓰던 가계부와 같은 계정으로 연결됩니다. 이번 달 지출부터
+            날짜별 거래까지 모바일에서 빠르게 확인하세요.
+          </Description>
+
+          <BenefitList>
+            <BenefitRow>
+              <BenefitDot />
+              <BenefitText>웹과 모바일에서 같은 가계부 사용</BenefitText>
+            </BenefitRow>
+            <BenefitRow>
+              <BenefitDot />
+              <BenefitText>기기 암호화 저장소로 로그인 상태 보호</BenefitText>
+            </BenefitRow>
+          </BenefitList>
+        </Hero>
+
+        <ActionArea>
+          <CardTitle>카카오 계정으로 계속하기</CardTitle>
           <CardDescription>
-            로그인 세션만 기기의 암호화 저장소에 보관하며, 가계부 데이터는
-            저장하지 않습니다.
+            가계부 원본은 기기에 저장하지 않으며, 로그인 세션만 안전하게
+            보관합니다.
           </CardDescription>
           {store.authErrorMessage ? (
             <ErrorText accessibilityLiveRegion="polite">
@@ -41,11 +66,11 @@ export default observer(function LoginScreen() {
           ) : null}
           <AppButton
             disabled={isLoading}
-            label={isLoading ? "로그인 확인 중..." : "카카오로 로그인"}
+            label={isLoading ? "로그인 확인 중..." : "카카오로 시작하기"}
             onPress={() => void store.loginWithKakao()}
             tone="kakao"
           />
-        </LoginCard>
+        </ActionArea>
       </Content>
     </Page>
   )
@@ -56,52 +81,120 @@ const Page = styled(SafeAreaView)`
   background-color: ${mobileTheme.colors.canvas};
 `
 
-const Content = styled.View`
-  width: 100%;
-  max-width: 560px;
-  align-self: center;
-  flex: 1;
-  justify-content: center;
-  padding: ${mobileTheme.spacing[6]}px ${mobileTheme.spacing[5]}px;
+const Content = styled.View({
+  width: "100%",
+  maxWidth: 560,
+  alignSelf: "center",
+  flex: 1,
+  justifyContent: "space-between",
+  gap: mobileTheme.spacing[6],
+  paddingTop: mobileTheme.spacing[5],
+  paddingRight: mobileTheme.spacing[5],
+  paddingBottom: mobileTheme.spacing[6],
+  paddingLeft: mobileTheme.spacing[5],
+})
+
+const TopBar = styled.View({
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: mobileTheme.spacing[3],
+})
+
+const BrandLockup = styled.View({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: mobileTheme.spacing[2],
+})
+
+const BrandMark = styled.View({
+  width: 34,
+  height: 34,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor: mobileTheme.colors.ink,
+})
+
+const BrandInitial = styled.Text`
+  color: ${mobileTheme.colors.panel};
+  font-size: 16px;
+  font-weight: 900;
 `
 
-const Brand = styled.Text`
+const BrandName = styled.Text`
+  color: ${mobileTheme.colors.ink};
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+`
+
+const ProductLabel = styled.Text`
+  color: ${mobileTheme.colors.muted};
+  font-size: 11px;
+  font-weight: 700;
+`
+
+const Hero = styled.View({ gap: mobileTheme.spacing[3] })
+
+const Eyebrow = styled.Text`
   color: ${mobileTheme.colors.teal};
   font-size: 14px;
   font-weight: 800;
-  letter-spacing: 0.5px;
 `
 
 const Title = styled.Text`
-  margin-top: ${mobileTheme.spacing[3]}px;
   color: ${mobileTheme.colors.ink};
-  font-size: 32px;
-  font-weight: 800;
-  letter-spacing: -0.8px;
-  line-height: 40px;
+  font-size: 29px;
+  font-weight: 900;
+  letter-spacing: -0.7px;
+  line-height: 38px;
 `
 
 const Description = styled.Text`
-  margin-top: ${mobileTheme.spacing[3]}px;
   color: ${mobileTheme.colors.muted};
-  font-size: 15px;
-  line-height: 23px;
+  font-size: 14px;
+  line-height: 22px;
 `
 
-const LoginCard = styled.View`
-  gap: ${mobileTheme.spacing[3]}px;
-  margin-top: ${mobileTheme.spacing[8]}px;
-  border-width: 1px;
-  border-color: ${mobileTheme.colors.border};
-  border-radius: ${mobileTheme.radii.md}px;
-  background-color: ${mobileTheme.colors.panel};
-  padding: ${mobileTheme.spacing[5]}px;
+const BenefitList = styled.View({
+  gap: mobileTheme.spacing[2],
+  marginTop: mobileTheme.spacing[2],
+})
+
+const BenefitRow = styled.View({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: mobileTheme.spacing[2],
+})
+
+const BenefitDot = styled.View({
+  width: 6,
+  height: 6,
+  borderRadius: mobileTheme.radii.round,
+  backgroundColor: mobileTheme.colors.teal,
+})
+
+const BenefitText = styled.Text`
+  color: ${mobileTheme.colors.ink};
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
 `
+
+const ActionArea = styled.View({
+  gap: mobileTheme.spacing[3],
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.border,
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor: mobileTheme.colors.panel,
+  padding: mobileTheme.spacing[5],
+})
 
 const CardTitle = styled.Text`
   color: ${mobileTheme.colors.ink};
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
 `
 
 const CardDescription = styled.Text`
@@ -110,11 +203,11 @@ const CardDescription = styled.Text`
   line-height: 20px;
 `
 
-const ErrorText = styled.Text`
-  border-radius: ${mobileTheme.radii.sm}px;
-  background-color: ${mobileTheme.colors.coralSoft};
-  color: ${mobileTheme.colors.coral};
-  font-size: 12px;
-  line-height: 18px;
-  padding: ${mobileTheme.spacing[3]}px;
-`
+const ErrorText = styled.Text({
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: mobileTheme.colors.coralSoft,
+  color: mobileTheme.colors.coral,
+  fontSize: 12,
+  lineHeight: 18,
+  padding: mobileTheme.spacing[3],
+})

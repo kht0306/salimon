@@ -271,6 +271,15 @@ export class MobileAppStore {
       const session = await this.authGateway.completeCallbackUrl(url)
       await this.activateSession(session)
     } catch (error) {
+      try {
+        const restoredSession = await this.authGateway.getCurrentSession()
+        if (restoredSession) {
+          await this.activateSession(restoredSession)
+          return
+        }
+      } catch {
+        // 콜백 오류를 유지하고 아래에서 안전하게 로그인 상태를 초기화한다.
+      }
       await this.rejectSession(error)
     }
   }

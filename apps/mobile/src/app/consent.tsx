@@ -138,15 +138,16 @@ const PageScroll = styled.ScrollView`
   flex: 1;
 `
 
-const Content = styled.View`
-  width: 100%;
-  max-width: 560px;
-  align-self: center;
-  flex: 1;
-  justify-content: center;
-  gap: ${mobileTheme.spacing[3]}px;
-  padding: ${mobileTheme.spacing[6]}px ${mobileTheme.spacing[5]}px;
-`
+const Content = styled.View({
+  width: "100%",
+  maxWidth: 560,
+  alignSelf: "center",
+  flex: 1,
+  justifyContent: "center",
+  gap: mobileTheme.spacing[3],
+  paddingVertical: mobileTheme.spacing[6],
+  paddingHorizontal: mobileTheme.spacing[5],
+})
 
 const Eyebrow = styled.Text`
   color: ${mobileTheme.colors.teal};
@@ -168,34 +169,36 @@ const Description = styled.Text`
   line-height: 21px;
 `
 
-const ConsentCard = styled.View`
-  gap: ${mobileTheme.spacing[2]}px;
-  border-width: 1px;
-  border-color: ${mobileTheme.colors.border};
-  border-radius: ${mobileTheme.radii.md}px;
-  background-color: ${mobileTheme.colors.panel};
-  padding: ${mobileTheme.spacing[4]}px;
-`
+const ConsentCard = styled.View({
+  gap: mobileTheme.spacing[2],
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.border,
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor: mobileTheme.colors.panel,
+  padding: mobileTheme.spacing[4],
+})
 
-const ConsentOption = styled.Pressable`
-  min-height: 44px;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: ${mobileTheme.spacing[3]}px;
-`
+const ConsentOption = styled.Pressable({
+  minHeight: 44,
+  flexDirection: "row",
+  alignItems: "flex-start",
+  gap: mobileTheme.spacing[3],
+})
 
-const Checkbox = styled.View<{ $checked: boolean }>`
-  width: 22px;
-  height: 22px;
-  align-items: center;
-  justify-content: center;
-  border-width: 1px;
-  border-color: ${({ $checked }) =>
-    $checked ? mobileTheme.colors.teal : mobileTheme.colors.borderStrong};
-  border-radius: ${mobileTheme.radii.xs}px;
-  background-color: ${({ $checked }) =>
-    $checked ? mobileTheme.colors.teal : mobileTheme.colors.panel};
-`
+const Checkbox = styled.View<{ $checked: boolean }>(({ $checked }) => ({
+  width: 22,
+  height: 22,
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 1,
+  borderColor: $checked
+    ? mobileTheme.colors.teal
+    : mobileTheme.colors.borderStrong,
+  borderRadius: mobileTheme.radii.xs,
+  backgroundColor: $checked
+    ? mobileTheme.colors.teal
+    : mobileTheme.colors.panel,
+}))
 
 const Checkmark = styled.Text`
   color: ${mobileTheme.colors.panel};
@@ -235,16 +238,16 @@ const Notice = styled.Text`
   line-height: 17px;
 `
 
-const ErrorText = styled.Text`
-  border-radius: ${mobileTheme.radii.sm}px;
-  background-color: ${mobileTheme.colors.coralSoft};
-  color: ${mobileTheme.colors.coral};
-  font-size: 12px;
-  line-height: 18px;
-  padding: ${mobileTheme.spacing[3]}px;
-`
+const ErrorText = styled.Text({
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: mobileTheme.colors.coralSoft,
+  color: mobileTheme.colors.coral,
+  fontSize: 12,
+  lineHeight: 18,
+  padding: mobileTheme.spacing[3],
+})
 
-const Actions = styled.View`
-  gap: ${mobileTheme.spacing[2]}px;
-  margin-top: ${mobileTheme.spacing[2]}px;
-`
+const Actions = styled.View({
+  gap: mobileTheme.spacing[2],
+  marginTop: mobileTheme.spacing[2],
+})

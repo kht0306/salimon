@@ -66,13 +66,13 @@ function firstValue(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value
 }
 
-const Page = styled(SafeAreaView)`
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  background-color: ${mobileTheme.colors.canvas};
-  padding: ${mobileTheme.spacing[5]}px;
-`
+const Page = styled(SafeAreaView)({
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: mobileTheme.colors.canvas,
+  padding: mobileTheme.spacing[5],
+})
 
 const Progress = styled.Text`
   color: ${mobileTheme.colors.muted};

@@ -10,7 +10,7 @@ import { DashboardHeader } from "./DashboardHeader"
 import { TransactionRow } from "./TransactionRow"
 
 const safeAreaEdges = ["top"] as const
-const listContentStyle = { paddingBottom: 32 } as const
+const listContentStyle = { paddingBottom: 24 } as const
 
 export const DashboardHome = observer(function DashboardHome() {
   const store = useMobileAppStore()
@@ -105,15 +105,15 @@ const List = styled(FlatList<Transaction>)`
   align-self: center;
 `
 
-const StateContent = styled.View`
-  width: 100%;
-  max-width: 420px;
-  align-self: center;
-  flex: 1;
-  justify-content: center;
-  gap: ${mobileTheme.spacing[3]}px;
-  padding: ${mobileTheme.spacing[5]}px;
-`
+const StateContent = styled.View({
+  width: "100%",
+  maxWidth: 420,
+  alignSelf: "center",
+  flex: 1,
+  justifyContent: "center",
+  gap: mobileTheme.spacing[3],
+  padding: mobileTheme.spacing[5],
+})
 
 const StateText = styled.Text`
   color: ${mobileTheme.colors.muted};
@@ -122,14 +122,14 @@ const StateText = styled.Text`
   text-align: center;
 `
 
-const EmptyState = styled.View`
-  margin: 0 ${mobileTheme.spacing[5]}px;
-  border-width: 1px;
-  border-color: ${mobileTheme.colors.border};
-  border-radius: ${mobileTheme.radii.md}px;
-  background-color: ${mobileTheme.colors.panel};
-  padding: ${mobileTheme.spacing[5]}px;
-`
+const EmptyState = styled.View({
+  marginHorizontal: mobileTheme.spacing[4],
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.border,
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor: mobileTheme.colors.panel,
+  padding: mobileTheme.spacing[5],
+})
 
 const EmptyTitle = styled.Text`
   color: ${mobileTheme.colors.ink};
