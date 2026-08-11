@@ -1,5 +1,4 @@
 import styled from "@emotion/native"
-import { useEffect, useRef } from "react"
 import { ScrollView } from "react-native"
 import { mobileTheme } from "../../theme"
 import type { MonthDaySummary } from "./dashboardPresentation"
@@ -15,17 +14,6 @@ export function DateSummaryStrip({
   onSelect,
   selectedDate,
 }: DateSummaryStripProps) {
-  const scrollRef = useRef<ScrollView>(null)
-  const selectedDayIndex = days.findIndex((day) => day.date === selectedDate)
-
-  useEffect(() => {
-    if (selectedDayIndex < 0) return
-    scrollRef.current?.scrollTo({
-      animated: false,
-      x: Math.max(0, selectedDayIndex * 78 - 24),
-    })
-  }, [selectedDayIndex])
-
   return (
     <Section>
       <SectionHeading>
@@ -33,7 +21,6 @@ export function DateSummaryStrip({
         <SectionHint>좌우로 밀어 날짜를 선택하세요.</SectionHint>
       </SectionHeading>
       <ScrollView
-        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={dateContentStyle}
