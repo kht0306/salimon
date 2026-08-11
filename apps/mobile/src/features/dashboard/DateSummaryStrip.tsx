@@ -153,10 +153,10 @@ const DayAmount = styled.Text<{
     $selected
       ? mobileTheme.colors.panel
       : $tone === "income"
-        ? mobileTheme.colors.green
+        ? mobileTheme.colors.blue
         : $tone === "expense"
-          ? mobileTheme.colors.coral
-          : mobileTheme.colors.teal};
+          ? mobileTheme.colors.amber
+          : mobileTheme.colors.violet};
   font-size: 9px;
   font-weight: 600;
   line-height: 13px;

@@ -2,6 +2,7 @@ import styled from "@emotion/native"
 import { Redirect, Tabs } from "expo-router"
 import { observer } from "mobx-react-lite"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { AppTabIcon } from "../../components/AppTabIcon"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
 
@@ -55,6 +56,9 @@ export default observer(function MainTabsLayout() {
         options={{
           title: "홈",
           tabBarAccessibilityLabel: "월별 홈",
+          tabBarIcon: ({ focused }) => (
+            <AppTabIcon active={focused} name="home" />
+          ),
         }}
       />
       <Tabs.Screen
@@ -62,6 +66,9 @@ export default observer(function MainTabsLayout() {
         options={{
           title: "설정",
           tabBarAccessibilityLabel: "앱 설정",
+          tabBarIcon: ({ focused }) => (
+            <AppTabIcon active={focused} name="settings" />
+          ),
         }}
       />
     </Tabs>

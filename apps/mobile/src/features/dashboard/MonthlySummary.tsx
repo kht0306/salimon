@@ -77,10 +77,10 @@ const SummaryValue = styled.Text<{
   flex-shrink: 1;
   color: ${({ $tone }) =>
     $tone === "income"
-      ? "#86efac"
+      ? "#93c5fd"
       : $tone === "expense"
-        ? "#fca5a5"
-        : "#99f6e4"};
+        ? "#fcd34d"
+        : "#c4b5fd"};
   font-size: 13px;
   font-weight: 800;
   line-height: 19px;
