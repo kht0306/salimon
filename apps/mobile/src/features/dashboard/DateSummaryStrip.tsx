@@ -55,22 +55,22 @@ export function DateSummaryStrip({
               </TransactionCount>
               <AmountStack>
                 {day.expense > 0 ? (
-                  <DayAmount $tone="expense">
+                  <DayAmount $selected={selected} $tone="expense">
                     지 {formatCompactAmount(day.expense)}
                   </DayAmount>
                 ) : null}
                 {day.income > 0 ? (
-                  <DayAmount $tone="income">
+                  <DayAmount $selected={selected} $tone="income">
                     수 {formatCompactAmount(day.income)}
                   </DayAmount>
                 ) : null}
                 {day.saving > 0 ? (
-                  <DayAmount $tone="saving">
+                  <DayAmount $selected={selected} $tone="saving">
                     저 {formatCompactAmount(day.saving)}
                   </DayAmount>
                 ) : null}
                 {day.expense + day.income + day.saving === 0 ? (
-                  <NoAmount>—</NoAmount>
+                  <NoAmount $selected={selected}>—</NoAmount>
                 ) : null}
               </AmountStack>
             </DayButton>
@@ -90,21 +90,19 @@ function formatCompactAmount(amount: number): string {
 
 const dateContentStyle = { gap: 8, paddingRight: 20 } as const
 
-const Section = styled.View`
-  gap: ${mobileTheme.spacing[3]}px;
-`
+const Section = styled.View({ gap: mobileTheme.spacing[3] })
 
-const SectionHeading = styled.View`
-  flex-direction: row;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: ${mobileTheme.spacing[3]}px;
-`
+const SectionHeading = styled.View({
+  flexDirection: "row",
+  alignItems: "baseline",
+  justifyContent: "space-between",
+  gap: mobileTheme.spacing[3],
+})
 
 const SectionTitle = styled.Text`
   color: ${mobileTheme.colors.ink};
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
 `
 
 const SectionHint = styled.Text`
@@ -115,53 +113,57 @@ const SectionHint = styled.Text`
   text-align: right;
 `
 
-const DayButton = styled.Pressable<{ $selected: boolean }>`
-  width: 70px;
-  min-height: 104px;
-  gap: ${mobileTheme.spacing[1]}px;
-  border-width: 1px;
-  border-color: ${({ $selected }) =>
-    $selected ? mobileTheme.colors.teal : mobileTheme.colors.border};
-  border-radius: ${mobileTheme.radii.sm}px;
-  background-color: ${({ $selected }) =>
-    $selected ? mobileTheme.colors.tealSoft : mobileTheme.colors.panel};
-  padding: ${mobileTheme.spacing[2]}px;
-`
+const DayButton = styled.Pressable<{ $selected: boolean }>(({ $selected }) => ({
+  width: 68,
+  minHeight: 94,
+  gap: mobileTheme.spacing[1],
+  borderWidth: 1,
+  borderColor: $selected ? mobileTheme.colors.teal : mobileTheme.colors.border,
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: $selected
+    ? mobileTheme.colors.teal
+    : mobileTheme.colors.panel,
+  padding: mobileTheme.spacing[2],
+}))
 
 const DayNumber = styled.Text<{ $selected: boolean }>`
   color: ${({ $selected }) =>
-    $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink};
+    $selected ? mobileTheme.colors.panel : mobileTheme.colors.ink};
   font-size: 13px;
   font-weight: 800;
 `
 
 const TransactionCount = styled.Text<{ $selected: boolean }>`
   color: ${({ $selected }) =>
-    $selected ? mobileTheme.colors.teal : mobileTheme.colors.muted};
+    $selected ? "#ccfbf1" : mobileTheme.colors.muted};
   font-size: 10px;
   font-weight: 600;
 `
 
-const AmountStack = styled.View`
-  gap: 1px;
-  margin-top: ${mobileTheme.spacing[1]}px;
-`
+const AmountStack = styled.View({
+  gap: 1,
+  marginTop: mobileTheme.spacing[1],
+})
 
 const DayAmount = styled.Text<{
+  $selected: boolean
   $tone: "expense" | "income" | "saving"
 }>`
-  color: ${({ $tone }) =>
-    $tone === "income"
-      ? mobileTheme.colors.green
-      : $tone === "expense"
-        ? mobileTheme.colors.coral
-        : mobileTheme.colors.teal};
+  color: ${({ $selected, $tone }) =>
+    $selected
+      ? mobileTheme.colors.panel
+      : $tone === "income"
+        ? mobileTheme.colors.green
+        : $tone === "expense"
+          ? mobileTheme.colors.coral
+          : mobileTheme.colors.teal};
   font-size: 9px;
   font-weight: 600;
   line-height: 13px;
 `
 
-const NoAmount = styled.Text`
-  color: ${mobileTheme.colors.subtle};
+const NoAmount = styled.Text<{ $selected: boolean }>`
+  color: ${({ $selected }) =>
+    $selected ? mobileTheme.colors.panel : mobileTheme.colors.subtle};
   font-size: 10px;
 `

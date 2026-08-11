@@ -31,11 +31,15 @@ export function TransactionRow({
         transaction.status === "excluded" ? ", 합계 제외" : ""
       }`}
     >
-      <Time>{formatKoreanTime(transaction.transactionAt)}</Time>
+      <TypeMark $type={transaction.type}>
+        <TypeInitial $type={transaction.type}>
+          {typeLabel.slice(0, 1)}
+        </TypeInitial>
+      </TypeMark>
       <TransactionCopy>
         <Title>{title}</Title>
         <Metadata>
-          {typeLabel} · {categoryLabel}
+          {formatKoreanTime(transaction.transactionAt)} · {categoryLabel}
           {transaction.status === "excluded" ? " · 합계 제외" : ""}
         </Metadata>
       </TransactionCopy>
@@ -47,23 +51,45 @@ export function TransactionRow({
   )
 }
 
-const Row = styled.View`
-  min-height: 72px;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: ${mobileTheme.spacing[3]}px;
-  margin: 0 ${mobileTheme.spacing[5]}px;
-  border-bottom-width: 1px;
-  border-bottom-color: ${mobileTheme.colors.border};
-  background-color: ${mobileTheme.colors.panel};
-  padding: ${mobileTheme.spacing[3]}px ${mobileTheme.spacing[4]}px;
-`
+const Row = styled.View({
+  minHeight: 68,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: mobileTheme.spacing[3],
+  marginHorizontal: mobileTheme.spacing[4],
+  marginBottom: mobileTheme.spacing[2],
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.border,
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor: mobileTheme.colors.panel,
+  paddingVertical: mobileTheme.spacing[3],
+  paddingHorizontal: mobileTheme.spacing[4],
+})
 
-const Time = styled.Text`
-  width: 58px;
-  color: ${mobileTheme.colors.muted};
-  font-size: 10px;
-  line-height: 16px;
+const TypeMark = styled.View<{ $type: Transaction["type"] }>(({ $type }) => ({
+  width: 36,
+  height: 36,
+  flexShrink: 0,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: mobileTheme.radii.round,
+  backgroundColor:
+    $type === "income"
+      ? mobileTheme.colors.greenSoft
+      : $type === "expense"
+        ? mobileTheme.colors.coralSoft
+        : mobileTheme.colors.tealSoft,
+}))
+
+const TypeInitial = styled.Text<{ $type: Transaction["type"] }>`
+  color: ${({ $type }) =>
+    $type === "income"
+      ? mobileTheme.colors.green
+      : $type === "expense"
+        ? mobileTheme.colors.coral
+        : mobileTheme.colors.teal};
+  font-size: 12px;
+  font-weight: 900;
 `
 
 const TransactionCopy = styled.View`
@@ -86,14 +112,14 @@ const Metadata = styled.Text`
 `
 
 const Amount = styled.Text<{ $type: Transaction["type"] }>`
-  max-width: 42%;
+  max-width: 40%;
   color: ${({ $type }) =>
     $type === "income"
       ? mobileTheme.colors.green
       : $type === "expense"
         ? mobileTheme.colors.coral
         : mobileTheme.colors.teal};
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   line-height: 20px;
   text-align: right;

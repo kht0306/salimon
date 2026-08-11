@@ -10,35 +10,37 @@ export const LedgerMonthControls = observer(function LedgerMonthControls() {
 
   return (
     <ControlsPanel>
-      <ControlLabel>가계부</ControlLabel>
-      <LedgerScroll
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={ledgerContentStyle}
-      >
-        {store.selectableLedgers.map((ledger) => {
-          const selected = ledger.id === store.selectedLedgerId
-          return (
-            <LedgerButton
-              key={ledger.id}
-              $selected={selected}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              onPress={() => store.selectLedger(ledger.id)}
-            >
-              <LedgerName $selected={selected}>{ledger.name}</LedgerName>
-              {store.financeData.members.some(
-                (member) =>
-                  member.userId === store.authUser?.id &&
-                  member.ledgerId === ledger.id &&
-                  member.isDefault,
-              ) ? (
-                <DefaultLabel $selected={selected}>기본</DefaultLabel>
-              ) : null}
-            </LedgerButton>
-          )
-        })}
-      </LedgerScroll>
+      <LedgerSection>
+        <ControlLabel>가계부 선택</ControlLabel>
+        <LedgerScroll
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={ledgerContentStyle}
+        >
+          {store.selectableLedgers.map((ledger) => {
+            const selected = ledger.id === store.selectedLedgerId
+            return (
+              <LedgerButton
+                key={ledger.id}
+                $selected={selected}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                onPress={() => store.selectLedger(ledger.id)}
+              >
+                <LedgerName $selected={selected}>{ledger.name}</LedgerName>
+                {store.financeData.members.some(
+                  (member) =>
+                    member.userId === store.authUser?.id &&
+                    member.ledgerId === ledger.id &&
+                    member.isDefault,
+                ) ? (
+                  <DefaultLabel $selected={selected}>기본</DefaultLabel>
+                ) : null}
+              </LedgerButton>
+            )
+          })}
+        </LedgerScroll>
+      </LedgerSection>
 
       <MonthRow>
         <MonthButton
@@ -65,18 +67,13 @@ export const LedgerMonthControls = observer(function LedgerMonthControls() {
 
 const ledgerContentStyle = { gap: 8 } as const
 
-const ControlsPanel = styled.View`
-  gap: ${mobileTheme.spacing[3]}px;
-  border-width: 1px;
-  border-color: ${mobileTheme.colors.border};
-  border-radius: ${mobileTheme.radii.md}px;
-  background-color: ${mobileTheme.colors.panel};
-  padding: ${mobileTheme.spacing[4]}px;
-`
+const ControlsPanel = styled.View({ gap: mobileTheme.spacing[3] })
+
+const LedgerSection = styled.View({ gap: mobileTheme.spacing[2] })
 
 const ControlLabel = styled.Text`
   color: ${mobileTheme.colors.muted};
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
 `
 
@@ -84,19 +81,24 @@ const LedgerScroll = styled(ScrollView)`
   flex-grow: 0;
 `
 
-const LedgerButton = styled.Pressable<{ $selected: boolean }>`
-  min-height: 44px;
-  flex-direction: row;
-  align-items: center;
-  gap: ${mobileTheme.spacing[2]}px;
-  border-width: 1px;
-  border-color: ${({ $selected }) =>
-    $selected ? mobileTheme.colors.teal : mobileTheme.colors.borderStrong};
-  border-radius: ${mobileTheme.radii.sm}px;
-  background-color: ${({ $selected }) =>
-    $selected ? mobileTheme.colors.tealSoft : mobileTheme.colors.panel};
-  padding: ${mobileTheme.spacing[2]}px ${mobileTheme.spacing[3]}px;
-`
+const LedgerButton = styled.Pressable<{ $selected: boolean }>(
+  ({ $selected }) => ({
+    minHeight: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: mobileTheme.spacing[2],
+    borderWidth: 1,
+    borderColor: $selected
+      ? mobileTheme.colors.teal
+      : mobileTheme.colors.border,
+    borderRadius: mobileTheme.radii.round,
+    backgroundColor: $selected
+      ? mobileTheme.colors.tealSoft
+      : mobileTheme.colors.panel,
+    paddingVertical: mobileTheme.spacing[1],
+    paddingHorizontal: mobileTheme.spacing[3],
+  }),
+)
 
 const LedgerName = styled.Text<{ $selected: boolean }>`
   color: ${({ $selected }) =>
@@ -112,22 +114,26 @@ const DefaultLabel = styled.Text<{ $selected: boolean }>`
   font-weight: 700;
 `
 
-const MonthRow = styled.View`
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-`
+const MonthRow = styled.View({
+  minHeight: 56,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.border,
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor: mobileTheme.colors.panel,
+  padding: mobileTheme.spacing[1],
+})
 
-const MonthButton = styled.Pressable`
-  width: 44px;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  border-width: 1px;
-  border-color: ${mobileTheme.colors.borderStrong};
-  border-radius: ${mobileTheme.radii.sm}px;
-  background-color: ${mobileTheme.colors.panel};
-`
+const MonthButton = styled.Pressable({
+  width: 44,
+  minHeight: 44,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: mobileTheme.colors.panelSubtle,
+})
 
 const MonthButtonLabel = styled.Text`
   color: ${mobileTheme.colors.ink};
@@ -138,8 +144,8 @@ const MonthButtonLabel = styled.Text`
 const MonthLabel = styled.Text`
   flex-shrink: 1;
   color: ${mobileTheme.colors.ink};
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 17px;
+  font-weight: 900;
   line-height: 25px;
   text-align: center;
 `

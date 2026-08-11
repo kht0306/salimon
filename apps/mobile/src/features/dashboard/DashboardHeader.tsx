@@ -21,14 +21,16 @@ export const DashboardHeader = observer(function DashboardHeader({
 
   return (
     <HeaderContent>
-      <HeadingRow>
-        <HeadingCopy>
-          <Eyebrow>살림온 모바일 · 4회차</Eyebrow>
-          <Title accessibilityRole="header">월별 홈</Title>
-          <Subtitle>
-            {store.currentLedgerName}의 수입·지출·저축을 한눈에 확인하세요.
-          </Subtitle>
-        </HeadingCopy>
+      <AppBar>
+        <BrandLockup>
+          <BrandMark>
+            <BrandInitial>S</BrandInitial>
+          </BrandMark>
+          <BrandCopy>
+            <BrandName>살림온</BrandName>
+            <BrandContext>{store.currentLedgerName}</BrandContext>
+          </BrandCopy>
+        </BrandLockup>
         <RefreshButton
           accessibilityLabel="현재 월 새로고침"
           accessibilityRole="button"
@@ -36,9 +38,17 @@ export const DashboardHeader = observer(function DashboardHeader({
           disabled={isRefreshing}
           onPress={() => void store.refreshSelectedMonth()}
         >
-          <RefreshLabel>{isRefreshing ? "갱신 중" : "새로고침"}</RefreshLabel>
+          <RefreshLabel>{isRefreshing ? "갱신 중" : "새로 고침"}</RefreshLabel>
         </RefreshButton>
-      </HeadingRow>
+      </AppBar>
+
+      <HeadingCopy>
+        <Eyebrow>
+          {store.authUser?.nickname ?? "가족"}님의 이번 달 가계부
+        </Eyebrow>
+        <Title accessibilityRole="header">생활비 한눈에 보기</Title>
+        <Subtitle>월별 흐름과 오늘의 거래를 빠르게 확인하세요.</Subtitle>
+      </HeadingCopy>
 
       {store.dataStatus === "stale" ? (
         <OfflineNotice accessibilityLiveRegion="polite">
@@ -79,67 +89,108 @@ export const DashboardHeader = observer(function DashboardHeader({
   )
 })
 
-const HeaderContent = styled.View`
-  gap: ${mobileTheme.spacing[4]}px;
-  padding: ${mobileTheme.spacing[5]}px;
+const HeaderContent = styled.View({
+  gap: mobileTheme.spacing[4],
+  padding: mobileTheme.spacing[4],
+})
+
+const AppBar = styled.View({
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: mobileTheme.spacing[3],
+})
+
+const BrandLockup = styled.View({
+  minWidth: 0,
+  flex: 1,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: mobileTheme.spacing[2],
+})
+
+const BrandMark = styled.View({
+  width: 36,
+  height: 36,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor: mobileTheme.colors.ink,
+})
+
+const BrandInitial = styled.Text`
+  color: ${mobileTheme.colors.panel};
+  font-size: 16px;
+  font-weight: 900;
 `
 
-const HeadingRow = styled.View`
-  flex-direction: row;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: ${mobileTheme.spacing[3]}px;
+const BrandCopy = styled.View({ minWidth: 0, flex: 1 })
+
+const BrandName = styled.Text`
+  color: ${mobileTheme.colors.ink};
+  font-size: 15px;
+  font-weight: 900;
 `
 
-const HeadingCopy = styled.View`
-  min-width: 0;
-  flex: 1;
+const BrandContext = styled.Text`
+  margin-top: 1px;
+  color: ${mobileTheme.colors.muted};
+  font-size: 10px;
+  font-weight: 600;
 `
+
+const HeadingCopy = styled.View({
+  minWidth: 0,
+  gap: mobileTheme.spacing[1],
+})
 
 const Eyebrow = styled.Text`
   color: ${mobileTheme.colors.teal};
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
 `
 
 const Title = styled.Text`
-  margin-top: ${mobileTheme.spacing[1]}px;
   color: ${mobileTheme.colors.ink};
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 36px;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  line-height: 31px;
 `
 
 const Subtitle = styled.Text`
-  margin-top: ${mobileTheme.spacing[1]}px;
   color: ${mobileTheme.colors.muted};
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 12px;
+  line-height: 18px;
 `
 
-const RefreshButton = styled(Pressable)`
-  min-height: 44px;
-  justify-content: center;
-  border-width: 1px;
-  border-color: ${mobileTheme.colors.borderStrong};
-  border-radius: ${mobileTheme.radii.sm}px;
-  background-color: ${mobileTheme.colors.panel};
-  padding: ${mobileTheme.spacing[2]}px ${mobileTheme.spacing[3]}px;
-  opacity: ${({ disabled }) => (disabled ? 0.5 : 1)};
-`
+const RefreshButton = styled(Pressable)<{ disabled?: boolean }>(
+  ({ disabled }) => ({
+    minHeight: 40,
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: mobileTheme.colors.borderStrong,
+    borderRadius: mobileTheme.radii.sm,
+    backgroundColor: mobileTheme.colors.panel,
+    paddingVertical: mobileTheme.spacing[2],
+    paddingHorizontal: mobileTheme.spacing[3],
+    opacity: disabled ? 0.5 : 1,
+  }),
+)
 
 const RefreshLabel = styled.Text`
-  color: ${mobileTheme.colors.ink};
-  font-size: 12px;
-  font-weight: 700;
+  color: ${mobileTheme.colors.teal};
+  font-size: 11px;
+  font-weight: 800;
 `
 
-const OfflineNotice = styled.View`
-  border-left-width: 3px;
-  border-left-color: ${mobileTheme.colors.coral};
-  background-color: ${mobileTheme.colors.coralSoft};
-  padding: ${mobileTheme.spacing[3]}px ${mobileTheme.spacing[4]}px;
-`
+const OfflineNotice = styled.View({
+  borderLeftWidth: 3,
+  borderLeftColor: mobileTheme.colors.coral,
+  backgroundColor: mobileTheme.colors.coralSoft,
+  paddingVertical: mobileTheme.spacing[3],
+  paddingHorizontal: mobileTheme.spacing[4],
+})
 
 const OfflineTitle = styled.Text`
   color: ${mobileTheme.colors.coral};
@@ -154,31 +205,28 @@ const OfflineDescription = styled.Text`
   line-height: 18px;
 `
 
-const OverviewColumns = styled.View<{ $isWide: boolean }>`
-  flex-direction: ${({ $isWide }) => ($isWide ? "row" : "column")};
-  align-items: stretch;
-  gap: ${mobileTheme.spacing[4]}px;
-`
+const OverviewColumns = styled.View<{ $isWide: boolean }>(({ $isWide }) => ({
+  flexDirection: $isWide ? "row" : "column",
+  alignItems: "stretch",
+  gap: mobileTheme.spacing[4],
+}))
 
-const OverviewColumn = styled.View`
-  min-width: 0;
-  flex: 1;
-`
+const OverviewColumn = styled.View({ minWidth: 0, flex: 1 })
 
-const SelectedDateHeading = styled.View`
-  flex-direction: row;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: ${mobileTheme.spacing[3]}px;
-  margin-top: ${mobileTheme.spacing[2]}px;
-`
+const SelectedDateHeading = styled.View({
+  flexDirection: "row",
+  alignItems: "baseline",
+  justifyContent: "space-between",
+  gap: mobileTheme.spacing[3],
+  marginTop: mobileTheme.spacing[1],
+})
 
 const SelectedDateTitle = styled.Text`
   flex-shrink: 1;
   color: ${mobileTheme.colors.ink};
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 24px;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 23px;
 `
 
 const SelectedDateCount = styled.Text`

@@ -134,6 +134,40 @@ describe("MobileAppStore authentication", () => {
     expect(store.authErrorMessage).toBeUndefined()
   })
 
+  it("keeps a restored session when an old callback is replayed", async () => {
+    const gateway = createAuthGateway({
+      completeCallbackUrl: vi.fn(async () => {
+        throw new Error(
+          "이전 로그인 요청이 만료되었습니다. 카카오 로그인을 다시 시도해 주세요.",
+        )
+      }),
+      getCurrentSession: vi.fn(async () => session),
+    })
+    const store = new MobileAppStore(createRepository(), gateway)
+
+    await store.completeAuthCallback("salimon://auth/callback?code=old-code")
+
+    expect(store.authState).toBe("authenticated")
+    expect(store.authErrorMessage).toBeUndefined()
+    expect(gateway.clearLocalSession).not.toHaveBeenCalled()
+  })
+
+  it("clears an invalid callback only when no session can be restored", async () => {
+    const gateway = createAuthGateway({
+      completeCallbackUrl: vi.fn(async () => {
+        throw new Error("로그인 요청이 만료되었습니다.")
+      }),
+      getCurrentSession: vi.fn(async () => null),
+    })
+    const store = new MobileAppStore(createRepository(), gateway)
+
+    await store.completeAuthCallback("salimon://auth/callback?code=old-code")
+
+    expect(store.authState).toBe("anonymous")
+    expect(store.authErrorMessage).toBe("로그인 요청이 만료되었습니다.")
+    expect(gateway.clearLocalSession).toHaveBeenCalledOnce()
+  })
+
   it("creates one initial personal ledger only when the account has none", async () => {
     const emptyData = createEmptyFinanceData()
     emptyData.profile = createReadyFinanceData().profile

@@ -30,22 +30,26 @@ export function AppButton({
   )
 }
 
-const Button = styled.Pressable<{ $tone: NonNullable<AppButtonProps["tone"]> }>`
-  min-height: 48px;
-  align-items: center;
-  justify-content: center;
-  border-width: 1px;
-  border-color: ${({ $tone }) =>
-    $tone === "secondary" ? mobileTheme.colors.borderStrong : "transparent"};
-  border-radius: ${mobileTheme.radii.md}px;
-  background-color: ${({ $tone }) => {
-    if ($tone === "kakao") return "#fee500"
-    if ($tone === "primary") return mobileTheme.colors.teal
-    return mobileTheme.colors.panel
-  }};
-  padding: ${mobileTheme.spacing[3]}px ${mobileTheme.spacing[4]}px;
-  opacity: ${({ disabled }) => (disabled ? 0.45 : 1)};
-`
+const Button = styled.Pressable<{
+  $tone: NonNullable<AppButtonProps["tone"]>
+}>(({ $tone, disabled }) => ({
+  minHeight: 48,
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 1,
+  borderColor:
+    $tone === "secondary" ? mobileTheme.colors.borderStrong : "transparent",
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor:
+    $tone === "kakao"
+      ? "#fee500"
+      : $tone === "primary"
+        ? mobileTheme.colors.teal
+        : mobileTheme.colors.panel,
+  paddingVertical: mobileTheme.spacing[3],
+  paddingHorizontal: mobileTheme.spacing[4],
+  opacity: disabled ? 0.45 : 1,
+}))
 
 const ButtonLabel = styled.Text<{
   $tone: NonNullable<AppButtonProps["tone"]>

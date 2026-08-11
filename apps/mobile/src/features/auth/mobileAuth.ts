@@ -41,17 +41,33 @@ export function createMobileAuthGateway(
   client: SalimonSupabaseClient,
 ): MobileAuthGateway {
   let lastCompletedCallback:
-    { code: string; session: AuthSessionInfo } | undefined
+    | { code: string; session: AuthSessionInfo }
+    | undefined
+  let callbackExchange:
+    | { code: string; promise: Promise<AuthSessionInfo> }
+    | undefined
 
   async function completeCallbackUrl(url: string): Promise<AuthSessionInfo> {
     const callback = parseAuthCallbackUrl(url)
     if (lastCompletedCallback?.code === callback.code) {
       return lastCompletedCallback.session
     }
+    if (callbackExchange?.code === callback.code) {
+      return callbackExchange.promise
+    }
 
-    const session = await exchangeAuthCodeForSession(client, callback.code)
-    lastCompletedCallback = { code: callback.code, session }
-    return session
+    const promise = exchangeCallbackCode(client, callback.code)
+    callbackExchange = { code: callback.code, promise }
+
+    try {
+      const session = await promise
+      lastCompletedCallback = { code: callback.code, session }
+      return session
+    } finally {
+      if (callbackExchange?.promise === promise) {
+        callbackExchange = undefined
+      }
+    }
   }
 
   return {
@@ -100,6 +116,28 @@ export function createMobileAuthGateway(
       }
     },
   }
+}
+
+async function exchangeCallbackCode(
+  client: SalimonSupabaseClient,
+  code: string,
+): Promise<AuthSessionInfo> {
+  try {
+    return await exchangeAuthCodeForSession(client, code)
+  } catch (error) {
+    if (isExpiredLoginFlow(error)) {
+      throw new Error(
+        "이전 로그인 요청이 만료되었습니다. 카카오 로그인을 다시 시도해 주세요.",
+      )
+    }
+    throw error
+  }
+}
+
+function isExpiredLoginFlow(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const message = error.message.toLowerCase()
+  return message.includes("flow state") || message.includes("code verifier")
 }
 
 function parseAuthCallbackUrl(url: string): { code: string } {

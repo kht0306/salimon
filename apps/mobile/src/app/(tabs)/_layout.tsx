@@ -30,15 +30,23 @@ export default observer(function MainTabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarActiveBackgroundColor: mobileTheme.colors.tealSoft,
         tabBarActiveTintColor: mobileTheme.colors.teal,
         tabBarInactiveTintColor: mobileTheme.colors.muted,
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "700",
+          fontSize: 13,
+          fontWeight: "800",
         },
         tabBarStyle: {
+          height: 64,
           backgroundColor: mobileTheme.colors.panel,
           borderTopColor: mobileTheme.colors.border,
+          paddingHorizontal: 12,
+          paddingTop: 7,
+          paddingBottom: 7,
+        },
+        tabBarItemStyle: {
+          borderRadius: mobileTheme.radii.md,
         },
       }}
     >
@@ -47,7 +55,6 @@ export default observer(function MainTabsLayout() {
         options={{
           title: "홈",
           tabBarAccessibilityLabel: "월별 홈",
-          tabBarIcon: ({ focused }) => <TabIcon $active={focused}>⌂</TabIcon>,
         }}
       />
       <Tabs.Screen
@@ -55,7 +62,6 @@ export default observer(function MainTabsLayout() {
         options={{
           title: "설정",
           tabBarAccessibilityLabel: "앱 설정",
-          tabBarIcon: ({ focused }) => <TabIcon $active={focused}>⚙</TabIcon>,
         }}
       />
     </Tabs>
@@ -75,11 +81,4 @@ const LoadingText = styled.Text`
   font-size: 15px;
   line-height: 23px;
   text-align: center;
-`
-
-const TabIcon = styled.Text<{ $active: boolean }>`
-  color: ${({ $active }) =>
-    $active ? mobileTheme.colors.teal : mobileTheme.colors.muted};
-  font-size: 20px;
-  font-weight: 700;
 `
