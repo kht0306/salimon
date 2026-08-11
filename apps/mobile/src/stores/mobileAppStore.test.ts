@@ -1,10 +1,12 @@
 import {
   createEmptyFinanceData,
   type AuthSessionInfo,
+  type FinanceData,
 } from "@salimon/api-client"
 import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "@salimon/types"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { MobileAuthGateway } from "../features/auth/mobileAuth"
+import { QueryCache } from "../infrastructure/queryCache"
 import { MobileAppStore } from "./mobileAppStore"
 
 vi.mock("../features/auth/mobileAuth", () => ({
@@ -210,4 +212,203 @@ describe("MobileAppStore authentication", () => {
     expect(store.requiresLegalConsent).toBe(false)
     expect(store.consentStatus).toBe("idle")
   })
+
+  it("selects the default ledger first and calculates each ledger independently", async () => {
+    const data = createReadyFinanceData()
+    data.ledgers.push({
+      id: "ledger-2",
+      ownerId: "user-1",
+      name: "여행",
+      type: "shared",
+      currency: "KRW",
+      role: "owner",
+    })
+    data.members.push({
+      id: "member-2",
+      ledgerId: "ledger-2",
+      userId: "user-1",
+      nickname: "살림 가족",
+      role: "owner",
+      status: "active",
+      isDefault: false,
+      joinedAt: "2026-08-10T00:00:00.000Z",
+    })
+    data.transactions = [
+      createTransaction("expense-1", "ledger-1", "expense", 12_000, 10),
+      createTransaction("income-1", "ledger-1", "income", 500_000, 10),
+      createTransaction("saving-1", "ledger-2", "saving", 80_000, 11),
+    ]
+    const store = new MobileAppStore(
+      createRepository(data),
+      createAuthGateway(),
+      new Date("2026-08-10T12:00:00+09:00"),
+    )
+
+    await store.initializeAuth()
+
+    expect(store.selectedLedgerId).toBe("ledger-1")
+    expect(store.monthTotals).toEqual({
+      expense: 12_000,
+      income: 500_000,
+      saving: 0,
+    })
+    store.selectLedger("ledger-2")
+    expect(store.currentLedgerName).toBe("여행")
+    expect(store.monthTotals).toEqual({
+      expense: 0,
+      income: 0,
+      saving: 80_000,
+    })
+  })
+
+  it("reuses a fresh month cache and refreshes only when requested", async () => {
+    const repository = createRepository()
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+
+    await store.loadSelectedMonth()
+    expect(repository.load).toHaveBeenCalledOnce()
+
+    await store.refreshSelectedMonth()
+    expect(repository.load).toHaveBeenCalledTimes(2)
+  })
+
+  it("keeps the last successful month read-only when refresh fails", async () => {
+    const data = createReadyFinanceData()
+    data.transactions = [
+      createTransaction("expense-1", "ledger-1", "expense", 12_000, 10),
+    ]
+    const repository = createRepository(data)
+    const store = new MobileAppStore(
+      repository,
+      createAuthGateway(),
+      new Date("2026-08-10T12:00:00+09:00"),
+      new QueryCache(),
+    )
+    await store.initializeAuth()
+    repository.load.mockRejectedValueOnce(new Error("network unavailable"))
+
+    await store.refreshSelectedMonth()
+
+    expect(store.dataStatus).toBe("stale")
+    expect(store.monthTransactions).toHaveLength(1)
+    expect(store.dataErrorMessage).toContain("읽기 전용")
+  })
+
+  it("uses the latest effective category budget and matching expense", async () => {
+    const data = createReadyFinanceData()
+    data.categories = [
+      {
+        id: "food",
+        ledgerId: "ledger-1",
+        type: "expense",
+        usageTypes: ["expense"],
+        name: "식비",
+        icon: "utensils",
+        color: "#d65a3a",
+        sortOrder: 0,
+        isDefault: true,
+        isArchived: false,
+      },
+    ]
+    data.categoryBudgets = [
+      {
+        id: "budget-july",
+        ledgerId: "ledger-1",
+        categoryId: "food",
+        effectiveMonth: "2026-07",
+        amount: 300_000,
+        createdAt: "2026-07-01T00:00:00.000Z",
+      },
+      {
+        id: "budget-august",
+        ledgerId: "ledger-1",
+        categoryId: "food",
+        effectiveMonth: "2026-08",
+        amount: 350_000,
+        createdAt: "2026-08-01T00:00:00.000Z",
+      },
+    ]
+    data.transactions = [
+      {
+        ...createTransaction("expense-1", "ledger-1", "expense", 12_000, 10),
+        categoryId: "food",
+      },
+    ]
+    const store = new MobileAppStore(
+      createRepository(data),
+      createAuthGateway(),
+      new Date("2026-08-10T12:00:00+09:00"),
+    )
+
+    await store.initializeAuth()
+
+    expect(store.selectedMonthBudgets).toHaveLength(1)
+    expect(store.selectedMonthBudgets[0]).toMatchObject({
+      amount: 350_000,
+      spent: 12_000,
+    })
+  })
+
+  it("ignores an older month response that finishes after the latest request", async () => {
+    const repository = createRepository()
+    const store = new MobileAppStore(
+      repository,
+      createAuthGateway(),
+      new Date("2026-08-10T12:00:00+09:00"),
+    )
+    await store.initializeAuth()
+    const julyData = createReadyFinanceData()
+    julyData.profile.nickname = "7월 응답"
+    const juneData = createReadyFinanceData()
+    juneData.profile.nickname = "6월 응답"
+    const julyRequestResult = createDeferred<FinanceData>()
+    const juneRequestResult = createDeferred<FinanceData>()
+    repository.load
+      .mockImplementationOnce(() => julyRequestResult.promise)
+      .mockImplementationOnce(() => juneRequestResult.promise)
+
+    const julyRequest = store.moveSelectedMonth(-1)
+    await vi.waitFor(() => expect(repository.load).toHaveBeenCalledTimes(2))
+    const juneRequest = store.moveSelectedMonth(-1)
+    await vi.waitFor(() => expect(repository.load).toHaveBeenCalledTimes(3))
+
+    juneRequestResult.resolve(juneData)
+    await juneRequest
+    julyRequestResult.resolve(julyData)
+    await julyRequest
+
+    expect(store.selectedMonth).toBe("2026-06")
+    expect(store.financeData.profile.nickname).toBe("6월 응답")
+  })
 })
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve
+  })
+  return { promise, resolve }
+}
+
+function createTransaction(
+  id: string,
+  ledgerId: string,
+  type: "expense" | "income" | "saving",
+  amount: number,
+  day: number,
+) {
+  const date = `2026-08-${String(day).padStart(2, "0")}T12:00:00+09:00`
+  return {
+    id,
+    ledgerId,
+    type,
+    status: "confirmed" as const,
+    amount,
+    currency: "KRW" as const,
+    transactionAt: date,
+    sourceType: "manual" as const,
+    createdAt: date,
+    updatedAt: date,
+  }
+}
