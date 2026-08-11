@@ -8,13 +8,32 @@ import {
   type FinanceLoadOptions,
   type TransactionDateRange,
 } from "@salimon/api-client"
-import { toMonthKey } from "@salimon/domain"
-import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "@salimon/types"
+import {
+  getDescendantCategoryIds,
+  moveMonth,
+  toDateKey,
+  toMonthKey,
+  transactionAmountForCategoryIds,
+} from "@salimon/domain"
+import {
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+  type Category,
+  type Ledger,
+  type Transaction,
+} from "@salimon/types"
 import { makeAutoObservable, runInAction } from "mobx"
 import {
   createMobileAuthGateway,
   type MobileAuthGateway,
 } from "../features/auth/mobileAuth"
+import {
+  buildMonthDaySummaries,
+  calculateConfirmedTotals,
+  type MonthDaySummary,
+  type TransactionTotals,
+} from "../features/dashboard/dashboardPresentation"
+import { QueryCache } from "../infrastructure/queryCache"
 import { requireSupabaseMobileClient } from "../infrastructure/supabase"
 
 type MobileFinanceRepository = Pick<
@@ -29,10 +48,24 @@ export type MobileAuthState =
   | "authenticated"
   | "signingOut"
 
-export type MobileDataStatus = "idle" | "loading" | "ready" | "error"
+export type MobileDataStatus =
+  | "idle"
+  | "loading"
+  | "refreshing"
+  | "ready"
+  | "stale"
+  | "error"
 export type MobileConsentStatus = "idle" | "saving" | "error"
 
+export interface MobileCategoryBudgetProgress {
+  amount: number
+  category: Category
+  spent: number
+}
+
 export class MobileAppStore {
+  selectedDate: string
+  selectedLedgerId = ""
   selectedMonth: string
   authState: MobileAuthState = "checking"
   authUser?: AuthUserInfo
@@ -44,6 +77,8 @@ export class MobileAppStore {
   consentErrorMessage?: string
 
   private activeSessionUserId?: string
+  private dataRequestSequence = 0
+  private readonly financeQueryCache: QueryCache<FinanceData>
   private sessionSequence = 0
   private activationPromise?: Promise<void>
 
@@ -51,30 +86,131 @@ export class MobileAppStore {
     private readonly repository: MobileFinanceRepository,
     private readonly authGateway: MobileAuthGateway,
     now = new Date(),
+    financeQueryCache = new QueryCache<FinanceData>(),
   ) {
     this.selectedMonth = toMonthKey(now)
+    this.selectedDate = toDateKey(now)
+    this.financeQueryCache = financeQueryCache
     makeAutoObservable(this, {}, { autoBind: true })
   }
 
   get requiresLegalConsent(): boolean {
     const consent = this.financeData.legalConsent
     return (
-      this.dataStatus === "ready" &&
+      this.hasLoadedFinanceData &&
       (consent?.termsVersion !== CURRENT_TERMS_VERSION ||
         consent.privacyVersion !== CURRENT_PRIVACY_VERSION)
     )
   }
 
-  get currentLedgerName(): string {
+  get hasLoadedFinanceData(): boolean {
+    return (
+      this.dataStatus === "ready" ||
+      this.dataStatus === "refreshing" ||
+      this.dataStatus === "stale"
+    )
+  }
+
+  get selectableLedgers(): Ledger[] {
     const defaultLedgerId = this.financeData.members.find(
       (member) => member.userId === this.authUser?.id && member.isDefault,
     )?.ledgerId
-    return (
-      this.financeData.ledgers.find((ledger) => ledger.id === defaultLedgerId)
-        ?.name ??
-      this.financeData.ledgers.find((ledger) => !ledger.archivedAt)?.name ??
-      "내 가계부"
+    const activeLedgers = this.financeData.ledgers.filter(
+      (ledger) => !ledger.archivedAt,
     )
+
+    return activeLedgers.sort((first, second) => {
+      if (first.id === defaultLedgerId) return -1
+      if (second.id === defaultLedgerId) return 1
+      return first.name.localeCompare(second.name, "ko-KR")
+    })
+  }
+
+  get currentLedger(): Ledger | undefined {
+    return this.selectableLedgers.find(
+      (ledger) => ledger.id === this.selectedLedgerId,
+    )
+  }
+
+  get currentLedgerName(): string {
+    return this.currentLedger?.name ?? "내 가계부"
+  }
+
+  get monthTransactions(): Transaction[] {
+    return this.financeData.transactions
+      .filter(
+        (transaction) =>
+          transaction.ledgerId === this.selectedLedgerId &&
+          !transaction.deletedAt &&
+          toMonthKey(new Date(transaction.transactionAt)) ===
+            this.selectedMonth,
+      )
+      .sort(
+        (first, second) =>
+          new Date(second.transactionAt).getTime() -
+          new Date(first.transactionAt).getTime(),
+      )
+  }
+
+  get selectedDateTransactions(): Transaction[] {
+    return this.monthTransactions.filter(
+      (transaction) =>
+        toDateKey(new Date(transaction.transactionAt)) === this.selectedDate,
+    )
+  }
+
+  get monthTotals(): TransactionTotals {
+    return calculateConfirmedTotals(this.monthTransactions)
+  }
+
+  get monthDaySummaries(): MonthDaySummary[] {
+    return buildMonthDaySummaries(this.selectedMonth, this.monthTransactions)
+  }
+
+  get selectedMonthBudgets(): MobileCategoryBudgetProgress[] {
+    const ledgerCategories = this.financeData.categories.filter(
+      (category) => category.ledgerId === this.selectedLedgerId,
+    )
+    const expenseCategories = ledgerCategories.filter(
+      (category) =>
+        !category.isArchived && category.usageTypes.includes("expense"),
+    )
+
+    return expenseCategories.flatMap((category) => {
+      const budget = this.financeData.categoryBudgets
+        .filter(
+          (item) =>
+            item.categoryId === category.id &&
+            item.effectiveMonth <= this.selectedMonth,
+        )
+        .sort((first, second) =>
+          second.effectiveMonth.localeCompare(first.effectiveMonth),
+        )[0]
+      if (!budget || budget.amount <= 0) return []
+
+      const categoryIds = getDescendantCategoryIds(
+        ledgerCategories,
+        category.id,
+      )
+      const spent = this.monthTransactions
+        .filter(
+          (transaction) =>
+            transaction.type === "expense" &&
+            transaction.status === "confirmed",
+        )
+        .reduce(
+          (sum, transaction) =>
+            sum +
+            transactionAmountForCategoryIds(
+              transaction,
+              this.financeData.transactionSplits,
+              categoryIds,
+            ),
+          0,
+        )
+
+      return [{ amount: budget.amount, category, spent }]
+    })
   }
 
   async initializeAuth(): Promise<void> {
@@ -168,18 +304,37 @@ export class MobileAppStore {
     })
   }
 
-  async loadSelectedMonth(month = this.selectedMonth): Promise<void> {
+  async loadSelectedMonth(
+    month = this.selectedMonth,
+    forceRefresh = false,
+  ): Promise<void> {
     const userId = this.authUser?.id
     if (!userId) return
 
     const sequence = this.sessionSequence
+    const requestSequence = ++this.dataRequestSequence
+    const cacheKey = createFinanceCacheKey(userId, month)
+    const cached = this.financeQueryCache.get(cacheKey)
     const options: FinanceLoadOptions = {
       transactionDateRange: createKoreaMonthTransactionRange(month),
     }
 
     this.selectedMonth = month
-    this.dataStatus = "loading"
+    this.ensureSelectedDateBelongsToMonth(month)
     this.dataErrorMessage = undefined
+
+    if (cached?.isFresh && !forceRefresh) {
+      this.applyFinanceData(cached.data)
+      this.dataStatus = "ready"
+      return
+    }
+
+    if (cached) {
+      this.applyFinanceData(cached.data)
+      this.dataStatus = "refreshing"
+    } else {
+      this.dataStatus = "loading"
+    }
 
     try {
       await this.repository.materializeMonth(month)
@@ -197,26 +352,65 @@ export class MobileAppStore {
         financeData = await this.repository.load(userId, options)
       }
 
-      if (sequence !== this.sessionSequence || userId !== this.authUser?.id) {
+      if (
+        sequence !== this.sessionSequence ||
+        requestSequence !== this.dataRequestSequence ||
+        userId !== this.authUser?.id
+      ) {
         return
       }
 
       runInAction(() => {
-        this.financeData = financeData
+        this.applyFinanceData(financeData)
+        this.financeQueryCache.set(cacheKey, financeData)
         this.dataStatus = "ready"
       })
     } catch (error) {
-      if (sequence !== this.sessionSequence || userId !== this.authUser?.id) {
+      if (
+        sequence !== this.sessionSequence ||
+        requestSequence !== this.dataRequestSequence ||
+        userId !== this.authUser?.id
+      ) {
         return
       }
 
       runInAction(() => {
-        this.dataStatus = "error"
-        this.dataErrorMessage = errorMessage(
+        const message = errorMessage(
           error,
           "가계부 데이터를 불러오지 못했습니다.",
         )
+        if (cached) {
+          this.applyFinanceData(cached.data)
+          this.dataStatus = "stale"
+          this.dataErrorMessage = `${message} 마지막 조회 내용을 읽기 전용으로 표시합니다.`
+        } else {
+          this.dataStatus = "error"
+          this.dataErrorMessage = message
+        }
       })
+    }
+  }
+
+  async refreshSelectedMonth(): Promise<void> {
+    await this.loadSelectedMonth(this.selectedMonth, true)
+  }
+
+  async moveSelectedMonth(amount: number): Promise<void> {
+    const month = moveMonth(this.selectedMonth, amount)
+    this.selectedDate = `${month}-01`
+    await this.loadSelectedMonth(month)
+  }
+
+  selectLedger(ledgerId: string): void {
+    if (!this.selectableLedgers.some((ledger) => ledger.id === ledgerId)) {
+      return
+    }
+    this.selectedLedgerId = ledgerId
+  }
+
+  selectDate(date: string): void {
+    if (this.monthDaySummaries.some((summary) => summary.date === date)) {
+      this.selectedDate = date
     }
   }
 
@@ -231,7 +425,7 @@ export class MobileAppStore {
         CURRENT_TERMS_VERSION,
         CURRENT_PRIVACY_VERSION,
       )
-      await this.loadSelectedMonth()
+      await this.loadSelectedMonth(this.selectedMonth, true)
       runInAction(() => {
         this.consentStatus = "idle"
       })
@@ -347,11 +541,31 @@ export class MobileAppStore {
   }
 
   private clearFinanceData(): void {
+    this.dataRequestSequence += 1
     this.financeData = createEmptyFinanceData()
+    this.selectedLedgerId = ""
     this.dataStatus = "idle"
     this.dataErrorMessage = undefined
     this.consentStatus = "idle"
     this.consentErrorMessage = undefined
+    this.financeQueryCache.clear()
+  }
+
+  private applyFinanceData(financeData: FinanceData): void {
+    this.financeData = financeData
+    if (
+      !this.selectableLedgers.some(
+        (ledger) => ledger.id === this.selectedLedgerId,
+      )
+    ) {
+      this.selectedLedgerId = this.selectableLedgers[0]?.id ?? ""
+    }
+  }
+
+  private ensureSelectedDateBelongsToMonth(month: string): void {
+    if (!this.selectedDate.startsWith(`${month}-`)) {
+      this.selectedDate = `${month}-01`
+    }
   }
 }
 
@@ -387,4 +601,8 @@ export function createKoreaMonthTransactionRange(
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
+}
+
+function createFinanceCacheKey(userId: string, month: string): string {
+  return `${userId}:${month}`
 }
