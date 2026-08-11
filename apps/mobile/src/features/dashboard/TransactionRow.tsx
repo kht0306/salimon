@@ -75,19 +75,19 @@ const TypeMark = styled.View<{ $type: Transaction["type"] }>(({ $type }) => ({
   borderRadius: mobileTheme.radii.round,
   backgroundColor:
     $type === "income"
-      ? mobileTheme.colors.greenSoft
+      ? mobileTheme.colors.blueSoft
       : $type === "expense"
-        ? mobileTheme.colors.coralSoft
-        : mobileTheme.colors.tealSoft,
+        ? mobileTheme.colors.amberSoft
+        : mobileTheme.colors.violetSoft,
 }))
 
 const TypeInitial = styled.Text<{ $type: Transaction["type"] }>`
   color: ${({ $type }) =>
     $type === "income"
-      ? mobileTheme.colors.green
+      ? mobileTheme.colors.blue
       : $type === "expense"
-        ? mobileTheme.colors.coral
-        : mobileTheme.colors.teal};
+        ? mobileTheme.colors.amber
+        : mobileTheme.colors.violet};
   font-size: 12px;
   font-weight: 900;
 `
@@ -115,10 +115,10 @@ const Amount = styled.Text<{ $type: Transaction["type"] }>`
   max-width: 40%;
   color: ${({ $type }) =>
     $type === "income"
-      ? mobileTheme.colors.green
+      ? mobileTheme.colors.blue
       : $type === "expense"
-        ? mobileTheme.colors.coral
-        : mobileTheme.colors.teal};
+        ? mobileTheme.colors.amber
+        : mobileTheme.colors.violet};
   font-size: 12px;
   font-weight: 800;
   line-height: 20px;

@@ -66,6 +66,12 @@ export const nativeColors = {
   greenSoft: "#f0fdf4",
   coral: "#dc2626",
   coralSoft: "#fef2f2",
+  amber: "#b45309",
+  amberSoft: "#fffbeb",
+  violet: "#6d28d9",
+  violetSoft: "#f5f3ff",
+  blue: "#2563eb",
+  blueSoft: "#eff6ff",
   focus: "#2563eb",
 } as const
 

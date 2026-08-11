@@ -182,8 +182,8 @@ const ProfileProvider = styled.Text`
 
 const ConnectedBadge = styled.Text({
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.greenSoft,
-  color: mobileTheme.colors.green,
+  backgroundColor: mobileTheme.colors.tealSoft,
+  color: mobileTheme.colors.teal,
   fontSize: 10,
   fontWeight: "800",
   paddingVertical: mobileTheme.spacing[1],
