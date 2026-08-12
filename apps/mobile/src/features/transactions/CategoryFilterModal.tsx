@@ -112,23 +112,25 @@ export function CategoryFilterModal({
           />
 
           {!searching ? (
-            <CategoryChoice
-              $selected={draftCategoryIds.length === 0}
-              accessibilityLabel="전체 카테고리"
-              accessibilityRole="button"
-              accessibilityState={{ selected: draftCategoryIds.length === 0 }}
-              onPress={() => setDraftCategoryIds([])}
-            >
+            <CategoryRow $depth={0}>
               <TreeControlSpacer />
-              <CategoryCopy>
-                <CategoryName $selected={draftCategoryIds.length === 0}>
-                  전체 카테고리
-                </CategoryName>
-                <CategoryStatus>
-                  선택한 카테고리를 모두 해제합니다.
-                </CategoryStatus>
-              </CategoryCopy>
-            </CategoryChoice>
+              <CategoryChoice
+                $selected={draftCategoryIds.length === 0}
+                accessibilityLabel="전체 카테고리"
+                accessibilityRole="button"
+                accessibilityState={{ selected: draftCategoryIds.length === 0 }}
+                onPress={() => setDraftCategoryIds([])}
+              >
+                <CategoryCopy>
+                  <CategoryName $selected={draftCategoryIds.length === 0}>
+                    전체 카테고리
+                  </CategoryName>
+                  <CategoryStatus>
+                    선택한 카테고리를 모두 해제합니다.
+                  </CategoryStatus>
+                </CategoryCopy>
+              </CategoryChoice>
+            </CategoryRow>
           ) : null}
 
           <CategoryList
