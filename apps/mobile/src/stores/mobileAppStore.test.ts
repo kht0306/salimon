@@ -67,6 +67,8 @@ function createRepository(data = createReadyFinanceData()) {
     createLedger: vi.fn(async () => "ledger-1"),
     load: vi.fn(async () => data),
     materializeMonth: vi.fn(async () => undefined),
+    saveTransaction: vi.fn(async () => "transaction-new"),
+    softDeleteTransaction: vi.fn(async () => undefined),
   }
 }
 
@@ -382,6 +384,110 @@ describe("MobileAppStore authentication", () => {
       amount: 350_000,
       spent: 12_000,
     })
+  })
+
+  it("saves a general transaction once and force refreshes its month", async () => {
+    const repository = createRepository()
+    const store = new MobileAppStore(
+      repository,
+      createAuthGateway(),
+      new Date("2026-08-10T12:00:00+09:00"),
+    )
+    await store.initializeAuth()
+
+    const firstSave = store.saveGeneralTransaction({
+      ledgerId: "ledger-1",
+      type: "expense",
+      status: "confirmed",
+      amount: 12_000,
+      transactionAt: "2026-08-12T20:30:00+09:00",
+      categoryId: "food",
+    })
+    const duplicateSave = await store.saveGeneralTransaction({
+      ledgerId: "ledger-1",
+      type: "expense",
+      status: "confirmed",
+      amount: 12_000,
+      transactionAt: "2026-08-12T20:30:00+09:00",
+      categoryId: "food",
+    })
+    const result = await firstSave
+
+    expect(duplicateSave).toEqual({ status: "error" })
+    expect(result).toEqual({
+      status: "saved",
+      transactionId: "transaction-new",
+    })
+    expect(repository.saveTransaction).toHaveBeenCalledOnce()
+    expect(repository.load).toHaveBeenCalledTimes(2)
+    expect(store.transactionMutationState).toBe("idle")
+  })
+
+  it("preserves the loaded month and exposes an error when saving fails", async () => {
+    const data = createReadyFinanceData()
+    data.transactions = [
+      createTransaction("expense-1", "ledger-1", "expense", 12_000, 10),
+    ]
+    const repository = createRepository(data)
+    repository.saveTransaction.mockRejectedValueOnce(
+      new Error("network unavailable"),
+    )
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+
+    const result = await store.saveGeneralTransaction({
+      ledgerId: "ledger-1",
+      type: "expense",
+      status: "confirmed",
+      amount: 20_000,
+      transactionAt: "2026-08-12T20:30:00+09:00",
+      categoryId: "food",
+    })
+
+    expect(result).toEqual({ status: "error" })
+    expect(store.monthTransactions).toHaveLength(1)
+    expect(store.transactionMutationErrorMessage).toBe("network unavailable")
+    expect(store.transactionMutationState).toBe("idle")
+  })
+
+  it("hides mutations from viewers and rejects a write defensively", async () => {
+    const data = createReadyFinanceData()
+    data.ledgers[0] = { ...data.ledgers[0]!, role: "viewer" }
+    const repository = createRepository(data)
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+
+    const result = await store.saveGeneralTransaction({
+      ledgerId: "ledger-1",
+      type: "expense",
+      status: "confirmed",
+      amount: 20_000,
+      transactionAt: "2026-08-12T20:30:00+09:00",
+      categoryId: "food",
+    })
+
+    expect(store.canMutateCurrentLedger).toBe(false)
+    expect(result).toEqual({ status: "error" })
+    expect(repository.saveTransaction).not.toHaveBeenCalled()
+  })
+
+  it("deletes only a regular transaction and refreshes the current month", async () => {
+    const data = createReadyFinanceData()
+    data.transactions = [
+      createTransaction("expense-1", "ledger-1", "expense", 12_000, 10),
+    ]
+    const repository = createRepository(data)
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+
+    const deleted = await store.deleteGeneralTransaction("expense-1")
+
+    expect(deleted).toBe(true)
+    expect(repository.softDeleteTransaction).toHaveBeenCalledWith(
+      "expense-1",
+      "user-1",
+    )
+    expect(repository.load).toHaveBeenCalledTimes(2)
   })
 
   it("ignores an older month response that finishes after the latest request", async () => {

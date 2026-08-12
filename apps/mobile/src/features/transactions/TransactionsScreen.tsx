@@ -147,6 +147,7 @@ export const TransactionsScreen = observer(function TransactionsScreen() {
         ListHeaderComponent={
           <TransactionListHeader
             activeFilterCount={activeFilterCount}
+            canCreate={store.canMutateCurrentLedger}
             categories={categories}
             filters={filters}
             filtersOpen={filtersOpen}
@@ -161,6 +162,7 @@ export const TransactionsScreen = observer(function TransactionsScreen() {
             onKeywordChange={(keyword) =>
               setFilters((current) => ({ ...current, keyword }))
             }
+            onCreate={() => router.push("/transactions/new")}
             onToggleFilters={() => setFiltersOpen((open) => !open)}
           />
         }
@@ -195,6 +197,7 @@ export const TransactionsScreen = observer(function TransactionsScreen() {
 
 interface TransactionListHeaderProps {
   activeFilterCount: number
+  canCreate: boolean
   categories: Category[]
   filters: MobileTransactionFilters
   filtersOpen: boolean
@@ -204,6 +207,7 @@ interface TransactionListHeaderProps {
   members: LedgerMember[]
   resultCount: number
   totals: ReturnType<typeof calculateTransactionTotals>
+  onCreate: () => void
   onFilterChange: (filters: MobileTransactionFilters) => void
   onFilterReset: () => void
   onKeywordChange: (keyword: string) => void
@@ -212,6 +216,7 @@ interface TransactionListHeaderProps {
 
 function TransactionListHeader({
   activeFilterCount,
+  canCreate,
   categories,
   filters,
   filtersOpen,
@@ -221,6 +226,7 @@ function TransactionListHeader({
   members,
   resultCount,
   totals,
+  onCreate,
   onFilterChange,
   onFilterReset,
   onKeywordChange,
@@ -234,7 +240,14 @@ function TransactionListHeader({
           <Title accessibilityRole="header">거래 내역</Title>
           <Subtitle>이번 달 거래를 조건별로 빠르게 찾아보세요.</Subtitle>
         </HeadingCopy>
-        <ResultCount>{resultCount}건</ResultCount>
+        <HeadingActions>
+          <ResultCount>{resultCount}건</ResultCount>
+          {canCreate ? (
+            <CreateButton accessibilityRole="button" onPress={onCreate}>
+              <CreateButtonLabel>거래 추가</CreateButtonLabel>
+            </CreateButton>
+          ) : null}
+        </HeadingActions>
       </HeadingRow>
 
       <LedgerMonthControls />
@@ -402,6 +415,26 @@ const ResultCount = styled.Text({
   fontWeight: "700",
   paddingVertical: mobileTheme.spacing[2],
   paddingHorizontal: mobileTheme.spacing[3],
+})
+
+const HeadingActions = styled.View({
+  alignItems: "flex-end",
+  gap: mobileTheme.spacing[2],
+})
+
+const CreateButton = styled.Pressable({
+  minHeight: 40,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: mobileTheme.colors.teal,
+  paddingHorizontal: mobileTheme.spacing[3],
+})
+
+const CreateButtonLabel = styled.Text({
+  color: mobileTheme.colors.panel,
+  fontSize: 11,
+  fontWeight: "800",
 })
 
 const StaleNotice = styled.Text({
