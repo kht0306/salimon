@@ -11,9 +11,9 @@ import {
   transactionCategoryLabel,
   transactionMemberLabel,
   transactionPaymentLabel,
-  transactionRecurrenceLabel,
   transactionSourceLabel,
   transactionStatusLabel,
+  transactionStructureLabels,
   transactionTypeLabel,
 } from "./transactionPresentation"
 
@@ -72,7 +72,10 @@ export const TransactionDetailScreen = observer(
     const splits = store.financeData.transactionSplits
       .filter((split) => split.transactionId === transaction.id)
       .sort((first, second) => first.sortOrder - second.sortOrder)
-    const recurrenceLabel = transactionRecurrenceLabel(transaction)
+    const structureLabel = transactionStructureLabels(
+      transaction,
+      splits.length,
+    ).join(" · ")
     const paymentLabel = transactionPaymentLabel(transaction, paymentMethod)
     const title =
       transaction.merchantName ??
@@ -107,12 +110,12 @@ export const TransactionDetailScreen = observer(
               </TransactionDate>
             </AmountCard>
 
-            {recurrenceLabel ? (
+            {structureLabel ? (
               <ReadOnlyNotice>
-                <ReadOnlyTitle>{recurrenceLabel}</ReadOnlyTitle>
+                <ReadOnlyTitle>{structureLabel}</ReadOnlyTitle>
                 <ReadOnlyDescription>
-                  고정·할부 거래는 모바일에서 안전하게 조회만 할 수 있습니다.
-                  변경은 웹에서 관리해 주세요.
+                  고정·할부·분할 거래는 모바일에서 안전하게 조회만 할 수
+                  있습니다. 변경은 웹에서 관리해 주세요.
                 </ReadOnlyDescription>
               </ReadOnlyNotice>
             ) : null}

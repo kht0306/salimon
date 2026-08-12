@@ -15,6 +15,8 @@ import {
   transactionMemberLabel,
   transactionPaymentLabel,
   transactionRecurrenceLabel,
+  transactionStructureLabels,
+  toggleTransactionFilterValue,
 } from "./transactionPresentation"
 
 const categories: Category[] = [
@@ -99,6 +101,48 @@ describe("mobile transaction presentation", () => {
     expect(result.map((transaction) => transaction.id)).toEqual(["recent"])
   })
 
+  it("filters regular, fixed, installment and split transaction structures", () => {
+    const structuredTransactions = [
+      transactions[0]!,
+      { ...transactions[0]!, id: "fixed", recurringType: "fixed" as const },
+      {
+        ...transactions[0]!,
+        id: "installment",
+        recurringType: "installment" as const,
+      },
+      transactions[1]!,
+    ]
+
+    expect(
+      filterTransactions(
+        structuredTransactions,
+        { ...defaultTransactionFilters, structure: "regular" },
+        context,
+      ).map((transaction) => transaction.id),
+    ).toEqual(["recent"])
+    expect(
+      filterTransactions(
+        structuredTransactions,
+        { ...defaultTransactionFilters, structure: "fixed" },
+        context,
+      ).map((transaction) => transaction.id),
+    ).toEqual(["fixed"])
+    expect(
+      filterTransactions(
+        structuredTransactions,
+        { ...defaultTransactionFilters, structure: "installment" },
+        context,
+      ).map((transaction) => transaction.id),
+    ).toEqual(["installment"])
+    expect(
+      filterTransactions(
+        structuredTransactions,
+        { ...defaultTransactionFilters, structure: "split" },
+        context,
+      ).map((transaction) => transaction.id),
+    ).toEqual(["split"])
+  })
+
   it("groups transactions by date in descending input order", () => {
     const sections = groupTransactionsByDate(transactions)
 
@@ -165,6 +209,22 @@ describe("mobile transaction presentation", () => {
         categories,
       ),
     ).toBe("예전 분류 · 보관됨")
+  })
+
+  it("resets an active filter and labels every complex transaction shape", () => {
+    expect(toggleTransactionFilterValue("expense", "expense", "")).toBe("")
+    expect(toggleTransactionFilterValue("", "expense", "")).toBe("expense")
+    expect(
+      transactionStructureLabels(
+        {
+          ...transactions[0]!,
+          recurringType: "installment",
+          installmentNumber: 2,
+          installmentTotal: 6,
+        },
+        3,
+      ),
+    ).toEqual(["할부 2/6회", "분할 3개"])
   })
 
   it("keeps all 1,000 loaded transactions available for virtualized rendering", () => {

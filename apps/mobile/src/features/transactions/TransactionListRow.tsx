@@ -5,7 +5,7 @@ import { mobileTheme } from "../../theme"
 import {
   transactionCategoryLabel,
   transactionMemberLabel,
-  transactionRecurrenceLabel,
+  transactionStructureLabels,
   transactionTypeLabel,
 } from "./transactionPresentation"
 
@@ -13,6 +13,7 @@ interface TransactionListRowProps {
   categories: Category[]
   members: LedgerMember[]
   onPress: () => void
+  splitCount: number
   transaction: Transaction
 }
 
@@ -20,6 +21,7 @@ export function TransactionListRow({
   categories,
   members,
   onPress,
+  splitCount,
   transaction,
 }: TransactionListRowProps) {
   const title =
@@ -27,7 +29,7 @@ export function TransactionListRow({
     transaction.memo ??
     transactionCategoryLabel(transaction, categories)
   const actor = transactionMemberLabel(transaction.actorUserId, members, "공통")
-  const recurrence = transactionRecurrenceLabel(transaction)
+  const structureLabels = transactionStructureLabels(transaction, splitCount)
   const typeLabel = transactionTypeLabel(transaction.type)
   const amountPrefix = transaction.type === "income" ? "+" : "−"
 
@@ -51,9 +53,11 @@ export function TransactionListRow({
           {formatKoreanTime(transaction.transactionAt)} · {actor} ·{" "}
           {transactionCategoryLabel(transaction, categories)}
         </Metadata>
-        {recurrence || transaction.status === "excluded" ? (
+        {structureLabels.length > 0 || transaction.status === "excluded" ? (
           <BadgeRow>
-            {recurrence ? <Badge>{recurrence}</Badge> : null}
+            {structureLabels.map((label) => (
+              <Badge key={label}>{label}</Badge>
+            ))}
             {transaction.status === "excluded" ? (
               <WarningBadge>합계 제외</WarningBadge>
             ) : null}

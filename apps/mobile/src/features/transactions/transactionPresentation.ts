@@ -15,6 +15,12 @@ import type {
 } from "@salimon/types"
 
 export type TransactionPeriod = "all" | "7" | "14" | "28"
+export type TransactionStructure =
+  | ""
+  | "regular"
+  | "fixed"
+  | "installment"
+  | "split"
 
 export interface MobileTransactionFilters {
   actorUserId: string
@@ -22,6 +28,7 @@ export interface MobileTransactionFilters {
   keyword: string
   period: TransactionPeriod
   status: "" | TransactionStatus
+  structure: TransactionStructure
   type: "" | TransactionType
 }
 
@@ -53,6 +60,7 @@ export const defaultTransactionFilters: MobileTransactionFilters = {
   keyword: "",
   period: "all",
   status: "",
+  structure: "",
   type: "",
 }
 
@@ -87,6 +95,17 @@ export function filterTransactions(
       }
       if (filters.type && transaction.type !== filters.type) return false
       if (filters.status && transaction.status !== filters.status) return false
+      const transactionSplits = splitsByTransaction.get(transaction.id) ?? []
+      if (
+        filters.structure &&
+        !matchesTransactionStructure(
+          transaction,
+          transactionSplits.length,
+          filters.structure,
+        )
+      ) {
+        return false
+      }
       if (
         filters.actorUserId &&
         (filters.actorUserId === "common"
@@ -96,10 +115,11 @@ export function filterTransactions(
         return false
       }
       if (selectedCategoryIds) {
-        const splits = splitsByTransaction.get(transaction.id) ?? []
         const matchesCategory =
-          splits.length > 0
-            ? splits.some((split) => selectedCategoryIds.has(split.categoryId))
+          transactionSplits.length > 0
+            ? transactionSplits.some((split) =>
+                selectedCategoryIds.has(split.categoryId),
+              )
             : Boolean(
                 transaction.categoryId &&
                 selectedCategoryIds.has(transaction.categoryId),
@@ -207,6 +227,25 @@ export function transactionRecurrenceLabel(
   return "할부 거래"
 }
 
+export function transactionStructureLabels(
+  transaction: Transaction,
+  splitCount: number,
+): string[] {
+  const recurrence = transactionRecurrenceLabel(transaction)
+  return [
+    recurrence,
+    splitCount > 0 ? `분할 ${splitCount}개` : undefined,
+  ].filter((label): label is string => Boolean(label))
+}
+
+export function toggleTransactionFilterValue<T extends string>(
+  selectedValue: T,
+  nextValue: T,
+  defaultValue: T,
+): T {
+  return selectedValue === nextValue ? defaultValue : nextValue
+}
+
 export function transactionSourceLabel(
   sourceType: Transaction["sourceType"],
 ): string {
@@ -240,6 +279,22 @@ function resolvePeriodStart(
       : new Date(year, month, 0)
   anchor.setDate(anchor.getDate() - Number(period) + 1)
   return toDateKey(anchor)
+}
+
+function matchesTransactionStructure(
+  transaction: Transaction,
+  splitCount: number,
+  structure: TransactionStructure,
+): boolean {
+  if (structure === "split") return splitCount > 0
+  if (structure === "fixed") return transaction.recurringType === "fixed"
+  if (structure === "installment") {
+    return transaction.recurringType === "installment"
+  }
+  if (structure === "regular") {
+    return !transaction.recurringType && splitCount === 0
+  }
+  return true
 }
 
 function formatSectionDate(dateKey: string): string {

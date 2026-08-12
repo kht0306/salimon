@@ -1,12 +1,15 @@
 import styled from "@emotion/native"
 import { getCategoryLabel } from "@salimon/domain"
 import type { Category, LedgerMember } from "@salimon/types"
+import { useState } from "react"
 import { ScrollView } from "react-native"
 import { mobileTheme } from "../../theme"
+import { CategoryFilterModal } from "./CategoryFilterModal"
 import type {
   MobileTransactionFilters,
   TransactionPeriod,
 } from "./transactionPresentation"
+import { toggleTransactionFilterValue } from "./transactionPresentation"
 
 interface TransactionFilterPanelProps {
   categories: Category[]
@@ -41,6 +44,15 @@ const statusOptions: FilterOption<MobileTransactionFilters["status"]>[] = [
   { label: "합계 제외", value: "excluded" },
 ]
 
+const structureOptions: FilterOption<MobileTransactionFilters["structure"]>[] =
+  [
+    { label: "전체", value: "" },
+    { label: "일반", value: "regular" },
+    { label: "고정", value: "fixed" },
+    { label: "할부", value: "installment" },
+    { label: "분할", value: "split" },
+  ]
+
 export function TransactionFilterPanel({
   categories,
   filters,
@@ -48,65 +60,108 @@ export function TransactionFilterPanel({
   onChange,
   onReset,
 }: TransactionFilterPanelProps) {
-  return (
-    <Panel>
-      <PanelHeading>
-        <PanelTitle>거래 필터</PanelTitle>
-        <ResetButton accessibilityRole="button" onPress={onReset}>
-          <ResetLabel>초기화</ResetLabel>
-        </ResetButton>
-      </PanelHeading>
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false)
+  const selectedCategory = categories.find(
+    (category) => category.id === filters.categoryId,
+  )
+  const selectedCategoryLabel = selectedCategory
+    ? `${getCategoryLabel(categories, selectedCategory.id)}${
+        selectedCategory.isArchived ? " · 보관됨" : ""
+      }`
+    : "전체 카테고리"
 
-      <FilterGroup
-        label="기간"
-        options={periodOptions}
-        selectedValue={filters.period}
-        onSelect={(period) => onChange({ ...filters, period })}
-      />
-      <FilterGroup
-        label="유형"
-        options={typeOptions}
-        selectedValue={filters.type}
-        onSelect={(type) => onChange({ ...filters, type })}
-      />
-      <FilterGroup
-        label="상태"
-        options={statusOptions}
-        selectedValue={filters.status}
-        onSelect={(status) => onChange({ ...filters, status })}
-      />
-      <FilterGroup
-        label="카테고리"
-        options={[
-          { label: "전체", value: "" },
-          ...categories.map((category) => ({
-            label: `${getCategoryLabel(categories, category.id)}${
-              category.isArchived ? " · 보관됨" : ""
-            }`,
-            value: category.id,
-          })),
-        ]}
-        selectedValue={filters.categoryId}
+  return (
+    <>
+      <Panel>
+        <PanelHeading>
+          <PanelTitle>거래 필터</PanelTitle>
+          <ResetButton accessibilityRole="button" onPress={onReset}>
+            <ResetLabel>초기화</ResetLabel>
+          </ResetButton>
+        </PanelHeading>
+
+        <FilterGroup
+          defaultValue="all"
+          label="기간"
+          options={periodOptions}
+          selectedValue={filters.period}
+          onSelect={(period) => onChange({ ...filters, period })}
+        />
+        <FilterGroup
+          defaultValue=""
+          label="유형"
+          options={typeOptions}
+          selectedValue={filters.type}
+          onSelect={(type) => onChange({ ...filters, type })}
+        />
+        <FilterGroup
+          defaultValue=""
+          label="상태"
+          options={statusOptions}
+          selectedValue={filters.status}
+          onSelect={(status) => onChange({ ...filters, status })}
+        />
+        <FilterGroup
+          defaultValue=""
+          label="거래 형태"
+          options={structureOptions}
+          selectedValue={filters.structure}
+          onSelect={(structure) => onChange({ ...filters, structure })}
+        />
+
+        <Group>
+          <GroupLabel>카테고리</GroupLabel>
+          <CategorySelector
+            $selected={Boolean(filters.categoryId)}
+            accessibilityHint="검색 가능한 카테고리 목록을 엽니다."
+            accessibilityRole="button"
+            onPress={() => setCategoryModalOpen(true)}
+          >
+            <CategorySelectorCopy>
+              <CategorySelectorLabel $selected={Boolean(filters.categoryId)}>
+                {selectedCategoryLabel}
+              </CategorySelectorLabel>
+              <CategorySelectorHint>
+                {filters.categoryId
+                  ? "선택됨 · 다시 선택하면 해제"
+                  : `${categories.length}개 중 검색하여 선택`}
+              </CategorySelectorHint>
+            </CategorySelectorCopy>
+            <CategorySelectorAction>
+              {filters.categoryId ? "변경" : "선택"}
+            </CategorySelectorAction>
+          </CategorySelector>
+        </Group>
+
+        <FilterGroup
+          defaultValue=""
+          label="거래자"
+          options={[
+            { label: "전체", value: "" },
+            { label: "공통", value: "common" },
+            ...members.map((member) => ({
+              label: member.nickname,
+              value: member.userId,
+            })),
+          ]}
+          selectedValue={filters.actorUserId}
+          onSelect={(actorUserId) => onChange({ ...filters, actorUserId })}
+        />
+      </Panel>
+
+      <CategoryFilterModal
+        categories={categories}
+        selectedCategoryId={filters.categoryId}
+        visible={categoryModalOpen}
+        onClose={() => setCategoryModalOpen(false)}
         onSelect={(categoryId) => onChange({ ...filters, categoryId })}
       />
-      <FilterGroup
-        label="거래자"
-        options={[
-          { label: "전체", value: "" },
-          { label: "공통", value: "common" },
-          ...members.map((member) => ({
-            label: member.nickname,
-            value: member.userId,
-          })),
-        ]}
-        selectedValue={filters.actorUserId}
-        onSelect={(actorUserId) => onChange({ ...filters, actorUserId })}
-      />
-    </Panel>
+    </>
   )
 }
 
 interface FilterGroupProps<T extends string> {
+  defaultValue: T
   label: string
   onSelect: (value: T) => void
   options: FilterOption<T>[]
@@ -114,6 +169,7 @@ interface FilterGroupProps<T extends string> {
 }
 
 function FilterGroup<T extends string>({
+  defaultValue,
   label,
   onSelect,
   options,
@@ -135,7 +191,15 @@ function FilterGroup<T extends string>({
               $selected={selected}
               accessibilityRole="button"
               accessibilityState={{ selected }}
-              onPress={() => onSelect(option.value)}
+              onPress={() =>
+                onSelect(
+                  toggleTransactionFilterValue(
+                    selectedValue,
+                    option.value,
+                    defaultValue,
+                  ),
+                )
+              }
             >
               <FilterChipLabel $selected={selected} numberOfLines={1}>
                 {option.label}
@@ -189,6 +253,50 @@ const GroupLabel = styled.Text({
   color: mobileTheme.colors.muted,
   fontSize: 10,
   fontWeight: "700",
+})
+
+const CategorySelector = styled.Pressable<{ $selected: boolean }>(
+  ({ $selected }) => ({
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: mobileTheme.spacing[3],
+    borderWidth: 1,
+    borderColor: $selected
+      ? mobileTheme.colors.teal
+      : mobileTheme.colors.border,
+    borderRadius: mobileTheme.radii.md,
+    backgroundColor: $selected
+      ? mobileTheme.colors.tealSoft
+      : mobileTheme.colors.panelSubtle,
+    paddingVertical: mobileTheme.spacing[3],
+    paddingHorizontal: mobileTheme.spacing[4],
+  }),
+)
+
+const CategorySelectorCopy = styled.View({ minWidth: 0, flex: 1 })
+
+const CategorySelectorLabel = styled.Text<{ $selected: boolean }>(
+  ({ $selected }) => ({
+    color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 18,
+  }),
+)
+
+const CategorySelectorHint = styled.Text({
+  marginTop: mobileTheme.spacing[1],
+  color: mobileTheme.colors.muted,
+  fontSize: 9,
+  lineHeight: 14,
+})
+
+const CategorySelectorAction = styled.Text({
+  flexShrink: 0,
+  color: mobileTheme.colors.teal,
+  fontSize: 11,
+  fontWeight: "800",
 })
 
 const FilterChip = styled.Pressable<{ $selected: boolean }>(

@@ -17,6 +17,7 @@ import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
 import { TransactionFilterPanel } from "./TransactionFilterPanel"
 import { TransactionListRow } from "./TransactionListRow"
+import { TransactionsSkeleton } from "./TransactionsSkeleton"
 import {
   calculateTransactionTotals,
   defaultTransactionFilters,
@@ -66,6 +67,16 @@ export const TransactionsScreen = observer(function TransactionsScreen() {
       store.selectedMonth,
     ],
   )
+  const splitCountByTransaction = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const split of store.financeData.transactionSplits) {
+      counts.set(
+        split.transactionId,
+        (counts.get(split.transactionId) ?? 0) + 1,
+      )
+    }
+    return counts
+  }, [store.financeData.transactionSplits])
   const sections = useMemo(
     () => groupTransactionsByDate(filteredTransactions),
     [filteredTransactions],
@@ -82,7 +93,11 @@ export const TransactionsScreen = observer(function TransactionsScreen() {
   }, [store.selectedLedgerId, store.selectedMonth])
 
   if (store.dataStatus === "idle" || store.dataStatus === "loading") {
-    return <TransactionsState message="거래 내역을 불러오고 있어요." />
+    return (
+      <Page edges={safeAreaEdges}>
+        <TransactionsSkeleton />
+      </Page>
+    )
   }
   if (store.dataStatus === "error") {
     return (
@@ -108,6 +123,7 @@ export const TransactionsScreen = observer(function TransactionsScreen() {
       <TransactionListRow
         categories={categories}
         members={members}
+        splitCount={splitCountByTransaction.get(item.id) ?? 0}
         transaction={item}
         onPress={() => openTransaction(item.id)}
       />
@@ -285,6 +301,7 @@ function countActiveFilters(filters: MobileTransactionFilters): number {
     filters.period !== "all",
     Boolean(filters.type),
     Boolean(filters.status),
+    Boolean(filters.structure),
     Boolean(filters.categoryId),
     Boolean(filters.actorUserId),
     Boolean(filters.keyword.trim()),
