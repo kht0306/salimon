@@ -1,7 +1,7 @@
 import styled from "@emotion/native"
 import { getCategoryLabel } from "@salimon/domain"
 import type { Category, LedgerMember } from "@salimon/types"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { ScrollView } from "react-native"
 import { mobileTheme } from "../../theme"
 import { CategoryFilterModal } from "./CategoryFilterModal"
@@ -61,14 +61,25 @@ export function TransactionFilterPanel({
   onReset,
 }: TransactionFilterPanelProps) {
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
-  const selectedCategory = categories.find(
-    (category) => category.id === filters.categoryId,
+  const categoriesById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category])),
+    [categories],
   )
-  const selectedCategoryLabel = selectedCategory
-    ? `${getCategoryLabel(categories, selectedCategory.id)}${
-        selectedCategory.isArchived ? " · 보관됨" : ""
-      }`
+  const selectedCategories = useMemo(
+    () =>
+      filters.categoryIds.flatMap((categoryId) => {
+        const category = categoriesById.get(categoryId)
+        return category ? [category] : []
+      }),
+    [categoriesById, filters.categoryIds],
+  )
+  const firstSelectedCategory = selectedCategories[0]
+  const selectedCategoryLabel = firstSelectedCategory
+    ? `${getCategoryLabel(categories, firstSelectedCategory.id)}${
+        firstSelectedCategory.isArchived ? " · 보관됨" : ""
+      }${selectedCategories.length > 1 ? ` 외 ${selectedCategories.length - 1}개` : ""}`
     : "전체 카테고리"
+  const hasSelectedCategories = filters.categoryIds.length > 0
 
   return (
     <>
@@ -112,23 +123,23 @@ export function TransactionFilterPanel({
         <Group>
           <GroupLabel>카테고리</GroupLabel>
           <CategorySelector
-            $selected={Boolean(filters.categoryId)}
+            $selected={hasSelectedCategories}
             accessibilityHint="검색 가능한 카테고리 목록을 엽니다."
             accessibilityRole="button"
             onPress={() => setCategoryModalOpen(true)}
           >
             <CategorySelectorCopy>
-              <CategorySelectorLabel $selected={Boolean(filters.categoryId)}>
+              <CategorySelectorLabel $selected={hasSelectedCategories}>
                 {selectedCategoryLabel}
               </CategorySelectorLabel>
               <CategorySelectorHint>
-                {filters.categoryId
-                  ? "선택됨 · 다시 선택하면 해제"
+                {hasSelectedCategories
+                  ? `${filters.categoryIds.length}개 선택 · 눌러서 변경`
                   : `${categories.length}개 중 검색하여 선택`}
               </CategorySelectorHint>
             </CategorySelectorCopy>
             <CategorySelectorAction>
-              {filters.categoryId ? "변경" : "선택"}
+              {hasSelectedCategories ? "변경" : "선택"}
             </CategorySelectorAction>
           </CategorySelector>
         </Group>
@@ -149,13 +160,17 @@ export function TransactionFilterPanel({
         />
       </Panel>
 
-      <CategoryFilterModal
-        categories={categories}
-        selectedCategoryId={filters.categoryId}
-        visible={categoryModalOpen}
-        onClose={() => setCategoryModalOpen(false)}
-        onSelect={(categoryId) => onChange({ ...filters, categoryId })}
-      />
+      {categoryModalOpen ? (
+        <CategoryFilterModal
+          categories={categories}
+          selectedCategoryIds={filters.categoryIds}
+          onApply={(categoryIds) => {
+            onChange({ ...filters, categoryIds })
+            setCategoryModalOpen(false)
+          }}
+          onClose={() => setCategoryModalOpen(false)}
+        />
+      ) : null}
     </>
   )
 }
