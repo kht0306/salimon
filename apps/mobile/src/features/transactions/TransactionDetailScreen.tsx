@@ -2,8 +2,9 @@ import styled from "@emotion/native"
 import { formatKrw, getCategoryLabel } from "@salimon/domain"
 import type { Transaction } from "@salimon/types"
 import { Redirect, router, useLocalSearchParams } from "expo-router"
+import * as WebBrowser from "expo-web-browser"
 import { observer } from "mobx-react-lite"
-import { ScrollView } from "react-native"
+import { Alert, ScrollView } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
@@ -16,6 +17,7 @@ import {
   transactionStructureLabels,
   transactionTypeLabel,
 } from "./transactionPresentation"
+import { isGeneralMobileTransaction } from "./transactionDraft"
 
 const safeAreaEdges = ["top", "bottom"] as const
 const scrollContentStyle = { paddingBottom: 32 } as const
@@ -76,6 +78,14 @@ export const TransactionDetailScreen = observer(
       transaction,
       splits.length,
     ).join(" · ")
+    const isGeneralTransaction = isGeneralMobileTransaction(
+      transaction,
+      splits.length,
+    )
+    const canMutate =
+      store.canMutateCurrentLedger &&
+      transaction.ledgerId === store.selectedLedgerId &&
+      isGeneralTransaction
     const paymentLabel = transactionPaymentLabel(transaction, paymentMethod)
     const title =
       transaction.merchantName ??
@@ -110,6 +120,40 @@ export const TransactionDetailScreen = observer(
               </TransactionDate>
             </AmountCard>
 
+            {canMutate ? (
+              <ActionRow>
+                <EditButton
+                  accessibilityRole="button"
+                  disabled={store.transactionMutationState !== "idle"}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/transactions/[id]/edit",
+                      params: { id: transaction.id },
+                    })
+                  }
+                >
+                  <EditButtonLabel>수정</EditButtonLabel>
+                </EditButton>
+                <DeleteButton
+                  accessibilityRole="button"
+                  disabled={store.transactionMutationState !== "idle"}
+                  onPress={() => confirmDelete(transaction.id)}
+                >
+                  <DeleteButtonLabel>
+                    {store.transactionMutationState === "deleting"
+                      ? "삭제 중..."
+                      : "삭제"}
+                  </DeleteButtonLabel>
+                </DeleteButton>
+              </ActionRow>
+            ) : null}
+
+            {store.transactionMutationErrorMessage ? (
+              <MutationError accessibilityLiveRegion="assertive">
+                {store.transactionMutationErrorMessage}
+              </MutationError>
+            ) : null}
+
             {structureLabel ? (
               <ReadOnlyNotice>
                 <ReadOnlyTitle>{structureLabel}</ReadOnlyTitle>
@@ -117,6 +161,12 @@ export const TransactionDetailScreen = observer(
                   고정·할부·분할 거래는 모바일에서 안전하게 조회만 할 수
                   있습니다. 변경은 웹에서 관리해 주세요.
                 </ReadOnlyDescription>
+                <WebManageButton
+                  accessibilityRole="button"
+                  onPress={() => void openWebTransactions()}
+                >
+                  <WebManageButtonLabel>웹에서 관리</WebManageButtonLabel>
+                </WebManageButton>
               </ReadOnlyNotice>
             ) : null}
 
@@ -235,8 +285,42 @@ export const TransactionDetailScreen = observer(
         </ScrollView>
       </Page>
     )
+
+    function confirmDelete(transactionId: string): void {
+      Alert.alert(
+        "거래를 삭제할까요?",
+        "삭제한 일반 거래는 월 합계와 목록에서 제외됩니다.",
+        [
+          { text: "취소", style: "cancel" },
+          {
+            text: "삭제",
+            style: "destructive",
+            onPress: () => void deleteTransaction(transactionId),
+          },
+        ],
+      )
+    }
+
+    async function deleteTransaction(transactionId: string): Promise<void> {
+      const deleted = await store.deleteGeneralTransaction(transactionId)
+      if (deleted) router.replace("/transactions")
+    }
   },
 )
+
+async function openWebTransactions(): Promise<void> {
+  const webUrl = process.env.EXPO_PUBLIC_WEB_URL?.replace(/\/$/, "")
+  if (!webUrl) {
+    Alert.alert("웹 주소 확인 필요", "모바일 웹 주소가 설정되지 않았습니다.")
+    return
+  }
+
+  try {
+    await WebBrowser.openBrowserAsync(`${webUrl}/transactions`)
+  } catch {
+    Alert.alert("웹을 열 수 없음", "잠시 후 다시 시도해 주세요.")
+  }
+}
 
 interface DetailRowProps {
   label: string
@@ -397,6 +481,75 @@ const ReadOnlyDescription = styled.Text({
   color: mobileTheme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
+})
+
+const WebManageButton = styled.Pressable({
+  minHeight: 40,
+  alignSelf: "flex-start",
+  justifyContent: "center",
+  marginTop: mobileTheme.spacing[2],
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.violet,
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: mobileTheme.colors.panel,
+  paddingHorizontal: mobileTheme.spacing[3],
+})
+
+const WebManageButtonLabel = styled.Text({
+  color: mobileTheme.colors.violet,
+  fontSize: 11,
+  fontWeight: "800",
+})
+
+const ActionRow = styled.View({
+  flexDirection: "row",
+  gap: mobileTheme.spacing[2],
+})
+
+const EditButton = styled.Pressable(({ disabled }) => ({
+  minHeight: 46,
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: mobileTheme.colors.teal,
+  opacity: disabled ? 0.45 : 1,
+}))
+
+const EditButtonLabel = styled.Text({
+  color: mobileTheme.colors.panel,
+  fontSize: 13,
+  fontWeight: "800",
+})
+
+const DeleteButton = styled.Pressable(({ disabled }) => ({
+  minHeight: 46,
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.coral,
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: mobileTheme.colors.panel,
+  opacity: disabled ? 0.45 : 1,
+}))
+
+const DeleteButtonLabel = styled.Text({
+  color: mobileTheme.colors.coral,
+  fontSize: 13,
+  fontWeight: "800",
+})
+
+const MutationError = styled.Text({
+  borderLeftWidth: 3,
+  borderLeftColor: mobileTheme.colors.coral,
+  backgroundColor: mobileTheme.colors.coralSoft,
+  color: mobileTheme.colors.coral,
+  fontSize: 11,
+  fontWeight: "700",
+  lineHeight: 17,
+  paddingVertical: mobileTheme.spacing[3],
+  paddingHorizontal: mobileTheme.spacing[4],
 })
 
 const Section = styled.View({

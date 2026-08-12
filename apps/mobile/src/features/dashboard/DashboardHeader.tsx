@@ -1,5 +1,6 @@
 import styled from "@emotion/native"
 import { formatKoreanDate } from "@salimon/domain"
+import { router } from "expo-router"
 import { observer } from "mobx-react-lite"
 import { Pressable } from "react-native"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
@@ -31,15 +32,28 @@ export const DashboardHeader = observer(function DashboardHeader({
             <BrandContext>{store.currentLedgerName}</BrandContext>
           </BrandCopy>
         </BrandLockup>
-        <RefreshButton
-          accessibilityLabel="현재 월 새로고침"
-          accessibilityRole="button"
-          accessibilityState={{ disabled: isRefreshing }}
-          disabled={isRefreshing}
-          onPress={() => void store.refreshSelectedMonth()}
-        >
-          <RefreshLabel>{isRefreshing ? "갱신 중" : "새로 고침"}</RefreshLabel>
-        </RefreshButton>
+        <AppBarActions>
+          {store.canMutateCurrentLedger ? (
+            <CreateButton
+              accessibilityLabel="새 거래 추가"
+              accessibilityRole="button"
+              onPress={() => router.push("/transactions/new")}
+            >
+              <CreateLabel>거래 추가</CreateLabel>
+            </CreateButton>
+          ) : null}
+          <RefreshButton
+            accessibilityLabel="현재 월 새로고침"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isRefreshing }}
+            disabled={isRefreshing}
+            onPress={() => void store.refreshSelectedMonth()}
+          >
+            <RefreshLabel>
+              {isRefreshing ? "갱신 중" : "새로 고침"}
+            </RefreshLabel>
+          </RefreshButton>
+        </AppBarActions>
       </AppBar>
 
       <HeadingCopy>
@@ -126,6 +140,12 @@ const BrandInitial = styled.Text`
 
 const BrandCopy = styled.View({ minWidth: 0, flex: 1 })
 
+const AppBarActions = styled.View({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: mobileTheme.spacing[2],
+})
+
 const BrandName = styled.Text`
   color: ${mobileTheme.colors.ink};
   font-size: 15px;
@@ -183,6 +203,21 @@ const RefreshLabel = styled.Text`
   font-size: 11px;
   font-weight: 800;
 `
+
+const CreateButton = styled(Pressable)({
+  minHeight: 40,
+  justifyContent: "center",
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: mobileTheme.colors.teal,
+  paddingVertical: mobileTheme.spacing[2],
+  paddingHorizontal: mobileTheme.spacing[3],
+})
+
+const CreateLabel = styled.Text({
+  color: mobileTheme.colors.panel,
+  fontSize: 11,
+  fontWeight: "800",
+})
 
 const OfflineNotice = styled.View({
   borderLeftWidth: 3,

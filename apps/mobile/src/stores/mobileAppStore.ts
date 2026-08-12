@@ -6,6 +6,7 @@ import {
   type AuthUserInfo,
   type FinanceData,
   type FinanceLoadOptions,
+  type RemoteTransactionInput,
   type TransactionDateRange,
 } from "@salimon/api-client"
 import {
@@ -33,12 +34,18 @@ import {
   type MonthDaySummary,
   type TransactionTotals,
 } from "../features/dashboard/dashboardPresentation"
+import { isGeneralMobileTransaction } from "../features/transactions/transactionDraft"
 import { QueryCache } from "../infrastructure/queryCache"
 import { requireSupabaseMobileClient } from "../infrastructure/supabase"
 
 type MobileFinanceRepository = Pick<
   SupabaseFinanceRepository,
-  "acceptLegalTerms" | "createLedger" | "load" | "materializeMonth"
+  | "acceptLegalTerms"
+  | "createLedger"
+  | "load"
+  | "materializeMonth"
+  | "saveTransaction"
+  | "softDeleteTransaction"
 >
 
 export type MobileAuthState =
@@ -56,6 +63,11 @@ export type MobileDataStatus =
   | "stale"
   | "error"
 export type MobileConsentStatus = "idle" | "saving" | "error"
+export type MobileTransactionMutationState = "idle" | "saving" | "deleting"
+
+export type MobileTransactionSaveResult =
+  | { status: "saved"; transactionId: string }
+  | { status: "error" }
 
 export interface MobileCategoryBudgetProgress {
   amount: number
@@ -72,9 +84,11 @@ export class MobileAppStore {
   financeData: FinanceData = createEmptyFinanceData()
   dataStatus: MobileDataStatus = "idle"
   consentStatus: MobileConsentStatus = "idle"
+  transactionMutationState: MobileTransactionMutationState = "idle"
   authErrorMessage?: string
   dataErrorMessage?: string
   consentErrorMessage?: string
+  transactionMutationErrorMessage?: string
 
   private activeSessionUserId?: string
   private dataRequestSequence = 0
@@ -134,6 +148,15 @@ export class MobileAppStore {
 
   get currentLedgerName(): string {
     return this.currentLedger?.name ?? "내 가계부"
+  }
+
+  get canMutateCurrentLedger(): boolean {
+    return (
+      this.dataStatus !== "stale" &&
+      this.dataStatus !== "error" &&
+      Boolean(this.currentLedger) &&
+      this.currentLedger?.role !== "viewer"
+    )
   }
 
   get monthTransactions(): Transaction[] {
@@ -404,6 +427,111 @@ export class MobileAppStore {
     await this.loadSelectedMonth(this.selectedMonth, true)
   }
 
+  clearTransactionMutationError(): void {
+    this.transactionMutationErrorMessage = undefined
+  }
+
+  async saveGeneralTransaction(
+    input: RemoteTransactionInput,
+  ): Promise<MobileTransactionSaveResult> {
+    if (this.transactionMutationState !== "idle") {
+      return { status: "error" }
+    }
+    if (
+      !this.authUser ||
+      !this.canMutateCurrentLedger ||
+      input.ledgerId !== this.selectedLedgerId ||
+      input.recurringType ||
+      input.recurringRuleId ||
+      (input.splits?.length ?? 0) > 0
+    ) {
+      this.transactionMutationErrorMessage =
+        "현재 가계부에서 일반 거래를 저장할 권한이 없습니다."
+      return { status: "error" }
+    }
+
+    this.transactionMutationState = "saving"
+    this.transactionMutationErrorMessage = undefined
+
+    try {
+      const transactionId = await this.repository.saveTransaction(
+        this.authUser.id,
+        input,
+      )
+      const savedTransactionId = transactionId ?? input.id
+      if (!savedTransactionId) {
+        throw new Error("저장된 거래를 확인하지 못했습니다.")
+      }
+
+      this.selectedDate = toDateKey(new Date(input.transactionAt))
+      await this.loadSelectedMonth(
+        toMonthKey(new Date(input.transactionAt)),
+        true,
+      )
+      runInAction(() => {
+        this.transactionMutationState = "idle"
+      })
+      return { status: "saved", transactionId: savedTransactionId }
+    } catch (error) {
+      runInAction(() => {
+        this.transactionMutationState = "idle"
+        this.transactionMutationErrorMessage = errorMessage(
+          error,
+          input.id
+            ? "거래를 수정하지 못했습니다. 입력 내용은 그대로 유지됩니다."
+            : "거래를 저장하지 못했습니다. 입력 내용은 그대로 유지됩니다.",
+        )
+      })
+      return { status: "error" }
+    }
+  }
+
+  async deleteGeneralTransaction(transactionId: string): Promise<boolean> {
+    if (this.transactionMutationState !== "idle") return false
+
+    const transaction = this.financeData.transactions.find(
+      (item) => item.id === transactionId && !item.deletedAt,
+    )
+    const splitCount = this.financeData.transactionSplits.filter(
+      (split) => split.transactionId === transactionId,
+    ).length
+    if (
+      !this.authUser ||
+      !this.canMutateCurrentLedger ||
+      !transaction ||
+      transaction.ledgerId !== this.selectedLedgerId ||
+      !isGeneralMobileTransaction(transaction, splitCount)
+    ) {
+      this.transactionMutationErrorMessage =
+        "일반 거래만 모바일에서 삭제할 수 있습니다."
+      return false
+    }
+
+    this.transactionMutationState = "deleting"
+    this.transactionMutationErrorMessage = undefined
+
+    try {
+      await this.repository.softDeleteTransaction(
+        transactionId,
+        this.authUser.id,
+      )
+      await this.loadSelectedMonth(this.selectedMonth, true)
+      runInAction(() => {
+        this.transactionMutationState = "idle"
+      })
+      return true
+    } catch (error) {
+      runInAction(() => {
+        this.transactionMutationState = "idle"
+        this.transactionMutationErrorMessage = errorMessage(
+          error,
+          "거래를 삭제하지 못했습니다.",
+        )
+      })
+      return false
+    }
+  }
+
   async moveSelectedMonth(amount: number): Promise<void> {
     const month = moveMonth(this.selectedMonth, amount)
     this.selectedDate = `${month}-01`
@@ -557,6 +685,8 @@ export class MobileAppStore {
     this.dataErrorMessage = undefined
     this.consentStatus = "idle"
     this.consentErrorMessage = undefined
+    this.transactionMutationState = "idle"
+    this.transactionMutationErrorMessage = undefined
     this.financeQueryCache.clear()
   }
 
