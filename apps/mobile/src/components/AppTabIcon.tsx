@@ -3,7 +3,7 @@ import { mobileTheme } from "../theme"
 
 interface AppTabIconProps {
   active: boolean
-  name: "home" | "settings" | "transactions"
+  name: "home" | "settings" | "settlement" | "transactions"
 }
 
 interface IconShapeProps {
@@ -21,7 +21,36 @@ export function AppTabIcon({ active, name }: AppTabIconProps) {
     >
       {name === "home" ? <HomeIcon color={color} /> : null}
       {name === "transactions" ? <TransactionsIcon color={color} /> : null}
+      {name === "settlement" ? <SettlementIcon color={color} /> : null}
       {name === "settings" ? <SettingsIcon color={color} /> : null}
+    </View>
+  )
+}
+
+function SettlementIcon({ color }: IconShapeProps) {
+  return (
+    <View style={styles.shapeFrame}>
+      <View
+        style={[
+          styles.settlementBase,
+          styles.settlementBaseTop,
+          { backgroundColor: color },
+        ]}
+      />
+      <View
+        style={[
+          styles.settlementBase,
+          styles.settlementBaseMiddle,
+          { backgroundColor: color },
+        ]}
+      />
+      <View
+        style={[
+          styles.settlementBase,
+          styles.settlementBaseBottom,
+          { backgroundColor: color },
+        ]}
+      />
     </View>
   )
 }
@@ -206,4 +235,13 @@ const styles = StyleSheet.create({
   knobTop: { top: 1, left: 4 },
   knobMiddle: { top: 7, right: 3 },
   knobBottom: { top: 13, left: 7 },
+  settlementBase: {
+    position: "absolute",
+    left: 2,
+    height: 4,
+    borderRadius: 2,
+  },
+  settlementBaseTop: { top: 2, width: 8 },
+  settlementBaseMiddle: { top: 8, width: 13 },
+  settlementBaseBottom: { top: 14, width: 18 },
 })

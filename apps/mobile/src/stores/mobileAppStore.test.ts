@@ -386,6 +386,38 @@ describe("MobileAppStore authentication", () => {
     })
   })
 
+  it("selects the month note for the current ledger only", async () => {
+    const data = createReadyFinanceData()
+    data.monthNotes = [
+      {
+        id: "note-current",
+        ledgerId: "ledger-1",
+        month: "2026-08",
+        note: "공과금 3만원은 다음 달 이월",
+        updatedBy: "user-1",
+        updatedAt: "2026-08-10T00:00:00+09:00",
+      },
+      {
+        id: "note-other-month",
+        ledgerId: "ledger-1",
+        month: "2026-07",
+        note: "지난달 메모",
+        updatedBy: "user-1",
+        updatedAt: "2026-07-10T00:00:00+09:00",
+      },
+    ]
+    const store = new MobileAppStore(
+      createRepository(data),
+      createAuthGateway(),
+      new Date("2026-08-10T12:00:00+09:00"),
+    )
+
+    await store.initializeAuth()
+
+    expect(store.selectedMonthNote?.id).toBe("note-current")
+    expect(store.selectedMonthNote?.note).toBe("공과금 3만원은 다음 달 이월")
+  })
+
   it("saves a general transaction once and force refreshes its month", async () => {
     const repository = createRepository()
     const store = new MobileAppStore(
