@@ -150,6 +150,14 @@ export class MobileAppStore {
     return this.currentLedger?.name ?? "내 가계부"
   }
 
+  get selectedMonthNote() {
+    return this.financeData.monthNotes.find(
+      (note) =>
+        note.ledgerId === this.selectedLedgerId &&
+        note.month === this.selectedMonth,
+    )
+  }
+
   get canMutateCurrentLedger(): boolean {
     return (
       this.dataStatus !== "stale" &&

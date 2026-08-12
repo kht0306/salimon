@@ -72,6 +72,16 @@ export default observer(function MainTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="settlement"
+        options={{
+          title: "정산",
+          tabBarAccessibilityLabel: "월 정산",
+          tabBarIcon: ({ focused }) => (
+            <AppTabIcon active={focused} name="settlement" />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: "설정",
