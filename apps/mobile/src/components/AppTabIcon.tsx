@@ -3,7 +3,7 @@ import { mobileTheme } from "../theme"
 
 interface AppTabIconProps {
   active: boolean
-  name: "home" | "settings"
+  name: "home" | "settings" | "transactions"
 }
 
 interface IconShapeProps {
@@ -19,11 +19,54 @@ export function AppTabIcon({ active, name }: AppTabIconProps) {
       importantForAccessibility="no-hide-descendants"
       style={styles.frame}
     >
-      {name === "home" ? (
-        <HomeIcon color={color} />
-      ) : (
-        <SettingsIcon color={color} />
-      )}
+      {name === "home" ? <HomeIcon color={color} /> : null}
+      {name === "transactions" ? <TransactionsIcon color={color} /> : null}
+      {name === "settings" ? <SettingsIcon color={color} /> : null}
+    </View>
+  )
+}
+
+function TransactionsIcon({ color }: IconShapeProps) {
+  return (
+    <View style={styles.shapeFrame}>
+      <View
+        style={[styles.listDot, styles.listDotTop, { backgroundColor: color }]}
+      />
+      <View
+        style={[
+          styles.listLine,
+          styles.listLineTop,
+          { backgroundColor: color },
+        ]}
+      />
+      <View
+        style={[
+          styles.listDot,
+          styles.listDotMiddle,
+          { backgroundColor: color },
+        ]}
+      />
+      <View
+        style={[
+          styles.listLine,
+          styles.listLineMiddle,
+          { backgroundColor: color },
+        ]}
+      />
+      <View
+        style={[
+          styles.listDot,
+          styles.listDotBottom,
+          { backgroundColor: color },
+        ]}
+      />
+      <View
+        style={[
+          styles.listLine,
+          styles.listLineBottom,
+          { backgroundColor: color },
+        ]}
+      />
     </View>
   )
 }
@@ -124,6 +167,26 @@ const styles = StyleSheet.create({
     width: 3,
     height: 5,
   },
+  listDot: {
+    position: "absolute",
+    left: 1,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  listDotTop: { top: 2 },
+  listDotMiddle: { top: 8 },
+  listDotBottom: { top: 14 },
+  listLine: {
+    position: "absolute",
+    left: 7,
+    width: 12,
+    height: 2,
+    borderRadius: 1,
+  },
+  listLineTop: { top: 3 },
+  listLineMiddle: { top: 9 },
+  listLineBottom: { top: 15 },
   sliderLine: {
     position: "absolute",
     left: 1,

@@ -62,6 +62,16 @@ export default observer(function MainTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="transactions"
+        options={{
+          title: "거래",
+          tabBarAccessibilityLabel: "거래 내역",
+          tabBarIcon: ({ focused }) => (
+            <AppTabIcon active={focused} name="transactions" />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: "설정",
