@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.salimon.notificationlistener'
+version = '0.1.0'
+
+expoModule {
+  canBePublished false
+}
+
+android {
+  namespace 'com.salimon.notificationlistener'
+
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+    testInstrumentationRunner 'com.salimon.notificationlistener.NotificationCaptureInstrumentation'
+  }
+}
