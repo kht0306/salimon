@@ -24,7 +24,7 @@ export type TransactionStructure =
 
 export interface MobileTransactionFilters {
   actorUserId: string
-  categoryId: string
+  categoryIds: string[]
   keyword: string
   period: TransactionPeriod
   status: "" | TransactionStatus
@@ -56,7 +56,7 @@ export interface TransactionTotals {
 
 export const defaultTransactionFilters: MobileTransactionFilters = {
   actorUserId: "",
-  categoryId: "",
+  categoryIds: [],
   keyword: "",
   period: "all",
   status: "",
@@ -75,9 +75,15 @@ export function filterTransactions(
     context.now,
   )
   const query = filters.keyword.trim().toLocaleLowerCase("ko-KR")
-  const selectedCategoryIds = filters.categoryId
-    ? getDescendantCategoryIds(context.categories, filters.categoryId)
-    : undefined
+  const selectedCategoryIds = new Set<string>()
+  for (const categoryId of filters.categoryIds) {
+    for (const descendantId of getDescendantCategoryIds(
+      context.categories,
+      categoryId,
+    )) {
+      selectedCategoryIds.add(descendantId)
+    }
+  }
   const splitsByTransaction = new Map<string, TransactionSplit[]>()
   for (const split of context.transactionSplits) {
     const splits = splitsByTransaction.get(split.transactionId) ?? []
@@ -114,7 +120,7 @@ export function filterTransactions(
       ) {
         return false
       }
-      if (selectedCategoryIds) {
+      if (selectedCategoryIds.size > 0) {
         const matchesCategory =
           transactionSplits.length > 0
             ? transactionSplits.some((split) =>

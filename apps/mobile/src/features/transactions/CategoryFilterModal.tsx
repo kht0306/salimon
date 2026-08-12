@@ -1,58 +1,61 @@
 import styled from "@emotion/native"
-import { getCategoryLabel } from "@salimon/domain"
 import type { Category } from "@salimon/types"
 import { useMemo, useState } from "react"
 import { FlatList, Modal, StyleSheet } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { mobileTheme } from "../../theme"
+import {
+  buildCategoryTreeOptions,
+  selectedCategoryAncestorIds,
+  toggleCategorySelection,
+  type CategoryTreeOption,
+} from "./categoryFilterPresentation"
 
 interface CategoryFilterModalProps {
   categories: Category[]
-  selectedCategoryId: string
-  visible: boolean
+  selectedCategoryIds: string[]
+  onApply: (categoryIds: string[]) => void
   onClose: () => void
-  onSelect: (categoryId: string) => void
-}
-
-interface CategoryOption {
-  category?: Category
-  id: string
-  label: string
 }
 
 const safeAreaEdges = ["bottom"] as const
 
 export function CategoryFilterModal({
   categories,
-  selectedCategoryId,
-  visible,
+  selectedCategoryIds,
+  onApply,
   onClose,
-  onSelect,
 }: CategoryFilterModalProps) {
+  const [draftCategoryIds, setDraftCategoryIds] = useState(() => [
+    ...selectedCategoryIds,
+  ])
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState(() =>
+    selectedCategoryAncestorIds(categories, selectedCategoryIds),
+  )
   const [query, setQuery] = useState("")
-  const options = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR")
-    const categoryOptions = categories.map<CategoryOption>((category) => ({
-      category,
-      id: category.id,
-      label: getCategoryLabel(categories, category.id),
-    }))
+  const searching = Boolean(query.trim())
+  const options = useMemo(
+    () => buildCategoryTreeOptions(categories, expandedCategoryIds, query),
+    [categories, expandedCategoryIds, query],
+  )
+  const draftCategoryIdSet = useMemo(
+    () => new Set(draftCategoryIds),
+    [draftCategoryIds],
+  )
 
-    if (!normalizedQuery) return categoryOptions
-    return categoryOptions.filter((option) =>
-      option.label.toLocaleLowerCase("ko-KR").includes(normalizedQuery),
+  function toggleCategory(categoryId: string): void {
+    setDraftCategoryIds((current) =>
+      toggleCategorySelection(current, categoryId),
     )
-  }, [categories, query])
-
-  function selectCategory(categoryId: string): void {
-    onSelect(categoryId === selectedCategoryId ? "" : categoryId)
-    setQuery("")
-    onClose()
   }
 
-  function closeModal(): void {
-    setQuery("")
-    onClose()
+  function toggleExpanded(categoryId: string): void {
+    setExpandedCategoryIds((current) => {
+      const next = new Set(current)
+      if (next.has(categoryId)) next.delete(categoryId)
+      else next.add(categoryId)
+      return next
+    })
   }
 
   return (
@@ -60,14 +63,14 @@ export function CategoryFilterModal({
       animationType="slide"
       statusBarTranslucent
       transparent
-      visible={visible}
-      onRequestClose={closeModal}
+      visible
+      onRequestClose={onClose}
     >
       <ModalRoot>
         <Backdrop
           accessibilityLabel="카테고리 선택 닫기"
           accessibilityRole="button"
-          onPress={closeModal}
+          onPress={onClose}
         />
         <Sheet edges={safeAreaEdges}>
           <SheetHandle />
@@ -75,12 +78,27 @@ export function CategoryFilterModal({
             <SheetHeading>
               <SheetTitle accessibilityRole="header">카테고리 선택</SheetTitle>
               <SheetDescription>
-                검색하거나 목록에서 하나를 선택하세요.
+                대분류는 하위 분류를 포함합니다. 여러 항목 선택 후 적용해
+                주세요.
               </SheetDescription>
             </SheetHeading>
-            <CloseButton accessibilityRole="button" onPress={closeModal}>
-              <CloseButtonLabel>닫기</CloseButtonLabel>
-            </CloseButton>
+            <HeaderActions>
+              <CloseButton accessibilityRole="button" onPress={onClose}>
+                <CloseButtonLabel>닫기</CloseButtonLabel>
+              </CloseButton>
+              <ApplyButton
+                accessibilityLabel={`카테고리 ${draftCategoryIds.length}개 적용`}
+                accessibilityRole="button"
+                onPress={() => onApply(draftCategoryIds)}
+              >
+                <ApplyButtonLabel>
+                  적용
+                  {draftCategoryIds.length > 0
+                    ? ` ${draftCategoryIds.length}`
+                    : ""}
+                </ApplyButtonLabel>
+              </ApplyButton>
+            </HeaderActions>
           </SheetHeader>
 
           <SearchInput
@@ -93,58 +111,78 @@ export function CategoryFilterModal({
             onChangeText={setQuery}
           />
 
-          {!query.trim() ? (
-            <CategoryRow
-              $selected={!selectedCategoryId}
+          {!searching ? (
+            <CategoryChoice
+              $selected={draftCategoryIds.length === 0}
+              accessibilityLabel="전체 카테고리"
               accessibilityRole="button"
-              accessibilityState={{ selected: !selectedCategoryId }}
-              onPress={() => selectCategory("")}
+              accessibilityState={{ selected: draftCategoryIds.length === 0 }}
+              onPress={() => setDraftCategoryIds([])}
             >
+              <TreeControlSpacer />
               <CategoryCopy>
-                <CategoryName $selected={!selectedCategoryId}>
+                <CategoryName $selected={draftCategoryIds.length === 0}>
                   전체 카테고리
                 </CategoryName>
-                <CategoryStatus>카테고리 필터를 적용하지 않음</CategoryStatus>
+                <CategoryStatus>
+                  선택한 카테고리를 모두 해제합니다.
+                </CategoryStatus>
               </CategoryCopy>
-              {!selectedCategoryId ? <SelectedMark>선택됨</SelectedMark> : null}
-            </CategoryRow>
+            </CategoryChoice>
           ) : null}
 
           <CategoryList
             contentContainerStyle={styles.listContent}
             data={options}
+            extraData={draftCategoryIds}
             keyboardShouldPersistTaps="handled"
-            keyExtractor={(option) => option.id}
+            keyExtractor={(option) => option.category.id}
             ListEmptyComponent={
               <EmptyMessage>검색 결과가 없습니다.</EmptyMessage>
             }
             renderItem={({ item }) => {
-              const selected = item.id === selectedCategoryId
+              const selected = draftCategoryIdSet.has(item.category.id)
+              const expanded = expandedCategoryIds.has(item.category.id)
               return (
-                <CategoryRow
-                  $selected={selected}
-                  accessibilityLabel={`${item.label}${
-                    selected ? ", 선택됨, 다시 누르면 해제" : ""
-                  }`}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  onPress={() => selectCategory(item.id)}
-                >
-                  <CategoryMarker
-                    style={{
-                      backgroundColor:
-                        item.category?.color ?? mobileTheme.colors.subtle,
-                    }}
-                  />
-                  <CategoryCopy>
-                    <CategoryName $selected={selected} numberOfLines={2}>
-                      {item.label}
-                    </CategoryName>
-                    {item.category?.isArchived ? (
-                      <CategoryStatus>보관된 카테고리</CategoryStatus>
-                    ) : null}
-                  </CategoryCopy>
-                  {selected ? <SelectedMark>선택됨</SelectedMark> : null}
+                <CategoryRow $depth={item.depth}>
+                  {!searching && item.hasChildren ? (
+                    <TreeControl
+                      accessibilityLabel={`${item.label} 하위 분류 ${
+                        expanded ? "접기" : "펼치기"
+                      }`}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded }}
+                      onPress={() => toggleExpanded(item.category.id)}
+                    >
+                      <TreeControlLabel>
+                        {expanded ? "−" : "+"}
+                      </TreeControlLabel>
+                    </TreeControl>
+                  ) : (
+                    <TreeControlSpacer />
+                  )}
+                  <CategoryChoice
+                    $selected={selected}
+                    accessibilityLabel={item.label}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => toggleCategory(item.category.id)}
+                  >
+                    <CategoryMarker
+                      style={{
+                        backgroundColor:
+                          item.category.color ?? mobileTheme.colors.subtle,
+                      }}
+                    />
+                    <CategoryCopy>
+                      <CategoryName $selected={selected} numberOfLines={2}>
+                        {item.label}
+                      </CategoryName>
+                      {item.category.isArchived ? (
+                        <CategoryStatus>보관된 카테고리</CategoryStatus>
+                      ) : null}
+                    </CategoryCopy>
+                  </CategoryChoice>
                 </CategoryRow>
               )
             }}
@@ -200,7 +238,7 @@ const SheetHeader = styled.View({
   paddingVertical: mobileTheme.spacing[4],
 })
 
-const SheetHeading = styled.View({ flex: 1, gap: mobileTheme.spacing[1] })
+const SheetHeading = styled.View({ minWidth: 0, flex: 1, gap: 2 })
 
 const SheetTitle = styled.Text({
   color: mobileTheme.colors.ink,
@@ -210,21 +248,43 @@ const SheetTitle = styled.Text({
 
 const SheetDescription = styled.Text({
   color: mobileTheme.colors.muted,
-  fontSize: 11,
-  lineHeight: 17,
+  fontSize: 10,
+  lineHeight: 15,
+})
+
+const HeaderActions = styled.View({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: mobileTheme.spacing[1],
 })
 
 const CloseButton = styled.Pressable({
-  minWidth: 48,
+  minWidth: 44,
   minHeight: 40,
   alignItems: "center",
   justifyContent: "center",
 })
 
 const CloseButtonLabel = styled.Text({
-  color: mobileTheme.colors.teal,
-  fontSize: 12,
+  color: mobileTheme.colors.muted,
+  fontSize: 11,
   fontWeight: "800",
+})
+
+const ApplyButton = styled.Pressable({
+  minWidth: 54,
+  minHeight: 40,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor: mobileTheme.colors.teal,
+  paddingHorizontal: mobileTheme.spacing[3],
+})
+
+const ApplyButtonLabel = styled.Text({
+  color: mobileTheme.colors.panel,
+  fontSize: 11,
+  fontWeight: "900",
 })
 
 const SearchInput = styled.TextInput({
@@ -239,16 +299,49 @@ const SearchInput = styled.TextInput({
   marginBottom: mobileTheme.spacing[3],
 })
 
-const CategoryList = styled(FlatList<CategoryOption>)({ flex: 1 })
+const CategoryList = styled(FlatList<CategoryTreeOption>)({ flex: 1 })
 
-const CategoryRow = styled.Pressable<{ $selected: boolean }>(
+const CategoryRow = styled.View<{ $depth: number }>(({ $depth }) => ({
+  minHeight: 58,
+  flexDirection: "row",
+  alignItems: "stretch",
+  borderBottomWidth: 1,
+  borderBottomColor: mobileTheme.colors.border,
+  paddingLeft: Math.min($depth, 3) * mobileTheme.spacing[4],
+}))
+
+const TreeControl = styled.Pressable({
+  width: 42,
+  minHeight: 52,
+  flexShrink: 0,
+  alignItems: "center",
+  justifyContent: "center",
+})
+
+const TreeControlSpacer = styled.View({ width: 42, flexShrink: 0 })
+
+const TreeControlLabel = styled.Text({
+  width: 24,
+  height: 24,
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.borderStrong,
+  borderRadius: mobileTheme.radii.xs,
+  color: mobileTheme.colors.teal,
+  fontSize: 17,
+  fontWeight: "700",
+  lineHeight: 21,
+  textAlign: "center",
+})
+
+const CategoryChoice = styled.Pressable<{ $selected: boolean }>(
   ({ $selected }) => ({
+    minWidth: 0,
     minHeight: 58,
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: mobileTheme.spacing[3],
-    borderBottomWidth: 1,
-    borderBottomColor: mobileTheme.colors.border,
+    borderRadius: mobileTheme.radii.sm,
     backgroundColor: $selected
       ? mobileTheme.colors.tealSoft
       : mobileTheme.colors.panel,
@@ -278,13 +371,6 @@ const CategoryStatus = styled.Text({
   color: mobileTheme.colors.muted,
   fontSize: 10,
   lineHeight: 15,
-})
-
-const SelectedMark = styled.Text({
-  flexShrink: 0,
-  color: mobileTheme.colors.teal,
-  fontSize: 10,
-  fontWeight: "800",
 })
 
 const EmptyMessage = styled.Text({

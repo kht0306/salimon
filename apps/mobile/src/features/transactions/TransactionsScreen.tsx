@@ -302,7 +302,7 @@ function countActiveFilters(filters: MobileTransactionFilters): number {
     Boolean(filters.type),
     Boolean(filters.status),
     Boolean(filters.structure),
-    Boolean(filters.categoryId),
+    filters.categoryIds.length > 0,
     Boolean(filters.actorUserId),
     Boolean(filters.keyword.trim()),
   ].filter(Boolean).length

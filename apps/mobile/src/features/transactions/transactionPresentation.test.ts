@@ -75,13 +75,35 @@ describe("mobile transaction presentation", () => {
   it("matches category descendants for direct and split transactions", () => {
     const result = filterTransactions(
       transactions,
-      { ...defaultTransactionFilters, categoryId: "living" },
+      { ...defaultTransactionFilters, categoryIds: ["living"] },
       context,
     )
 
     expect(result.map((transaction) => transaction.id)).toEqual([
       "recent",
       "split",
+    ])
+  })
+
+  it("matches the union of multiple selected category trees", () => {
+    const result = filterTransactions(
+      [
+        ...transactions,
+        createTransaction("archived-transaction", "expense", 8_000, 7, {
+          categoryId: "archived",
+        }),
+      ],
+      {
+        ...defaultTransactionFilters,
+        categoryIds: ["food", "archived"],
+      },
+      context,
+    )
+
+    expect(result.map((transaction) => transaction.id)).toEqual([
+      "recent",
+      "split",
+      "archived-transaction",
     ])
   })
 
