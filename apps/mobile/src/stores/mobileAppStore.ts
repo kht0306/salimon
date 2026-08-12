@@ -37,6 +37,10 @@ import {
 import { isGeneralMobileTransaction } from "../features/transactions/transactionDraft"
 import { QueryCache } from "../infrastructure/queryCache"
 import { requireSupabaseMobileClient } from "../infrastructure/supabase"
+import {
+  clearNotificationCaptureSession,
+  setAuthenticatedNotificationCaptureUser,
+} from "../native/notificationListener"
 
 type MobileFinanceRepository = Pick<
   SupabaseFinanceRepository,
@@ -251,6 +255,7 @@ export class MobileAppStore {
     try {
       const session = await this.authGateway.getCurrentSession()
       if (!session) {
+        await this.safelyClearNotificationCaptureSession()
         this.resetSession()
         return
       }
@@ -321,6 +326,12 @@ export class MobileAppStore {
     this.authState = "signingOut"
     this.authErrorMessage = undefined
     let logoutError: unknown
+
+    try {
+      await clearNotificationCaptureSession()
+    } catch (error) {
+      logoutError = error
+    }
 
     try {
       await this.authGateway.signOut()
@@ -592,6 +603,7 @@ export class MobileAppStore {
     if (!session) {
       const wasAuthenticated = Boolean(this.authUser)
       const wasSigningOut = this.authState === "signingOut"
+      void this.safelyClearNotificationCaptureSession()
       this.resetSession()
       if (wasAuthenticated && !wasSigningOut && event === "SIGNED_OUT") {
         this.authErrorMessage =
@@ -650,6 +662,12 @@ export class MobileAppStore {
 
   private async finishSessionActivation(userId: string): Promise<void> {
     try {
+      await setAuthenticatedNotificationCaptureUser(userId)
+    } catch {
+      // 알림 자동 수집 오류가 수동 가계부 로그인을 막지 않게 한다.
+    }
+
+    try {
       await this.authGateway.ensureProfile()
     } catch (error) {
       await this.rejectSession(error)
@@ -667,6 +685,8 @@ export class MobileAppStore {
       // 원래 인증 오류를 사용자에게 유지한다.
     }
 
+    await this.safelyClearNotificationCaptureSession()
+
     runInAction(() => {
       this.resetSession()
       this.authErrorMessage = errorMessage(
@@ -683,6 +703,14 @@ export class MobileAppStore {
     this.authUser = undefined
     this.authState = "anonymous"
     this.clearFinanceData()
+  }
+
+  private async safelyClearNotificationCaptureSession(): Promise<void> {
+    try {
+      await clearNotificationCaptureSession()
+    } catch {
+      // 인증 종료는 네이티브 저장소 정리 오류와 무관하게 계속한다.
+    }
   }
 
   private clearFinanceData(): void {

@@ -7,6 +7,10 @@ import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "@salimon/types"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { MobileAuthGateway } from "../features/auth/mobileAuth"
 import { QueryCache } from "../infrastructure/queryCache"
+import {
+  clearNotificationCaptureSession,
+  setAuthenticatedNotificationCaptureUser,
+} from "../native/notificationListener"
 import { MobileAppStore } from "./mobileAppStore"
 
 vi.mock("../features/auth/mobileAuth", () => ({
@@ -15,6 +19,11 @@ vi.mock("../features/auth/mobileAuth", () => ({
 
 vi.mock("../infrastructure/supabase", () => ({
   requireSupabaseMobileClient: vi.fn(),
+}))
+
+vi.mock("../native/notificationListener", () => ({
+  clearNotificationCaptureSession: vi.fn(async () => undefined),
+  setAuthenticatedNotificationCaptureUser: vi.fn(async () => undefined),
 }))
 
 const session: AuthSessionInfo = {
@@ -94,6 +103,8 @@ function createAuthGateway(
 describe("MobileAppStore authentication", () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vi.mocked(clearNotificationCaptureSession).mockClear()
+    vi.mocked(setAuthenticatedNotificationCaptureUser).mockClear()
   })
 
   it("restores the secure session and loads only the selected month", async () => {
@@ -118,6 +129,9 @@ describe("MobileAppStore authentication", () => {
         endExclusive: "2026-09-01T00:00:00+09:00",
       },
     })
+    expect(setAuthenticatedNotificationCaptureUser).toHaveBeenCalledWith(
+      "user-1",
+    )
   })
 
   it("returns to the login state without an error when login is cancelled", async () => {
@@ -207,6 +221,19 @@ describe("MobileAppStore authentication", () => {
     expect(store.financeData.ledgers).toEqual([])
     expect(store.financeData.transactions).toEqual([])
     expect(store.dataStatus).toBe("idle")
+    expect(clearNotificationCaptureSession).toHaveBeenCalled()
+  })
+
+  it("clears notification records when no secure session exists", async () => {
+    const gateway = createAuthGateway({
+      getCurrentSession: vi.fn(async () => null),
+    })
+    const store = new MobileAppStore(createRepository(), gateway)
+
+    await store.initializeAuth()
+
+    expect(clearNotificationCaptureSession).toHaveBeenCalledOnce()
+    expect(store.authState).toBe("anonymous")
   })
 
   it("returns safely to login when the restored session expires", async () => {
@@ -228,6 +255,7 @@ describe("MobileAppStore authentication", () => {
     expect(store.authErrorMessage).toBe(
       "로그인 세션이 만료되었습니다. 다시 로그인해 주세요.",
     )
+    expect(clearNotificationCaptureSession).toHaveBeenCalled()
   })
 
   it("records the current legal versions and reloads the account", async () => {
