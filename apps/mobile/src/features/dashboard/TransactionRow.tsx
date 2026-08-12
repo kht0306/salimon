@@ -7,11 +7,13 @@ import { transactionTypeLabel } from "./dashboardPresentation"
 interface TransactionRowProps {
   categories: Category[]
   transaction: Transaction
+  onPress: () => void
 }
 
 export function TransactionRow({
   categories,
   transaction,
+  onPress,
 }: TransactionRowProps) {
   const categoryLabel = getCategoryLabel(
     categories,
@@ -30,6 +32,8 @@ export function TransactionRow({
       )}, ${title}, ${typeLabel} ${formatKrw(transaction.amount)}${
         transaction.status === "excluded" ? ", 합계 제외" : ""
       }`}
+      accessibilityRole="button"
+      onPress={onPress}
     >
       <TypeMark $type={transaction.type}>
         <TypeInitial $type={transaction.type}>
@@ -51,7 +55,7 @@ export function TransactionRow({
   )
 }
 
-const Row = styled.View({
+const Row = styled.Pressable({
   minHeight: 68,
   flexDirection: "row",
   alignItems: "center",

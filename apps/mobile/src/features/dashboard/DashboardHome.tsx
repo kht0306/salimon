@@ -1,5 +1,6 @@
 import styled from "@emotion/native"
 import type { Transaction } from "@salimon/types"
+import { router } from "expo-router"
 import { observer } from "mobx-react-lite"
 import { FlatList, RefreshControl, useWindowDimensions } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
@@ -38,6 +39,12 @@ export const DashboardHome = observer(function DashboardHome() {
       <TransactionRow
         categories={store.financeData.categories}
         transaction={item}
+        onPress={() =>
+          router.push({
+            pathname: "/transactions/[id]",
+            params: { id: item.id },
+          })
+        }
       />
     )
   }
