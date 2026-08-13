@@ -1,6 +1,7 @@
 import styled from "@emotion/native"
 import { Redirect, Tabs } from "expo-router"
 import { observer } from "mobx-react-lite"
+import { useWindowDimensions } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppTabIcon } from "../../components/AppTabIcon"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
@@ -10,6 +11,11 @@ const safeAreaEdges = ["top", "bottom"] as const
 
 export default observer(function MainTabsLayout() {
   const store = useMobileAppStore()
+  const { fontScale, width } = useWindowDimensions()
+  const showTabLabels = fontScale < 1.3 && width >= 360
+  const tabBarHeight = showTabLabels
+    ? 64 + Math.round(Math.max(0, fontScale - 1) * 28)
+    : 64
 
   if (store.authState === "anonymous") {
     return <Redirect href="/auth/login" />
@@ -38,8 +44,10 @@ export default observer(function MainTabsLayout() {
           fontSize: 13,
           fontWeight: "800",
         },
+        tabBarHideOnKeyboard: true,
+        tabBarShowLabel: showTabLabels,
         tabBarStyle: {
-          height: 64,
+          height: tabBarHeight,
           backgroundColor: mobileTheme.colors.panel,
           borderTopColor: mobileTheme.colors.border,
           paddingHorizontal: 12,

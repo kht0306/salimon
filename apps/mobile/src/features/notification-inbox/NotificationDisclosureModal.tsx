@@ -26,7 +26,12 @@ export function NotificationDisclosureModal({
       visible
       onRequestClose={busy ? undefined : onClose}
     >
-      <Page edges={safeAreaEdges}>
+      <Page
+        accessibilityViewIsModal
+        edges={safeAreaEdges}
+        importantForAccessibility="yes"
+        onAccessibilityEscape={busy ? undefined : onClose}
+      >
         <Content contentContainerStyle={styles.content}>
           <Eyebrow>선택 기능</Eyebrow>
           <Title accessibilityRole="header">결제 알림 후보함 사용 안내</Title>
@@ -58,11 +63,20 @@ export function NotificationDisclosureModal({
           </DisclosureList>
 
           <ConfirmRow
+            accessibilityLabel="위 내용을 이해했으며 알림 감지에 동의합니다."
             accessibilityRole="checkbox"
-            accessibilityState={{ checked: confirmed }}
+            accessibilityState={{ checked: confirmed, disabled: busy }}
+            disabled={busy}
             onPress={() => setConfirmed((value) => !value)}
           >
-            <Checkbox $checked={confirmed}>{confirmed ? "✓" : ""}</Checkbox>
+            <Checkbox
+              $checked={confirmed}
+              accessibilityElementsHidden
+              allowFontScaling={false}
+              importantForAccessibility="no"
+            >
+              {confirmed ? "✓" : ""}
+            </Checkbox>
             <ConfirmText>
               위 내용을 이해했으며 알림 감지에 동의합니다.
             </ConfirmText>

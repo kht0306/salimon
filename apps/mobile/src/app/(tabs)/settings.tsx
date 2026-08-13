@@ -25,6 +25,12 @@ export default observer(function SettingsScreen() {
   const [disclosureBusy, setDisclosureBusy] = useState(false)
   const [selectedPackages, setSelectedPackages] = useState<string[]>([])
   const [targetLedgerId, setTargetLedgerId] = useState("")
+  const notificationStatusTone = !store.notificationCaptureStatus
+    .isCollectionEnabled
+    ? "inactive"
+    : store.notificationCaptureStatus.hasNotificationAccess
+      ? "active"
+      : "warning"
 
   useFocusEffect(
     useCallback(() => {
@@ -190,7 +196,8 @@ export default observer(function SettingsScreen() {
             <SectionHeader>
               <SectionTitle>결제 알림 후보함</SectionTitle>
               <StatusText
-                $active={store.notificationCaptureStatus.isCollectionEnabled}
+                $tone={notificationStatusTone}
+                accessibilityLiveRegion="polite"
               >
                 {store.notificationCaptureStatus.isCollectionEnabled
                   ? store.notificationCaptureStatus.hasNotificationAccess
@@ -221,6 +228,7 @@ export default observer(function SettingsScreen() {
                       <SelectionButton
                         key={app.packageName}
                         $selected={selected}
+                        accessibilityLabel={app.name}
                         accessibilityRole="checkbox"
                         accessibilityState={{ checked: selected }}
                         onPress={() =>
@@ -234,7 +242,12 @@ export default observer(function SettingsScreen() {
                           )
                         }
                       >
-                        <SelectionMark $selected={selected}>
+                        <SelectionMark
+                          $selected={selected}
+                          accessibilityElementsHidden
+                          allowFontScaling={false}
+                          importantForAccessibility="no"
+                        >
                           {selected ? "✓" : ""}
                         </SelectionMark>
                         <SelectionCopy>
@@ -280,6 +293,7 @@ export default observer(function SettingsScreen() {
                     </Description>
                   </PermissionCopy>
                   <InlineButton
+                    accessibilityLabel="Android 알림 접근 설정 열기"
                     accessibilityRole="button"
                     onPress={() =>
                       void store.openNotificationPermissionSettings()
@@ -312,7 +326,12 @@ export default observer(function SettingsScreen() {
                 </PermissionRow>
 
                 {store.notificationInboxErrorMessage ? (
-                  <ErrorText>{store.notificationInboxErrorMessage}</ErrorText>
+                  <ErrorText
+                    accessibilityLiveRegion="assertive"
+                    accessibilityRole="alert"
+                  >
+                    {store.notificationInboxErrorMessage}
+                  </ErrorText>
                 ) : null}
                 <AppButton
                   disabled={selectedPackages.length === 0 || !targetLedgerId}
@@ -508,8 +527,15 @@ const SectionHeader = styled.View({
   gap: mobileTheme.spacing[3],
 })
 
-const StatusText = styled.Text<{ $active: boolean }>(({ $active }) => ({
-  color: $active ? mobileTheme.colors.teal : mobileTheme.colors.muted,
+const StatusText = styled.Text<{
+  $tone: "active" | "inactive" | "warning"
+}>(({ $tone }) => ({
+  color:
+    $tone === "active"
+      ? mobileTheme.colors.teal
+      : $tone === "warning"
+        ? mobileTheme.colors.coral
+        : mobileTheme.colors.muted,
   fontSize: 11,
   fontWeight: "800",
 }))

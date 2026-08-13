@@ -9,6 +9,7 @@ import {
   SectionList,
   StyleSheet,
   type SectionListRenderItemInfo,
+  useWindowDimensions,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppButton } from "../../components/AppButton"
@@ -232,6 +233,9 @@ function TransactionListHeader({
   onKeywordChange,
   onToggleFilters,
 }: TransactionListHeaderProps) {
+  const { fontScale, width } = useWindowDimensions()
+  const stackTotals = fontScale >= 1.3 || width < 360
+
   return (
     <Header>
       <HeadingRow>
@@ -291,18 +295,24 @@ function TransactionListHeader({
         />
       ) : null}
 
-      <TotalsCard accessibilityLabel="검색 결과 합계">
-        <TotalItem>
+      <TotalsCard $stacked={stackTotals} accessibilityLabel="검색 결과 합계">
+        <TotalItem $stacked={stackTotals}>
           <TotalLabel>지출</TotalLabel>
-          <TotalValue $tone="expense">{formatKrw(totals.expense)}</TotalValue>
+          <TotalValue $tone="expense" numberOfLines={1}>
+            {formatKrw(totals.expense)}
+          </TotalValue>
         </TotalItem>
-        <TotalItem>
+        <TotalItem $stacked={stackTotals}>
           <TotalLabel>수입</TotalLabel>
-          <TotalValue $tone="income">{formatKrw(totals.income)}</TotalValue>
+          <TotalValue $tone="income" numberOfLines={1}>
+            {formatKrw(totals.income)}
+          </TotalValue>
         </TotalItem>
-        <TotalItem>
+        <TotalItem $stacked={stackTotals}>
           <TotalLabel>저축</TotalLabel>
-          <TotalValue $tone="saving">{formatKrw(totals.saving)}</TotalValue>
+          <TotalValue $tone="saving" numberOfLines={1}>
+            {formatKrw(totals.saving)}
+          </TotalValue>
         </TotalItem>
       </TotalsCard>
     </Header>
@@ -487,19 +497,22 @@ const FilterButtonLabel = styled.Text<{ $active: boolean }>(({ $active }) => ({
   fontWeight: "800",
 }))
 
-const TotalsCard = styled.View({
-  flexDirection: "row",
+const TotalsCard = styled.View<{ $stacked: boolean }>(({ $stacked }) => ({
+  flexDirection: $stacked ? "column" : "row",
   gap: mobileTheme.spacing[2],
   borderRadius: mobileTheme.radii.md,
   backgroundColor: mobileTheme.colors.ink,
   padding: mobileTheme.spacing[4],
-})
+}))
 
-const TotalItem = styled.View({
+const TotalItem = styled.View<{ $stacked: boolean }>(({ $stacked }) => ({
   minWidth: 0,
-  flex: 1,
+  flex: $stacked ? undefined : 1,
+  flexDirection: $stacked ? "row" : "column",
+  alignItems: $stacked ? "baseline" : "stretch",
+  justifyContent: $stacked ? "space-between" : "flex-start",
   gap: mobileTheme.spacing[1],
-})
+}))
 
 const TotalLabel = styled.Text({
   color: mobileTheme.colors.subtle,

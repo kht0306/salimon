@@ -392,7 +392,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                   <SegmentButton
                     key={type}
                     $selected={draft.type === type}
-                    accessibilityRole="button"
+                    accessibilityRole="radio"
                     accessibilityState={{ selected: draft.type === type }}
                     onPress={() => selectType(type)}
                   >
@@ -559,7 +559,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                   <SegmentButton
                     key={option.value}
                     $selected={draft.status === option.value}
-                    accessibilityRole="button"
+                    accessibilityRole="radio"
                     accessibilityState={{
                       selected: draft.status === option.value,
                     }}
@@ -630,7 +630,12 @@ function SelectionField({
   return (
     <Field>
       <FieldLabel>{label}</FieldLabel>
-      <SelectionButton accessibilityRole="button" onPress={onPress}>
+      <SelectionButton
+        accessibilityHint="선택 목록을 엽니다."
+        accessibilityLabel={`${label}, ${value ?? placeholder}`}
+        accessibilityRole="button"
+        onPress={onPress}
+      >
         <SelectionValue $placeholder={!value} numberOfLines={2}>
           {value ?? placeholder}
         </SelectionValue>

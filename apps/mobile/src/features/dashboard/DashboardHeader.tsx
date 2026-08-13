@@ -2,7 +2,7 @@ import styled from "@emotion/native"
 import { formatKoreanDate } from "@salimon/domain"
 import { router } from "expo-router"
 import { observer } from "mobx-react-lite"
-import { Pressable } from "react-native"
+import { Pressable, useWindowDimensions } from "react-native"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
 import { BudgetOverview } from "./BudgetOverview"
@@ -18,18 +18,25 @@ export const DashboardHeader = observer(function DashboardHeader({
   isWide,
 }: DashboardHeaderProps) {
   const store = useMobileAppStore()
+  const { fontScale, width } = useWindowDimensions()
   const isRefreshing = store.dataStatus === "refreshing"
+  const useCompactBrand = width / fontScale < 320
 
   return (
     <HeaderContent>
       <AppBar>
-        <BrandLockup>
+        <BrandLockup
+          accessibilityLabel={`살림온, ${store.currentLedgerName}`}
+          accessible
+        >
           <BrandMark>
             <BrandInitial>S</BrandInitial>
           </BrandMark>
-          <BrandCopy>
-            <BrandName>살림온</BrandName>
-            <BrandContext>{store.currentLedgerName}</BrandContext>
+          <BrandCopy $compact={useCompactBrand}>
+            <BrandName numberOfLines={1}>살림온</BrandName>
+            <BrandContext numberOfLines={1}>
+              {store.currentLedgerName}
+            </BrandContext>
           </BrandCopy>
         </BrandLockup>
         <AppBarActions>
@@ -138,7 +145,11 @@ const BrandInitial = styled.Text`
   font-weight: 900;
 `
 
-const BrandCopy = styled.View({ minWidth: 0, flex: 1 })
+const BrandCopy = styled.View<{ $compact: boolean }>(({ $compact }) => ({
+  minWidth: 0,
+  flex: 1,
+  display: $compact ? "none" : "flex",
+}))
 
 const AppBarActions = styled.View({
   flexDirection: "row",
