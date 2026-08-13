@@ -518,7 +518,12 @@ describe("MobileAppStore authentication", () => {
 
     expect(result).toEqual({ status: "error" })
     expect(store.monthTransactions).toHaveLength(1)
-    expect(store.transactionMutationErrorMessage).toBe("network unavailable")
+    expect(store.transactionMutationErrorMessage).toBe(
+      "네트워크 연결이 원활하지 않아 저장 결과를 확인하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요. 입력 내용은 그대로 유지됩니다.",
+    )
+    expect(store.transactionMutationErrorMessage).not.toContain(
+      "network unavailable",
+    )
     expect(store.transactionMutationState).toBe("idle")
   })
 
