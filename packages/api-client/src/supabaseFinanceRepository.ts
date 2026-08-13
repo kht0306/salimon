@@ -85,6 +85,10 @@ export interface FinanceLoadOptions {
   transactionDateRange?: TransactionDateRange
 }
 
+export interface FinanceMutationOptions {
+  signal?: AbortSignal
+}
+
 export class SupabaseFinanceRepository {
   constructor(private readonly client?: SalimonSupabaseClient) {}
 
@@ -305,6 +309,7 @@ export class SupabaseFinanceRepository {
   async saveTransaction(
     userId: string,
     input: RemoteTransactionInput,
+    options: FinanceMutationOptions = {},
   ): Promise<string | undefined> {
     const client = this.requireClient()
     const payload = {
@@ -327,7 +332,7 @@ export class SupabaseFinanceRepository {
     }
 
     if (input.id) {
-      const { error } = await client.rpc(
+      const updateRequest = client.rpc(
         "update_transaction_with_recurrence_v3",
         {
           p_transaction_id: input.id,
@@ -348,40 +353,47 @@ export class SupabaseFinanceRepository {
           p_apply_changes_to_future: input.applyChangesToFuture ?? true,
         },
       )
+      if (options.signal) updateRequest.abortSignal(options.signal)
+      const { error } = await updateRequest
       throwIfError(error)
       const transactionId = input.id
       if (input.tags !== undefined) {
-        const { error: tagError } = await client
+        const tagRequest = client
           .from("transactions")
           .update({ tags: input.tags })
           .eq("id", transactionId)
+        if (options.signal) tagRequest.abortSignal(options.signal)
+        const { error: tagError } = await tagRequest
         throwIfError(tagError)
       }
       if (input.splits !== undefined) {
-        await this.replaceTransactionSplits(transactionId, input.splits)
+        await this.replaceTransactionSplits(
+          transactionId,
+          input.splits,
+          options,
+        )
       }
       return transactionId
     }
 
     if (input.recurringType === "installment") {
-      const { data, error } = await client.rpc(
-        "save_card_installment_series_v3",
-        {
-          p_rule_id: input.recurringRuleId ?? null,
-          p_ledger_id: input.ledgerId,
-          p_amount: input.amount,
-          p_amount_type: input.installmentAmountType ?? "monthly",
-          p_transaction_at: input.transactionAt,
-          p_installment_months: input.installmentMonths ?? 2,
-          p_category_id: input.categoryId ?? null,
-          p_merchant_name: input.merchantName ?? null,
-          p_memo: input.memo ?? null,
-          p_actor_user_id: input.actorUserId ?? null,
-          p_status: input.status,
-          p_type: input.type,
-          p_payment_method_id: input.paymentMethodId,
-        },
-      )
+      const installmentRequest = client.rpc("save_card_installment_series_v3", {
+        p_rule_id: input.recurringRuleId ?? null,
+        p_ledger_id: input.ledgerId,
+        p_amount: input.amount,
+        p_amount_type: input.installmentAmountType ?? "monthly",
+        p_transaction_at: input.transactionAt,
+        p_installment_months: input.installmentMonths ?? 2,
+        p_category_id: input.categoryId ?? null,
+        p_merchant_name: input.merchantName ?? null,
+        p_memo: input.memo ?? null,
+        p_actor_user_id: input.actorUserId ?? null,
+        p_status: input.status,
+        p_type: input.type,
+        p_payment_method_id: input.paymentMethodId,
+      })
+      if (options.signal) installmentRequest.abortSignal(options.signal)
+      const { data, error } = await installmentRequest
       throwIfError(error)
       return typeof data === "string" ? data : undefined
     }
@@ -389,7 +401,7 @@ export class SupabaseFinanceRepository {
     if (!input.id && input.recurringType === "fixed") {
       const date = new Date(input.transactionAt)
       const startMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`
-      const { error: ruleError } = await client.from("recurring_rules").insert({
+      const ruleRequest = client.from("recurring_rules").insert({
         ledger_id: input.ledgerId,
         created_by: userId,
         rule_type: input.recurringType,
@@ -408,12 +420,14 @@ export class SupabaseFinanceRepository {
         transaction_status: input.status,
         actor_user_id: input.actorUserId ?? null,
       })
+      if (options.signal) ruleRequest.abortSignal(options.signal)
+      const { error: ruleError } = await ruleRequest
       throwIfError(ruleError)
       await this.materializeMonth(startMonth.slice(0, 7))
       return undefined
     }
 
-    const result = await client
+    const saveRequest = client
       .from("transactions")
       .insert({
         ...payload,
@@ -421,14 +435,15 @@ export class SupabaseFinanceRepository {
         created_by: userId,
       })
       .select("id")
-      .single()
+    if (options.signal) saveRequest.abortSignal(options.signal)
+    const result = await saveRequest.single()
     throwIfError(result.error)
     const transactionId =
       result.data && typeof result.data.id === "string"
         ? result.data.id
         : undefined
     if (transactionId && input.splits !== undefined) {
-      await this.replaceTransactionSplits(transactionId, input.splits)
+      await this.replaceTransactionSplits(transactionId, input.splits, options)
     }
     return transactionId
   }
@@ -436,15 +451,18 @@ export class SupabaseFinanceRepository {
   private async replaceTransactionSplits(
     transactionId: string,
     splits: Array<{ categoryId: string; amount: number }>,
+    options: FinanceMutationOptions = {},
   ): Promise<void> {
     const client = this.requireClient()
-    const { error } = await client.rpc("replace_transaction_splits", {
+    const replaceRequest = client.rpc("replace_transaction_splits", {
       p_transaction_id: transactionId,
       p_splits: splits.map((split) => ({
         categoryId: split.categoryId,
         amount: split.amount,
       })),
     })
+    if (options.signal) replaceRequest.abortSignal(options.signal)
+    const { error } = await replaceRequest
     throwIfError(error)
   }
 

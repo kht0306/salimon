@@ -342,7 +342,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
     return null
   }
 
-  const errorMessage = formError ?? store.transactionMutationErrorMessage
+  const mutationErrorMessage = store.transactionMutationErrorMessage
 
   return (
     <Page edges={safeAreaEdges}>
@@ -379,9 +379,9 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
               </IntroDescription>
             </Intro>
 
-            {errorMessage ? (
+            {formError ? (
               <ErrorNotice accessibilityLiveRegion="assertive">
-                {errorMessage}
+                {formError}
               </ErrorNotice>
             ) : null}
 
@@ -580,20 +580,30 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
             </Section>
 
             <SubmitArea>
+              {mutationErrorMessage ? (
+                <ErrorNotice accessibilityLiveRegion="assertive">
+                  {mutationErrorMessage}
+                </ErrorNotice>
+              ) : null}
               <AppButton
                 disabled={isSaving}
                 label={
                   isSaving
                     ? "서버에 저장 중..."
-                    : transaction
-                      ? "거래 수정"
-                      : "거래 등록"
+                    : mutationErrorMessage
+                      ? transaction
+                        ? "다시 수정 시도"
+                        : "다시 등록 시도"
+                      : transaction
+                        ? "거래 수정"
+                        : "거래 등록"
                 }
                 tone="primary"
                 onPress={requestSave}
               />
               <SubmitHint>
-                저장에 실패하면 이 화면과 입력 내용이 그대로 유지됩니다.
+                저장이 15초 이상 지연되면 요청을 중단하며 입력 내용은 그대로
+                유지됩니다.
               </SubmitHint>
             </SubmitArea>
           </Content>

@@ -2,9 +2,11 @@ import {
   createEmptyFinanceData,
   type AuthSessionInfo,
   type FinanceData,
+  type FinanceMutationOptions,
+  type RemoteTransactionInput,
 } from "@salimon/api-client"
 import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "@salimon/types"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { MobileAuthGateway } from "../features/auth/mobileAuth"
 import { QueryCache } from "../infrastructure/queryCache"
 import {
@@ -76,7 +78,13 @@ function createRepository(data = createReadyFinanceData()) {
     createLedger: vi.fn(async () => "ledger-1"),
     load: vi.fn(async () => data),
     materializeMonth: vi.fn(async () => undefined),
-    saveTransaction: vi.fn(async () => "transaction-new"),
+    saveTransaction: vi.fn(
+      async (
+        _userId: string,
+        _input: RemoteTransactionInput,
+        _options?: FinanceMutationOptions,
+      ) => "transaction-new",
+    ),
     softDeleteTransaction: vi.fn(async () => undefined),
   }
 }
@@ -105,6 +113,10 @@ describe("MobileAppStore authentication", () => {
     vi.restoreAllMocks()
     vi.mocked(clearNotificationCaptureSession).mockClear()
     vi.mocked(setAuthenticatedNotificationCaptureUser).mockClear()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it("restores the secure session and loads only the selected month", async () => {
@@ -508,6 +520,54 @@ describe("MobileAppStore authentication", () => {
     expect(store.monthTransactions).toHaveLength(1)
     expect(store.transactionMutationErrorMessage).toBe("network unavailable")
     expect(store.transactionMutationState).toBe("idle")
+  })
+
+  it("aborts a delayed save and returns to a retryable state", async () => {
+    vi.useFakeTimers()
+    const repository = createRepository()
+    let saveSignal: AbortSignal | undefined
+    repository.saveTransaction.mockImplementationOnce(
+      (_userId, _input, options) => {
+        saveSignal = options?.signal
+        return new Promise<string>((_resolve, reject) => {
+          options?.signal?.addEventListener(
+            "abort",
+            () => reject(new Error("aborted")),
+            { once: true },
+          )
+        })
+      },
+    )
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+
+    const input: RemoteTransactionInput = {
+      ledgerId: "ledger-1",
+      type: "expense",
+      status: "confirmed",
+      amount: 20_000,
+      transactionAt: "2026-08-12T20:30:00+09:00",
+      categoryId: "food",
+    }
+    const firstSave = store.saveGeneralTransaction(input)
+
+    expect(store.transactionMutationState).toBe("saving")
+    await vi.advanceTimersByTimeAsync(15_000)
+
+    expect(await firstSave).toEqual({ status: "error" })
+    expect(saveSignal?.aborted).toBe(true)
+    expect(store.transactionMutationState).toBe("idle")
+    expect(store.transactionMutationErrorMessage).toBe(
+      "네트워크 응답이 지연되어 저장 결과를 확인하지 못했습니다. 연결 상태와 거래 목록을 확인한 뒤 다시 시도해 주세요. 입력 내용은 그대로 유지됩니다.",
+    )
+
+    repository.saveTransaction.mockResolvedValueOnce("transaction-retry")
+
+    await expect(store.saveGeneralTransaction(input)).resolves.toEqual({
+      status: "saved",
+      transactionId: "transaction-retry",
+    })
+    expect(repository.saveTransaction).toHaveBeenCalledTimes(2)
   })
 
   it("hides mutations from viewers and rejects a write defensively", async () => {

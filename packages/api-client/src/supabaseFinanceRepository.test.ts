@@ -44,6 +44,24 @@ class LoadQueryDouble implements PromiseLike<QueryResult> {
   }
 }
 
+class MutationQueryDouble implements PromiseLike<QueryResult> {
+  readonly abortSignal = vi.fn(() => this)
+  readonly insert = vi.fn(() => this)
+  readonly select = vi.fn(() => this)
+  readonly single = vi.fn(() => this)
+
+  constructor(private readonly result: QueryResult) {}
+
+  then<TResult1 = QueryResult, TResult2 = never>(
+    onfulfilled?:
+      | ((value: QueryResult) => TResult1 | PromiseLike<TResult1>)
+      | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): PromiseLike<TResult1 | TResult2> {
+    return Promise.resolve(this.result).then(onfulfilled, onrejected)
+  }
+}
+
 interface LoadClientDouble {
   client: SalimonSupabaseClient
   from: ReturnType<typeof vi.fn>
@@ -202,6 +220,33 @@ describe("mapPaymentMethodType", () => {
 })
 
 describe("saveTransaction", () => {
+  it("passes the abort signal to a new transaction request", async () => {
+    const query = new MutationQueryDouble({
+      data: { id: "transaction-1" },
+      error: null,
+    })
+    const clientFrom = vi.fn(() => query)
+    const repository = new SupabaseFinanceRepository({
+      from: clientFrom,
+    } as unknown as SalimonSupabaseClient)
+    const abortController = new AbortController()
+
+    await repository.saveTransaction(
+      "user-1",
+      {
+        ledgerId: "ledger-1",
+        type: "expense",
+        status: "confirmed",
+        amount: 12_000,
+        transactionAt: "2026-08-12T20:30:00+09:00",
+      },
+      { signal: abortController.signal },
+    )
+
+    expect(clientFrom).toHaveBeenCalledWith("transactions")
+    expect(query.abortSignal).toHaveBeenCalledWith(abortController.signal)
+  })
+
   it("creates new installments with the purchase-first schedule RPC", async () => {
     rpc.mockResolvedValue({ data: "rule-1", error: null })
     const repository = new SupabaseFinanceRepository()
