@@ -9,6 +9,7 @@
     "prebuild:mobile": "pnpm --filter @salimon/mobile prebuild:android",
     "dev:seoulsys": "set \"PATH=%LOCALAPPDATA%\\Volta\\tools\\image\\node\\24.15.0;%PATH%\" && %LOCALAPPDATA%\\pnpm\\bin\\pnpm.CMD --filter @salimon/web dev",
     "build:web": "pnpm --filter @salimon/web build",
+    "build:mobile:family-alpha": "pnpm --filter @salimon/mobile build:family-alpha",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test"
