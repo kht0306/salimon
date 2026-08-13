@@ -6,16 +6,33 @@ import SalimonNotificationListener, {
 
 const unsupportedStatus: NativeNotificationCaptureStatus = {
   allowedPackageNames: [],
+  disclosureAcceptedAt: 0,
   hasNotificationAccess: false,
+  hasDisclosureConsent: false,
   isCollectionEnabled: false,
+  reviewNotificationsEnabled: false,
   retentionDays: 7,
   storedRecordCount: 0,
+  targetLedgerId: "",
 }
 
 export type NotificationCaptureConfiguration =
   NativeNotificationCaptureConfiguration
 export type NotificationCaptureStatus = NativeNotificationCaptureStatus
 export type StoredNotificationRecord = NativeNotificationRecord
+
+export async function acceptNotificationDisclosure(): Promise<NotificationCaptureStatus> {
+  return (
+    (await SalimonNotificationListener?.acceptDisclosure()) ?? unsupportedStatus
+  )
+}
+
+export async function revokeNotificationDisclosure(): Promise<NotificationCaptureStatus> {
+  return (
+    (await SalimonNotificationListener?.revokeDisclosureAndDeleteRecords()) ??
+    unsupportedStatus
+  )
+}
 
 export async function setAuthenticatedNotificationCaptureUser(
   userId: string,

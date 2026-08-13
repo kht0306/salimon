@@ -1,8 +1,18 @@
 import styled from "@emotion/native"
+import { useFocusEffect } from "expo-router"
 import { observer } from "mobx-react-lite"
-import { ScrollView } from "react-native"
+import { useCallback, useEffect, useState } from "react"
+import {
+  Alert,
+  PermissionsAndroid,
+  Platform,
+  ScrollView,
+  Switch,
+} from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppButton } from "../../components/AppButton"
+import { NotificationDisclosureModal } from "../../features/notification-inbox/NotificationDisclosureModal"
+import { SUPPORTED_NOTIFICATION_APPS } from "../../features/notification-inbox/notificationInbox"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
 
@@ -11,6 +21,135 @@ const scrollContentStyle = { flexGrow: 1 } as const
 
 export default observer(function SettingsScreen() {
   const store = useMobileAppStore()
+  const [disclosureOpen, setDisclosureOpen] = useState(false)
+  const [disclosureBusy, setDisclosureBusy] = useState(false)
+  const [selectedPackages, setSelectedPackages] = useState<string[]>([])
+  const [targetLedgerId, setTargetLedgerId] = useState("")
+
+  useFocusEffect(
+    useCallback(() => {
+      void store.refreshNotificationInbox()
+    }, [store]),
+  )
+
+  useEffect(() => {
+    setSelectedPackages(store.notificationCaptureStatus.allowedPackageNames)
+    setTargetLedgerId(store.notificationTargetLedgerId)
+  }, [
+    store.notificationCaptureStatus.allowedPackageNames,
+    store.notificationTargetLedgerId,
+  ])
+
+  async function acceptDisclosureAndContinue(): Promise<void> {
+    setDisclosureBusy(true)
+    const accepted = await store.acceptNotificationPrivacyDisclosure()
+    if (!accepted) {
+      setDisclosureBusy(false)
+      return
+    }
+
+    const allowedPackageNames =
+      selectedPackages.length > 0
+        ? selectedPackages
+        : [SUPPORTED_NOTIFICATION_APPS[0].packageName]
+    const ledgerId = targetLedgerId || store.selectedLedgerId
+    const configured = await store.configureNotificationInbox({
+      allowedPackageNames,
+      enabled: true,
+      reviewNotificationsEnabled: false,
+      targetLedgerId: ledgerId,
+    })
+    setDisclosureBusy(false)
+    if (!configured) return
+
+    setSelectedPackages(allowedPackageNames)
+    setTargetLedgerId(ledgerId)
+    setDisclosureOpen(false)
+    await store.openNotificationPermissionSettings()
+  }
+
+  async function saveNotificationSettings(): Promise<void> {
+    if (selectedPackages.length === 0) {
+      Alert.alert("지원 앱을 선택해 주세요.")
+      return
+    }
+    const saved = await store.configureNotificationInbox({
+      allowedPackageNames: selectedPackages,
+      enabled: true,
+      targetLedgerId: targetLedgerId || store.selectedLedgerId,
+    })
+    if (saved) Alert.alert("알림 후보함 설정을 저장했습니다.")
+  }
+
+  async function toggleReviewNotification(enabled: boolean): Promise<void> {
+    if (!store.notificationCaptureStatus.hasNotificationAccess) {
+      Alert.alert(
+        "알림 접근을 먼저 허용해 주세요.",
+        "결제 알림 감지를 허용한 다음 후보 도착 알림을 켤 수 있습니다.",
+      )
+      return
+    }
+
+    if (
+      enabled &&
+      Platform.OS === "android" &&
+      Number(Platform.Version) >= 33
+    ) {
+      const result = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+      )
+      if (result !== PermissionsAndroid.RESULTS.GRANTED) {
+        Alert.alert(
+          "알림 표시 권한이 꺼져 있어요.",
+          "후보는 계속 저장되며 후보함에서 직접 확인할 수 있습니다.",
+        )
+        return
+      }
+    }
+
+    await store.configureNotificationInbox({
+      allowedPackageNames: selectedPackages,
+      enabled: true,
+      reviewNotificationsEnabled: enabled,
+      targetLedgerId: targetLedgerId || store.selectedLedgerId,
+    })
+  }
+
+  function stopNotificationInbox(): void {
+    Alert.alert(
+      "알림 후보함을 끌까요?",
+      "수집을 중지하고 기기에 보관된 후보와 암호화 원문을 모두 삭제합니다.",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "중지 및 삭제",
+          style: "destructive",
+          onPress: () =>
+            void store.configureNotificationInbox({
+              allowedPackageNames: selectedPackages,
+              enabled: false,
+              reviewNotificationsEnabled: false,
+              targetLedgerId: targetLedgerId || store.selectedLedgerId,
+            }),
+        },
+      ],
+    )
+  }
+
+  function revokeNotificationConsent(): void {
+    Alert.alert(
+      "알림 동의를 철회할까요?",
+      "수집 설정과 보관된 후보·암호화 원문이 모두 삭제됩니다.",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "동의 철회",
+          style: "destructive",
+          onPress: () => void store.revokeNotificationPrivacyDisclosure(),
+        },
+      ],
+    )
+  }
 
   return (
     <Page edges={safeAreaEdges}>
@@ -45,6 +184,156 @@ export default observer(function SettingsScreen() {
               <SettingLabel>현재 선택</SettingLabel>
               <SettingValue>{store.currentLedgerName}</SettingValue>
             </SettingRow>
+          </Section>
+
+          <Section>
+            <SectionHeader>
+              <SectionTitle>결제 알림 후보함</SectionTitle>
+              <StatusText
+                $active={store.notificationCaptureStatus.isCollectionEnabled}
+              >
+                {store.notificationCaptureStatus.isCollectionEnabled
+                  ? store.notificationCaptureStatus.hasNotificationAccess
+                    ? "사용 중"
+                    : "알림 접근 필요"
+                  : "사용 안 함"}
+              </StatusText>
+            </SectionHeader>
+            <Description>
+              선택한 앱의 결제 알림만 기기에 최대 7일간 암호화 보관합니다.
+              원문과 미확정 후보는 서버로 전송하지 않습니다.
+            </Description>
+
+            {!store.notificationCaptureStatus.hasDisclosureConsent ? (
+              <AppButton
+                label="안내 확인 후 설정 시작"
+                tone="primary"
+                onPress={() => setDisclosureOpen(true)}
+              />
+            ) : (
+              <>
+                <Divider />
+                <SettingGroup>
+                  <SettingGroupLabel>지원 앱</SettingGroupLabel>
+                  {SUPPORTED_NOTIFICATION_APPS.map((app) => {
+                    const selected = selectedPackages.includes(app.packageName)
+                    return (
+                      <SelectionButton
+                        key={app.packageName}
+                        $selected={selected}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: selected }}
+                        onPress={() =>
+                          setSelectedPackages((packages) =>
+                            selected
+                              ? packages.filter(
+                                  (packageName) =>
+                                    packageName !== app.packageName,
+                                )
+                              : [...packages, app.packageName],
+                          )
+                        }
+                      >
+                        <SelectionMark $selected={selected}>
+                          {selected ? "✓" : ""}
+                        </SelectionMark>
+                        <SelectionCopy>
+                          <SelectionTitle>{app.name}</SelectionTitle>
+                          <SelectionDescription>
+                            실제 기기에서 확인한 지원 앱
+                          </SelectionDescription>
+                        </SelectionCopy>
+                      </SelectionButton>
+                    )
+                  })}
+                </SettingGroup>
+
+                <SettingGroup>
+                  <SettingGroupLabel>등록 대상 가계부</SettingGroupLabel>
+                  <LedgerOptions>
+                    {store.selectableLedgers.map((ledger) => {
+                      const selected = targetLedgerId === ledger.id
+                      return (
+                        <LedgerButton
+                          key={ledger.id}
+                          $selected={selected}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected }}
+                          onPress={() => setTargetLedgerId(ledger.id)}
+                        >
+                          <LedgerLabel $selected={selected}>
+                            {ledger.name}
+                          </LedgerLabel>
+                        </LedgerButton>
+                      )
+                    })}
+                  </LedgerOptions>
+                </SettingGroup>
+
+                <PermissionRow>
+                  <PermissionCopy>
+                    <SecurityTitle>Android 알림 접근</SecurityTitle>
+                    <Description>
+                      {store.notificationCaptureStatus.hasNotificationAccess
+                        ? "허용됨"
+                        : "허용이 필요합니다."}
+                    </Description>
+                  </PermissionCopy>
+                  <InlineButton
+                    accessibilityRole="button"
+                    onPress={() =>
+                      void store.openNotificationPermissionSettings()
+                    }
+                  >
+                    <InlineButtonLabel>설정 열기</InlineButtonLabel>
+                  </InlineButton>
+                </PermissionRow>
+
+                <PermissionRow>
+                  <PermissionCopy>
+                    <SecurityTitle>후보 도착 알림</SecurityTitle>
+                    <Description>
+                      꺼도 후보함에는 정상적으로 저장됩니다.
+                    </Description>
+                  </PermissionCopy>
+                  <Switch
+                    accessibilityLabel="후보 도착 알림"
+                    trackColor={{
+                      false: mobileTheme.colors.borderStrong,
+                      true: mobileTheme.colors.teal,
+                    }}
+                    value={
+                      store.notificationCaptureStatus.reviewNotificationsEnabled
+                    }
+                    onValueChange={(enabled) =>
+                      void toggleReviewNotification(enabled)
+                    }
+                  />
+                </PermissionRow>
+
+                {store.notificationInboxErrorMessage ? (
+                  <ErrorText>{store.notificationInboxErrorMessage}</ErrorText>
+                ) : null}
+                <AppButton
+                  disabled={selectedPackages.length === 0 || !targetLedgerId}
+                  label="후보함 설정 저장"
+                  tone="primary"
+                  onPress={() => void saveNotificationSettings()}
+                />
+                {store.notificationCaptureStatus.isCollectionEnabled ? (
+                  <AppButton
+                    label="수집 중지 및 후보 삭제"
+                    onPress={stopNotificationInbox}
+                  />
+                ) : null}
+                <TextAction
+                  accessibilityRole="button"
+                  onPress={revokeNotificationConsent}
+                >
+                  <TextActionLabel>알림 동의 철회</TextActionLabel>
+                </TextAction>
+              </>
+            )}
           </Section>
 
           <Section>
@@ -83,6 +372,13 @@ export default observer(function SettingsScreen() {
           </LogoutArea>
         </Content>
       </ScrollView>
+      {disclosureOpen ? (
+        <NotificationDisclosureModal
+          busy={disclosureBusy}
+          onAccept={() => void acceptDisclosureAndContinue()}
+          onClose={() => setDisclosureOpen(false)}
+        />
+      ) : null}
     </Page>
   )
 })
@@ -204,6 +500,139 @@ const SectionTitle = styled.Text`
   font-size: 15px;
   font-weight: 700;
 `
+
+const SectionHeader = styled.View({
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: mobileTheme.spacing[3],
+})
+
+const StatusText = styled.Text<{ $active: boolean }>(({ $active }) => ({
+  color: $active ? mobileTheme.colors.teal : mobileTheme.colors.muted,
+  fontSize: 11,
+  fontWeight: "800",
+}))
+
+const SettingGroup = styled.View({ gap: mobileTheme.spacing[2] })
+
+const SettingGroupLabel = styled.Text({
+  color: mobileTheme.colors.muted,
+  fontSize: 11,
+  fontWeight: "700",
+})
+
+const SelectionButton = styled.Pressable<{ $selected: boolean }>(
+  ({ $selected }) => ({
+    minHeight: 60,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: mobileTheme.spacing[3],
+    borderWidth: 1,
+    borderColor: $selected
+      ? mobileTheme.colors.teal
+      : mobileTheme.colors.border,
+    borderRadius: mobileTheme.radii.md,
+    backgroundColor: $selected
+      ? mobileTheme.colors.tealSoft
+      : mobileTheme.colors.panelSubtle,
+    padding: mobileTheme.spacing[3],
+  }),
+)
+
+const SelectionMark = styled.Text<{ $selected: boolean }>(({ $selected }) => ({
+  width: 24,
+  height: 24,
+  borderWidth: 2,
+  borderColor: $selected
+    ? mobileTheme.colors.teal
+    : mobileTheme.colors.borderStrong,
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: $selected
+    ? mobileTheme.colors.teal
+    : mobileTheme.colors.panel,
+  color: mobileTheme.colors.panel,
+  fontSize: 16,
+  fontWeight: "900",
+  lineHeight: 20,
+  textAlign: "center",
+}))
+
+const SelectionCopy = styled.View({ flex: 1, gap: 2 })
+const SelectionTitle = styled.Text({
+  color: mobileTheme.colors.ink,
+  fontSize: 14,
+  fontWeight: "800",
+})
+const SelectionDescription = styled.Text({
+  color: mobileTheme.colors.muted,
+  fontSize: 10,
+})
+
+const LedgerOptions = styled.View({
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: mobileTheme.spacing[2],
+})
+const LedgerButton = styled.Pressable<{ $selected: boolean }>(
+  ({ $selected }) => ({
+    minHeight: 40,
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: $selected
+      ? mobileTheme.colors.teal
+      : mobileTheme.colors.border,
+    borderRadius: mobileTheme.radii.round,
+    backgroundColor: $selected
+      ? mobileTheme.colors.tealSoft
+      : mobileTheme.colors.panel,
+    paddingHorizontal: mobileTheme.spacing[3],
+  }),
+)
+const LedgerLabel = styled.Text<{ $selected: boolean }>(({ $selected }) => ({
+  color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+  fontSize: 12,
+  fontWeight: "800",
+}))
+
+const PermissionRow = styled.View({
+  minHeight: 52,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: mobileTheme.spacing[3],
+})
+const PermissionCopy = styled.View({ minWidth: 0, flex: 1, gap: 2 })
+const InlineButton = styled.Pressable({
+  minHeight: 40,
+  justifyContent: "center",
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor: mobileTheme.colors.tealSoft,
+  paddingHorizontal: mobileTheme.spacing[3],
+})
+const InlineButtonLabel = styled.Text({
+  color: mobileTheme.colors.teal,
+  fontSize: 11,
+  fontWeight: "800",
+})
+const ErrorText = styled.Text({
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor: mobileTheme.colors.coralSoft,
+  color: mobileTheme.colors.coral,
+  fontSize: 11,
+  lineHeight: 18,
+  padding: mobileTheme.spacing[3],
+})
+const TextAction = styled.Pressable({
+  minHeight: 40,
+  alignItems: "center",
+  justifyContent: "center",
+})
+const TextActionLabel = styled.Text({
+  color: mobileTheme.colors.muted,
+  fontSize: 11,
+  textDecorationLine: "underline",
+})
 
 const SettingRow = styled.View({
   minHeight: 32,

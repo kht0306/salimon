@@ -21,6 +21,7 @@ import {
   CURRENT_TERMS_VERSION,
   type Category,
   type Ledger,
+  type LocalSmsCandidate,
   type Transaction,
 } from "@salimon/types"
 import { makeAutoObservable, runInAction } from "mobx"
@@ -35,11 +36,22 @@ import {
   type TransactionTotals,
 } from "../features/dashboard/dashboardPresentation"
 import { isGeneralMobileTransaction } from "../features/transactions/transactionDraft"
+import { createCandidateFromNotificationRecord } from "../features/notification-inbox/notificationInbox"
 import { QueryCache } from "../infrastructure/queryCache"
 import { requireSupabaseMobileClient } from "../infrastructure/supabase"
 import {
+  acceptNotificationDisclosure,
   clearNotificationCaptureSession,
+  configureNotificationCapture,
+  deleteAllStoredNotificationRecords,
+  deleteExpiredNotificationRecords,
+  deleteStoredNotificationRecord,
+  getNotificationCaptureStatus,
+  openNotificationAccessSettings,
+  readStoredNotificationRecords,
+  revokeNotificationDisclosure,
   setAuthenticatedNotificationCaptureUser,
+  type NotificationCaptureStatus,
 } from "../native/notificationListener"
 
 type MobileFinanceRepository = Pick<
@@ -68,6 +80,7 @@ export type MobileDataStatus =
   | "error"
 export type MobileConsentStatus = "idle" | "saving" | "error"
 export type MobileTransactionMutationState = "idle" | "saving" | "deleting"
+export type NotificationInboxStatus = "idle" | "loading" | "ready" | "error"
 
 export type MobileTransactionSaveResult =
   | { status: "saved"; transactionId: string }
@@ -100,10 +113,15 @@ export class MobileAppStore {
   dataStatus: MobileDataStatus = "idle"
   consentStatus: MobileConsentStatus = "idle"
   transactionMutationState: MobileTransactionMutationState = "idle"
+  notificationCaptureStatus: NotificationCaptureStatus =
+    createEmptyNotificationCaptureStatus()
+  notificationCandidates: LocalSmsCandidate[] = []
+  notificationInboxStatus: NotificationInboxStatus = "idle"
   authErrorMessage?: string
   dataErrorMessage?: string
   consentErrorMessage?: string
   transactionMutationErrorMessage?: string
+  notificationInboxErrorMessage?: string
 
   private activeSessionUserId?: string
   private dataRequestSequence = 0
@@ -163,6 +181,19 @@ export class MobileAppStore {
 
   get currentLedgerName(): string {
     return this.currentLedger?.name ?? "내 가계부"
+  }
+
+  get notificationCandidateCount(): number {
+    return this.notificationCandidates.length
+  }
+
+  get notificationTargetLedgerId(): string {
+    const configuredLedgerId = this.notificationCaptureStatus.targetLedgerId
+    return this.selectableLedgers.some(
+      (ledger) => ledger.id === configuredLedgerId,
+    )
+      ? configuredLedgerId
+      : this.selectedLedgerId
   }
 
   get selectedMonthNote() {
@@ -626,6 +657,227 @@ export class MobileAppStore {
     }
   }
 
+  async acceptNotificationPrivacyDisclosure(): Promise<boolean> {
+    try {
+      const status = await acceptNotificationDisclosure()
+      runInAction(() => {
+        this.notificationCaptureStatus = status
+        this.notificationInboxErrorMessage = undefined
+      })
+      return status.hasDisclosureConsent
+    } catch (error) {
+      runInAction(() => {
+        this.notificationInboxErrorMessage = errorMessage(
+          error,
+          "알림 개인정보 동의를 저장하지 못했습니다.",
+        )
+      })
+      return false
+    }
+  }
+
+  async configureNotificationInbox(input: {
+    allowedPackageNames: string[]
+    enabled: boolean
+    reviewNotificationsEnabled?: boolean
+    targetLedgerId: string
+  }): Promise<boolean> {
+    if (
+      input.enabled &&
+      (!this.notificationCaptureStatus.hasDisclosureConsent ||
+        !this.selectableLedgers.some(
+          (ledger) => ledger.id === input.targetLedgerId,
+        ))
+    ) {
+      this.notificationInboxErrorMessage =
+        "개인정보 고지 동의와 대상 가계부 선택이 필요합니다."
+      return false
+    }
+
+    try {
+      const status = await configureNotificationCapture({
+        allowedPackageNames: input.allowedPackageNames,
+        enabled: input.enabled,
+        reviewNotificationsEnabled:
+          input.reviewNotificationsEnabled ??
+          this.notificationCaptureStatus.reviewNotificationsEnabled,
+        targetLedgerId: input.targetLedgerId,
+      })
+      runInAction(() => {
+        this.notificationCaptureStatus = status
+        this.notificationInboxErrorMessage = undefined
+        if (!status.isCollectionEnabled) {
+          this.notificationCandidates = []
+        }
+      })
+      return input.enabled ? status.isCollectionEnabled : true
+    } catch (error) {
+      runInAction(() => {
+        this.notificationInboxErrorMessage = errorMessage(
+          error,
+          "알림 수집 설정을 저장하지 못했습니다.",
+        )
+      })
+      return false
+    }
+  }
+
+  async openNotificationPermissionSettings(): Promise<boolean> {
+    if (!this.notificationCaptureStatus.hasDisclosureConsent) {
+      this.notificationInboxErrorMessage =
+        "개인정보 고지에 동의한 뒤 알림 접근을 설정해 주세요."
+      return false
+    }
+
+    try {
+      await openNotificationAccessSettings()
+      return true
+    } catch (error) {
+      runInAction(() => {
+        this.notificationInboxErrorMessage = errorMessage(
+          error,
+          "Android 알림 접근 설정을 열지 못했습니다.",
+        )
+      })
+      return false
+    }
+  }
+
+  async refreshNotificationInbox(): Promise<void> {
+    const userId = this.authUser?.id
+    if (!userId || this.notificationInboxStatus === "loading") return
+
+    this.notificationInboxStatus = "loading"
+    this.notificationInboxErrorMessage = undefined
+
+    try {
+      await deleteExpiredNotificationRecords()
+      const status = await getNotificationCaptureStatus()
+      const records = status.hasDisclosureConsent
+        ? await readStoredNotificationRecords()
+        : []
+      const targetLedgerId = this.selectableLedgers.some(
+        (ledger) => ledger.id === status.targetLedgerId,
+      )
+        ? status.targetLedgerId
+        : this.selectedLedgerId
+      const deferredIds = new Set(
+        this.notificationCandidates
+          .filter((candidate) => candidate.status === "deferred")
+          .map((candidate) => candidate.id),
+      )
+      const candidates = records.map((record) => {
+        const candidate = createCandidateFromNotificationRecord({
+          record,
+          targetLedgerId,
+          userId,
+        })
+        return deferredIds.has(candidate.id)
+          ? { ...candidate, status: "deferred" as const }
+          : candidate
+      })
+
+      runInAction(() => {
+        this.notificationCaptureStatus = {
+          ...status,
+          storedRecordCount: candidates.length,
+        }
+        this.notificationCandidates = candidates
+        this.notificationInboxStatus = "ready"
+      })
+    } catch (error) {
+      runInAction(() => {
+        this.notificationInboxStatus = "error"
+        this.notificationInboxErrorMessage = errorMessage(
+          error,
+          "알림 후보를 불러오지 못했습니다.",
+        )
+      })
+    }
+  }
+
+  deferNotificationCandidate(candidateId: string): void {
+    this.notificationCandidates = this.notificationCandidates.map(
+      (candidate) =>
+        candidate.id === candidateId
+          ? {
+              ...candidate,
+              status: "deferred",
+              promptCount: candidate.promptCount + 1,
+              lastPromptedAt: new Date().toISOString(),
+            }
+          : candidate,
+    )
+  }
+
+  async excludeNotificationCandidate(candidateId: string): Promise<boolean> {
+    try {
+      const deleted = await deleteStoredNotificationRecord(candidateId)
+      if (!deleted) return false
+      runInAction(() => {
+        this.notificationCandidates = this.notificationCandidates.filter(
+          (candidate) => candidate.id !== candidateId,
+        )
+        this.notificationCaptureStatus = {
+          ...this.notificationCaptureStatus,
+          storedRecordCount: this.notificationCandidates.length,
+        }
+      })
+      return true
+    } catch (error) {
+      runInAction(() => {
+        this.notificationInboxErrorMessage = errorMessage(
+          error,
+          "알림 후보를 제외하지 못했습니다.",
+        )
+      })
+      return false
+    }
+  }
+
+  async deleteAllNotificationCandidates(): Promise<boolean> {
+    try {
+      await deleteAllStoredNotificationRecords()
+      runInAction(() => {
+        this.notificationCandidates = []
+        this.notificationCaptureStatus = {
+          ...this.notificationCaptureStatus,
+          storedRecordCount: 0,
+        }
+      })
+      return true
+    } catch (error) {
+      runInAction(() => {
+        this.notificationInboxErrorMessage = errorMessage(
+          error,
+          "알림 후보를 모두 삭제하지 못했습니다.",
+        )
+      })
+      return false
+    }
+  }
+
+  async revokeNotificationPrivacyDisclosure(): Promise<boolean> {
+    try {
+      const status = await revokeNotificationDisclosure()
+      runInAction(() => {
+        this.notificationCaptureStatus = status
+        this.notificationCandidates = []
+        this.notificationInboxStatus = "ready"
+        this.notificationInboxErrorMessage = undefined
+      })
+      return true
+    } catch (error) {
+      runInAction(() => {
+        this.notificationInboxErrorMessage = errorMessage(
+          error,
+          "알림 개인정보 동의를 철회하지 못했습니다.",
+        )
+      })
+      return false
+    }
+  }
+
   private handleAuthEvent(
     event: AuthSessionEvent,
     session: AuthSessionInfo | null,
@@ -706,6 +958,9 @@ export class MobileAppStore {
 
     if (userId !== this.authUser?.id) return
     await this.loadSelectedMonth()
+    if (userId === this.authUser?.id) {
+      await this.refreshNotificationInbox()
+    }
   }
 
   private async rejectSession(error: unknown): Promise<void> {
@@ -753,6 +1008,10 @@ export class MobileAppStore {
     this.consentErrorMessage = undefined
     this.transactionMutationState = "idle"
     this.transactionMutationErrorMessage = undefined
+    this.notificationCaptureStatus = createEmptyNotificationCaptureStatus()
+    this.notificationCandidates = []
+    this.notificationInboxStatus = "idle"
+    this.notificationInboxErrorMessage = undefined
     this.financeQueryCache.clear()
   }
 
@@ -771,6 +1030,20 @@ export class MobileAppStore {
     if (!this.selectedDate.startsWith(`${month}-`)) {
       this.selectedDate = `${month}-01`
     }
+  }
+}
+
+function createEmptyNotificationCaptureStatus(): NotificationCaptureStatus {
+  return {
+    allowedPackageNames: [],
+    disclosureAcceptedAt: 0,
+    hasDisclosureConsent: false,
+    hasNotificationAccess: false,
+    isCollectionEnabled: false,
+    retentionDays: 7,
+    reviewNotificationsEnabled: false,
+    storedRecordCount: 0,
+    targetLedgerId: "",
   }
 }
 

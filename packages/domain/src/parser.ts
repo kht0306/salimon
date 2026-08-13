@@ -1,12 +1,14 @@
 import type { ParsedTransaction, TransactionType } from "@salimon/types"
 
 const amountPattern = /(\d{1,3}(?:,\d{3})+|\d+)\s*(?:원|KRW)/i
+const allAmountPattern = /(?:₩\s*)?(?:\d{1,3}(?:,\d{3})+|\d+)\s*(?:원|KRW)/gi
 const datePattern = /(\d{1,2})[./-](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?/
 const sensitivePatterns = [
   /\b\d{2,4}-\d{3,4}-\d{4}\b/g,
   /\b\d{3,6}-\d{2,6}-\d{2,8}\b/g,
   /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{3,4}\b/g,
-  /(승인번호|승인|카드|계좌)\s*[:：]?\s*\d{4,}/gi,
+  /(승인번호|카드|계좌)\s*[:：]?\s*\d{4,}/gi,
+  /\((?=[\d* -]{4,}\))[\d* -]*\d[\d* -]*\)/g,
 ]
 
 export function parseCardSmsText(
@@ -23,7 +25,7 @@ export function parseCardSmsText(
   const amount = amountMatch ? Number(amountMatch[1].replace(/,/g, "")) : 0
   const transactionAt = parseTransactionDate(text, receivedAt)
   const type = inferType(text)
-  const merchantName = extractMerchantName(text, amountMatch?.[0])
+  const merchantName = extractMerchantName(rawText, text)
   const confidence = scoreConfidence({
     amount,
     merchantName,
@@ -103,7 +105,7 @@ function parseTransactionDate(text: string, receivedAt: Date): Date {
 }
 
 function inferType(text: string): TransactionType {
-  if (/(입금|환급|캐시백)/.test(text)) {
+  if (/(입금|환급|환불|캐시백|승인취소)/.test(text)) {
     return "income"
   }
 
@@ -111,26 +113,42 @@ function inferType(text: string): TransactionType {
 }
 
 function extractMerchantName(
+  rawText: string,
   text: string,
-  amountToken?: string,
 ): string | undefined {
+  const standaloneLine = rawText
+    .split(/\r?\n/)
+    .map(normalizeWhitespace)
+    .find(
+      (line) =>
+        line.length > 1 &&
+        line.length <= 50 &&
+        !amountPattern.test(line) &&
+        !datePattern.test(line) &&
+        !/[()*]/.test(line) &&
+        !/(카드|은행|로카|승인|결제|일시불|할부|누적|잔액)/.test(line),
+    )
+  if (standaloneLine) return standaloneLine
+
   let scrubbed = text
     .replace(/\[[^\]]+\]/g, " ")
     .replace(datePattern, " ")
+    .replace(allAmountPattern, " ")
+    .replace(/\S*(?:카드|은행)/gi, " ")
+    .replace(/쇼핑엔\s+로카(?:\([^)]*\))?/gi, " ")
     .replace(
-      /일시불|체크카드|신용카드|승인취소|승인|결제|사용|출금|입금|환급|캐시백|누적|잔액/gi,
+      /일시불|할부|체크카드|신용카드|승인취소|승인|결제|사용|출금|입금|이체|환급|환불|캐시백|누적금액|누적|잔액/gi,
       " ",
     )
 
-  if (amountToken) {
-    scrubbed = scrubbed.replace(amountToken, " ")
-  }
-
   const tokens = normalizeWhitespace(scrubbed)
     .split(" ")
-    .filter((token) => token.length > 1 && !/^\d+$/.test(token))
+    .filter(
+      (token) =>
+        token.length > 1 && !/^\d+$/.test(token) && !/[()*]/.test(token),
+    )
 
-  return tokens.at(-1)
+  return tokens.at(0)
 }
 
 function scoreConfidence({

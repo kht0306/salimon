@@ -10,7 +10,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { MobileAuthGateway } from "../features/auth/mobileAuth"
 import { QueryCache } from "../infrastructure/queryCache"
 import {
+  acceptNotificationDisclosure,
   clearNotificationCaptureSession,
+  configureNotificationCapture,
+  deleteAllStoredNotificationRecords,
+  deleteStoredNotificationRecord,
+  getNotificationCaptureStatus,
+  readStoredNotificationRecords,
+  revokeNotificationDisclosure,
   setAuthenticatedNotificationCaptureUser,
 } from "../native/notificationListener"
 import { MobileAppStore } from "./mobileAppStore"
@@ -24,9 +31,30 @@ vi.mock("../infrastructure/supabase", () => ({
 }))
 
 vi.mock("../native/notificationListener", () => ({
+  acceptNotificationDisclosure: vi.fn(),
   clearNotificationCaptureSession: vi.fn(async () => undefined),
+  configureNotificationCapture: vi.fn(),
+  deleteAllStoredNotificationRecords: vi.fn(async () => undefined),
+  deleteExpiredNotificationRecords: vi.fn(async () => 0),
+  deleteStoredNotificationRecord: vi.fn(async () => true),
+  getNotificationCaptureStatus: vi.fn(),
+  openNotificationAccessSettings: vi.fn(async () => undefined),
+  readStoredNotificationRecords: vi.fn(async () => []),
+  revokeNotificationDisclosure: vi.fn(),
   setAuthenticatedNotificationCaptureUser: vi.fn(async () => undefined),
 }))
+
+const emptyNotificationStatus = {
+  allowedPackageNames: [],
+  disclosureAcceptedAt: 0,
+  hasDisclosureConsent: false,
+  hasNotificationAccess: false,
+  isCollectionEnabled: false,
+  retentionDays: 7,
+  reviewNotificationsEnabled: false,
+  storedRecordCount: 0,
+  targetLedgerId: "",
+}
 
 const session: AuthSessionInfo = {
   user: { id: "user-1", nickname: "살림 가족" },
@@ -113,6 +141,10 @@ describe("MobileAppStore authentication", () => {
     vi.restoreAllMocks()
     vi.mocked(clearNotificationCaptureSession).mockClear()
     vi.mocked(setAuthenticatedNotificationCaptureUser).mockClear()
+    vi.mocked(getNotificationCaptureStatus).mockResolvedValue(
+      emptyNotificationStatus,
+    )
+    vi.mocked(readStoredNotificationRecords).mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -287,6 +319,89 @@ describe("MobileAppStore authentication", () => {
     )
     expect(store.requiresLegalConsent).toBe(false)
     expect(store.consentStatus).toBe("idle")
+  })
+
+  it("creates masked notification candidates and deletes the native record when excluded", async () => {
+    const captureStatus = {
+      ...emptyNotificationStatus,
+      allowedPackageNames: ["com.lotte"],
+      disclosureAcceptedAt: Date.now(),
+      hasDisclosureConsent: true,
+      hasNotificationAccess: true,
+      isCollectionEnabled: true,
+      storedRecordCount: 1,
+      targetLedgerId: "ledger-1",
+    }
+    vi.mocked(getNotificationCaptureStatus).mockResolvedValue(captureStatus)
+    vi.mocked(readStoredNotificationRecords).mockResolvedValue([
+      {
+        capturedAt: Date.now(),
+        expandedText: "12,000원 승인\n쇼핑엔 로카(8*3*)\n08/13 14:00",
+        id: "a".repeat(64),
+        receivedAt: new Date("2026-08-13T14:00:00+09:00").getTime(),
+        sourcePackageName: "com.lotte",
+        text: "12,000원 승인",
+        title: "테스트상점",
+      },
+    ])
+    const store = new MobileAppStore(createRepository(), createAuthGateway())
+
+    await store.initializeAuth()
+
+    expect(store.notificationCandidateCount).toBe(1)
+    expect(store.notificationCandidates[0]?.maskedMessage).not.toContain(
+      "(8*3*)",
+    )
+
+    await expect(
+      store.excludeNotificationCandidate("a".repeat(64)),
+    ).resolves.toBe(true)
+    expect(deleteStoredNotificationRecord).toHaveBeenCalledWith("a".repeat(64))
+    expect(store.notificationCandidateCount).toBe(0)
+  })
+
+  it("keeps notification collection disabled until disclosure consent", async () => {
+    vi.mocked(acceptNotificationDisclosure).mockResolvedValue({
+      ...emptyNotificationStatus,
+      disclosureAcceptedAt: Date.now(),
+      hasDisclosureConsent: true,
+    })
+    vi.mocked(configureNotificationCapture).mockResolvedValue({
+      ...emptyNotificationStatus,
+      allowedPackageNames: ["com.lotte"],
+      disclosureAcceptedAt: Date.now(),
+      hasDisclosureConsent: true,
+      isCollectionEnabled: true,
+      targetLedgerId: "ledger-1",
+    })
+    vi.mocked(revokeNotificationDisclosure).mockResolvedValue(
+      emptyNotificationStatus,
+    )
+    const store = new MobileAppStore(createRepository(), createAuthGateway())
+    await store.initializeAuth()
+
+    await expect(
+      store.configureNotificationInbox({
+        allowedPackageNames: ["com.lotte"],
+        enabled: true,
+        targetLedgerId: "ledger-1",
+      }),
+    ).resolves.toBe(false)
+    expect(configureNotificationCapture).not.toHaveBeenCalled()
+
+    await expect(store.acceptNotificationPrivacyDisclosure()).resolves.toBe(
+      true,
+    )
+    await expect(
+      store.configureNotificationInbox({
+        allowedPackageNames: ["com.lotte"],
+        enabled: true,
+        targetLedgerId: "ledger-1",
+      }),
+    ).resolves.toBe(true)
+
+    await store.deleteAllNotificationCandidates()
+    expect(deleteAllStoredNotificationRecords).toHaveBeenCalled()
   })
 
   it("selects the default ledger first and calculates each ledger independently", async () => {

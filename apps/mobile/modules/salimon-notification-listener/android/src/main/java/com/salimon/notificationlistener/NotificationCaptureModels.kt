@@ -36,11 +36,19 @@ internal data class NotificationCaptureRecord(
 
 internal data class NotificationCapturePreferencesSnapshot(
   val sessionFingerprint: String,
+  val disclosureAcceptedAt: Long,
   val isCollectionEnabled: Boolean,
   val allowedPackageNames: Set<String>,
+  val targetLedgerId: String,
+  val reviewNotificationsEnabled: Boolean,
 ) {
+  val hasDisclosureConsent: Boolean
+    get() = disclosureAcceptedAt > 0L
+
   val isCaptureActive: Boolean
-    get() = sessionFingerprint.isNotBlank() &&
+    get() = hasDisclosureConsent &&
+      sessionFingerprint.isNotBlank() &&
       isCollectionEnabled &&
-      allowedPackageNames.isNotEmpty()
+      allowedPackageNames.isNotEmpty() &&
+      targetLedgerId.isNotBlank()
 }

@@ -72,6 +72,25 @@ export default observer(function MainTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="inbox"
+        options={{
+          title: "후보함",
+          tabBarAccessibilityLabel: "결제 알림 후보함",
+          tabBarBadge:
+            store.notificationCandidateCount > 0
+              ? store.notificationCandidateCount
+              : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: mobileTheme.colors.teal,
+            color: mobileTheme.colors.panel,
+            fontSize: 10,
+          },
+          tabBarIcon: ({ focused }) => (
+            <AppTabIcon active={focused} name="inbox" />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="settlement"
         options={{
           title: "정산",

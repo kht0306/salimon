@@ -2,6 +2,7 @@ import styled from "@emotion/native"
 import { Stack } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { useEffect, useState } from "react"
+import { AppState } from "react-native"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
 import { MobileStoreProvider } from "../stores/MobileStoreProvider"
 import {
@@ -53,9 +54,18 @@ function MobileRuntime({ store }: MobileRuntimeProps) {
   useEffect(() => {
     const stopObserving = store.observeAuthSession()
     const stopRefreshing = store.bindSessionRefresh()
+    const appStateSubscription = AppState.addEventListener(
+      "change",
+      (state) => {
+        if (state === "active" && store.authState === "authenticated") {
+          void store.refreshNotificationInbox()
+        }
+      },
+    )
     void store.initializeAuth()
 
     return () => {
+      appStateSubscription.remove()
       stopObserving()
       stopRefreshing()
     }
