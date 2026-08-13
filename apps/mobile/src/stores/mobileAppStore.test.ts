@@ -330,7 +330,7 @@ describe("MobileAppStore authentication", () => {
   it("creates masked notification candidates and deletes the native record when excluded", async () => {
     const captureStatus = {
       ...emptyNotificationStatus,
-      allowedPackageNames: ["com.lotte"],
+      allowedPackageNames: ["com.lcacApp"],
       disclosureAcceptedAt: Date.now(),
       hasDisclosureConsent: true,
       hasNotificationAccess: true,
@@ -345,7 +345,7 @@ describe("MobileAppStore authentication", () => {
         expandedText: "12,000원 승인\n쇼핑엔 로카(8*3*)\n08/13 14:00",
         id: "a".repeat(64),
         receivedAt: new Date("2026-08-13T14:00:00+09:00").getTime(),
-        sourcePackageName: "com.lotte",
+        sourcePackageName: "com.lcacApp",
         text: "12,000원 승인",
         title: "테스트상점",
       },
@@ -402,7 +402,7 @@ describe("MobileAppStore authentication", () => {
     expect(repository.saveTransaction).toHaveBeenCalledWith(
       "user-1",
       expect.objectContaining({
-        sourceApp: "com.lotte",
+        sourceApp: "com.lcacApp",
         sourceHash: expect.any(String),
         sourceType: "android_sms_notification",
       }),
@@ -500,7 +500,7 @@ describe("MobileAppStore authentication", () => {
     })
     vi.mocked(configureNotificationCapture).mockResolvedValue({
       ...emptyNotificationStatus,
-      allowedPackageNames: ["com.lotte"],
+      allowedPackageNames: ["com.lcacApp"],
       disclosureAcceptedAt: Date.now(),
       hasDisclosureConsent: true,
       isCollectionEnabled: true,
@@ -514,7 +514,7 @@ describe("MobileAppStore authentication", () => {
 
     await expect(
       store.configureNotificationInbox({
-        allowedPackageNames: ["com.lotte"],
+        allowedPackageNames: ["com.lcacApp"],
         enabled: true,
         targetLedgerId: "ledger-1",
       }),
@@ -526,7 +526,7 @@ describe("MobileAppStore authentication", () => {
     )
     await expect(
       store.configureNotificationInbox({
-        allowedPackageNames: ["com.lotte"],
+        allowedPackageNames: ["com.lcacApp"],
         enabled: true,
         targetLedgerId: "ledger-1",
       }),
@@ -943,7 +943,7 @@ function createExpenseCategory() {
 function mockCapturedNotification(): void {
   vi.mocked(getNotificationCaptureStatus).mockResolvedValue({
     ...emptyNotificationStatus,
-    allowedPackageNames: ["com.lotte"],
+    allowedPackageNames: ["com.lcacApp"],
     disclosureAcceptedAt: Date.now(),
     hasDisclosureConsent: true,
     hasNotificationAccess: true,
@@ -957,7 +957,7 @@ function mockCapturedNotification(): void {
       expandedText: "45,000원 승인\n쇼핑엔 로카(8*3*)\n08/13 14:00",
       id: "a".repeat(64),
       receivedAt: Date.now(),
-      sourcePackageName: "com.lotte",
+      sourcePackageName: "com.lcacApp",
       text: "45,000원 승인",
       title: "테스트주유소",
     },

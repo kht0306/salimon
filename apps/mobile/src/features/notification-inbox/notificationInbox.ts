@@ -2,7 +2,7 @@ import { maskSensitiveText, parseCardSmsText } from "@salimon/domain"
 import type { LocalSmsCandidate } from "@salimon/types"
 
 export const SUPPORTED_NOTIFICATION_APPS = [
-  { name: "롯데카드", packageName: "com.lotte" },
+  { name: "롯데카드", packageName: "com.lcacApp" },
 ] as const
 
 export interface NotificationRecordInput {
