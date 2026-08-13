@@ -2,13 +2,13 @@
   "expo": {
     "name": "살림온",
     "slug": "salimon",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "orientation": "default",
     "icon": "../web/public/salimon-app-icon-128.png",
     "scheme": "salimon",
     "android": {
       "package": "com.salimon.app",
-      "versionCode": 1,
+      "versionCode": 2,
       "permissions": ["android.permission.POST_NOTIFICATIONS"],
       "adaptiveIcon": {
         "backgroundColor": "#101c18",
@@ -18,6 +18,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/withReleaseSigning.cjs",
       "expo-secure-store",
       [
         "expo-splash-screen",

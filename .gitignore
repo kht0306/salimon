@@ -34,3 +34,5 @@ apps/mobile/ios/
 *.keystore
 *.p8
 *.mobileprovision
+*.keystore.properties
+release-signing.properties

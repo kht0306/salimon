@@ -39,7 +39,21 @@ SecureStore, WebBrowser, 살림온 알림 수신 네이티브 모듈이 포함�
 Development APK로 업데이트해야 한다. 같은 디버그 서명을 사용하면 기존 앱을
 제거하지 않고 `adb install -r`로 업데이트할 수 있다.
 
-## 현재 구현 범위 (11회차 진행 중)
+## 가족 알파 APK 빌드
+
+12회차부터 가족 알파는 `0.2.0`·`versionCode 2`와 전용 릴리스 서명을
+사용한다. 키 파일과 비밀번호는 저장소 밖에 보관하고 다음 명령으로 APK를 만든다.
+
+```bash
+pnpm build:mobile:family-alpha
+```
+
+서명 설정과 최초 설치·업데이트 절차는
+[`docs/mobile-private-distribution.md`](../../docs/mobile-private-distribution.md)를
+따른다. 전용 서명이 없으면 릴리스 빌드는 실패하며 디버그 인증서로 가족 APK를
+생성하지 않는다.
+
+## 현재 구현 범위 (12회차 진행 중)
 
 - Expo Router와 Development Client 기반 앱 셸
 - Emotion Native와 공용 모바일 UI 토큰
@@ -86,8 +100,10 @@ Development APK로 업데이트해야 한다. 같은 디버그 서명을 사용�
 - 모달 화면 판독기 범위 분리와 선택 필드의 현재 값·동작 안내
 - 알림 접근 회수 시 후보함의 권한 복구 안내와 보관 후보 유지
 - TypeScript·Kotlin 런타임 소스의 직접 로그 출력 방지 검사
+- 가족 알파 전용 릴리스 서명 강제와 디버그 인증서 차단
+- 서명 검증·버전별 APK 파일명·SHA-256 체크섬 자동 생성
 
-11회차 기기별 상태와 완료 조건은
+11회차 S25 검증 상태와 최종 기기 호환성 조건은
 [`docs/mobile-phase-11-device-matrix.md`](../../docs/mobile-phase-11-device-matrix.md)에
 기록한다.
 
