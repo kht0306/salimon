@@ -485,7 +485,7 @@ export class MobileAppStore {
       }
 
       runInAction(() => {
-        const message = errorMessage(
+        const message = dataLoadErrorMessage(
           error,
           "가계부 데이터를 불러오지 못했습니다.",
         )
@@ -1274,17 +1274,25 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
 }
 
+function dataLoadErrorMessage(error: unknown, fallback: string): string {
+  return isNetworkError(error) ? "네트워크에 연결할 수 없습니다." : fallback
+}
+
 function mutationErrorMessage(error: unknown, fallback: string): string {
-  if (
-    error instanceof Error &&
-    /fetch failed|failed to fetch|network(?: request)? (?:failed|unavailable)|unknownhostexception|unable to resolve host/i.test(
-      error.message,
-    )
-  ) {
+  if (isNetworkError(error)) {
     return "네트워크 연결이 원활하지 않아 저장 결과를 확인하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요. 입력 내용은 그대로 유지됩니다."
   }
 
   return errorMessage(error, fallback)
+}
+
+function isNetworkError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    /fetch failed|failed to fetch|network(?: request)? (?:failed|unavailable)|unknownhostexception|unable to resolve host/i.test(
+      error.message,
+    )
+  )
 }
 
 function createFinanceCacheKey(userId: string, month: string): string {

@@ -19,6 +19,9 @@ export const NotificationInboxScreen = observer(
     const store = useMobileAppStore()
     const [selectedCandidate, setSelectedCandidate] =
       useState<LocalSmsCandidate>()
+    const captureOperational =
+      store.notificationCaptureStatus.isCollectionEnabled &&
+      store.notificationCaptureStatus.hasNotificationAccess
 
     useFocusEffect(
       useCallback(() => {
@@ -97,10 +100,17 @@ export const NotificationInboxScreen = observer(
                 서버로 전송되지 않습니다.
               </PrivacyNotice>
               {store.notificationInboxErrorMessage ? (
-                <ErrorNotice>{store.notificationInboxErrorMessage}</ErrorNotice>
+                <ErrorNotice
+                  accessibilityLiveRegion="assertive"
+                  accessibilityRole="alert"
+                >
+                  {store.notificationInboxErrorMessage}
+                </ErrorNotice>
               ) : null}
               {store.notificationInboxNoticeMessage ? (
-                <InfoNotice>{store.notificationInboxNoticeMessage}</InfoNotice>
+                <InfoNotice accessibilityLiveRegion="polite">
+                  {store.notificationInboxNoticeMessage}
+                </InfoNotice>
               ) : null}
             </Header>
           }
@@ -113,16 +123,20 @@ export const NotificationInboxScreen = observer(
             ) : (
               <EmptyCard>
                 <EmptyTitle>
-                  {store.notificationCaptureStatus.isCollectionEnabled
+                  {captureOperational
                     ? "확인할 후보가 없어요"
-                    : "알림 후보함이 꺼져 있어요"}
+                    : store.notificationCaptureStatus.isCollectionEnabled
+                      ? "알림 접근이 꺼져 있어요"
+                      : "알림 후보함이 꺼져 있어요"}
                 </EmptyTitle>
                 <EmptyDescription>
-                  {store.notificationCaptureStatus.isCollectionEnabled
+                  {captureOperational
                     ? "새 결제 알림이 감지되면 이곳에서 검토할 수 있습니다."
-                    : "설정에서 개인정보 안내를 확인하고 지원 앱을 선택해 주세요."}
+                    : store.notificationCaptureStatus.isCollectionEnabled
+                      ? "설정에서 Android 알림 접근을 다시 허용해 주세요. 보관 중인 후보는 삭제되지 않습니다."
+                      : "설정에서 개인정보 안내를 확인하고 지원 앱을 선택해 주세요."}
                 </EmptyDescription>
-                {!store.notificationCaptureStatus.isCollectionEnabled ? (
+                {!captureOperational ? (
                   <AppButton
                     label="알림 후보함 설정"
                     tone="primary"

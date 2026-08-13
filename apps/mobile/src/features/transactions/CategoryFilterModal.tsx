@@ -68,11 +68,17 @@ export function CategoryFilterModal({
     >
       <ModalRoot>
         <Backdrop
-          accessibilityLabel="카테고리 선택 닫기"
-          accessibilityRole="button"
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
           onPress={onClose}
         />
-        <Sheet edges={safeAreaEdges}>
+        <Sheet
+          accessibilityViewIsModal
+          edges={safeAreaEdges}
+          importantForAccessibility="yes"
+          onAccessibilityEscape={onClose}
+        >
           <SheetHandle />
           <SheetHeader>
             <SheetHeading>
@@ -83,7 +89,11 @@ export function CategoryFilterModal({
               </SheetDescription>
             </SheetHeading>
             <HeaderActions>
-              <CloseButton accessibilityRole="button" onPress={onClose}>
+              <CloseButton
+                accessibilityLabel="카테고리 선택 닫기"
+                accessibilityRole="button"
+                onPress={onClose}
+              >
                 <CloseButtonLabel>닫기</CloseButtonLabel>
               </CloseButton>
               <ApplyButton
@@ -156,7 +166,11 @@ export function CategoryFilterModal({
                       accessibilityState={{ expanded }}
                       onPress={() => toggleExpanded(item.category.id)}
                     >
-                      <TreeControlLabel>
+                      <TreeControlLabel
+                        accessibilityElementsHidden
+                        allowFontScaling={false}
+                        importantForAccessibility="no"
+                      >
                         {expanded ? "−" : "+"}
                       </TreeControlLabel>
                     </TreeControl>

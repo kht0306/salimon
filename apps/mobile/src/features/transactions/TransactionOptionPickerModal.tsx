@@ -58,15 +58,25 @@ export function TransactionOptionPickerModal({
     >
       <ModalRoot>
         <Backdrop
-          accessibilityLabel={`${title} 닫기`}
-          accessibilityRole="button"
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
           onPress={onClose}
         />
-        <Sheet edges={safeAreaEdges}>
+        <Sheet
+          accessibilityViewIsModal
+          edges={safeAreaEdges}
+          importantForAccessibility="yes"
+          onAccessibilityEscape={onClose}
+        >
           <SheetHandle />
           <SheetHeader>
             <SheetTitle accessibilityRole="header">{title}</SheetTitle>
-            <CloseButton accessibilityRole="button" onPress={onClose}>
+            <CloseButton
+              accessibilityLabel={`${title} 닫기`}
+              accessibilityRole="button"
+              onPress={onClose}
+            >
               <CloseButtonLabel>닫기</CloseButtonLabel>
             </CloseButton>
           </SheetHeader>

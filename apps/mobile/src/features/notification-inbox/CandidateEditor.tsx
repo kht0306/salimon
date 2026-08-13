@@ -234,7 +234,12 @@ export const CandidateEditor = observer(function CandidateEditor({
         if (!isSaving) onClose()
       }}
     >
-      <Page edges={safeAreaEdges}>
+      <Page
+        accessibilityViewIsModal
+        edges={safeAreaEdges}
+        importantForAccessibility="yes"
+        onAccessibilityEscape={isSaving ? undefined : onClose}
+      >
         <KeyboardAvoidingView behavior={keyboardBehavior} style={styles.flex}>
           <ScrollView
             contentContainerStyle={styles.scrollContent}
@@ -450,6 +455,12 @@ function SelectionField({
     <Field>
       <FieldLabel>{label}</FieldLabel>
       <SelectionButton
+        accessibilityHint={
+          disabled
+            ? "등록 대기 중에는 변경할 수 없습니다."
+            : "선택 목록을 엽니다."
+        }
+        accessibilityLabel={`${label}, ${value ?? placeholder}`}
         accessibilityRole="button"
         accessibilityState={{ disabled }}
         disabled={disabled}

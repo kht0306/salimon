@@ -609,13 +609,20 @@ describe("MobileAppStore authentication", () => {
       new QueryCache(),
     )
     await store.initializeAuth()
-    repository.load.mockRejectedValueOnce(new Error("network unavailable"))
+    repository.load.mockRejectedValueOnce(
+      new Error(
+        "fetch failed: UnknownHostException: unable to resolve host private.example.test",
+      ),
+    )
 
     await store.refreshSelectedMonth()
 
     expect(store.dataStatus).toBe("stale")
     expect(store.monthTransactions).toHaveLength(1)
-    expect(store.dataErrorMessage).toContain("읽기 전용")
+    expect(store.dataErrorMessage).toBe(
+      "네트워크에 연결할 수 없습니다. 마지막 조회 내용을 읽기 전용으로 표시합니다.",
+    )
+    expect(store.dataErrorMessage).not.toContain("private.example.test")
   })
 
   it("uses the latest effective category budget and matching expense", async () => {

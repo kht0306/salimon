@@ -8,6 +8,7 @@
     "start": "expo start --dev-client",
     "android": "expo run:android",
     "prebuild:android": "expo prebuild --platform android",
+    "security:check": "node scripts/check-sensitive-logs.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
     "test": "vitest run"
