@@ -73,6 +73,17 @@ export type MobileTransactionSaveResult =
   | { status: "saved"; transactionId: string }
   | { status: "error" }
 
+const TRANSACTION_SAVE_TIMEOUT_MS = 15_000
+const TRANSACTION_SAVE_TIMEOUT_MESSAGE =
+  "네트워크 응답이 지연되어 저장 결과를 확인하지 못했습니다. 연결 상태와 거래 목록을 확인한 뒤 다시 시도해 주세요. 입력 내용은 그대로 유지됩니다."
+
+class TransactionSaveTimeoutError extends Error {
+  constructor() {
+    super(TRANSACTION_SAVE_TIMEOUT_MESSAGE)
+    this.name = "TransactionSaveTimeoutError"
+  }
+}
+
 export interface MobileCategoryBudgetProgress {
   amount: number
   category: Category
@@ -472,11 +483,25 @@ export class MobileAppStore {
     this.transactionMutationState = "saving"
     this.transactionMutationErrorMessage = undefined
 
+    const abortController = new AbortController()
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
     try {
-      const transactionId = await this.repository.saveTransaction(
-        this.authUser.id,
-        input,
-      )
+      const transactionId = await Promise.race([
+        this.repository.saveTransaction(this.authUser.id, input, {
+          signal: abortController.signal,
+        }),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new TransactionSaveTimeoutError())
+            abortController.abort()
+          }, TRANSACTION_SAVE_TIMEOUT_MS)
+        }),
+      ])
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId)
+        timeoutId = undefined
+      }
       const savedTransactionId = transactionId ?? input.id
       if (!savedTransactionId) {
         throw new Error("저장된 거래를 확인하지 못했습니다.")
@@ -494,14 +519,19 @@ export class MobileAppStore {
     } catch (error) {
       runInAction(() => {
         this.transactionMutationState = "idle"
-        this.transactionMutationErrorMessage = errorMessage(
-          error,
-          input.id
-            ? "거래를 수정하지 못했습니다. 입력 내용은 그대로 유지됩니다."
-            : "거래를 저장하지 못했습니다. 입력 내용은 그대로 유지됩니다.",
-        )
+        this.transactionMutationErrorMessage =
+          error instanceof TransactionSaveTimeoutError
+            ? TRANSACTION_SAVE_TIMEOUT_MESSAGE
+            : errorMessage(
+                error,
+                input.id
+                  ? "거래를 수정하지 못했습니다. 입력 내용은 그대로 유지됩니다."
+                  : "거래를 저장하지 못했습니다. 입력 내용은 그대로 유지됩니다.",
+              )
       })
       return { status: "error" }
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
     }
   }
 
