@@ -2,9 +2,16 @@ import { describe, expect, it } from "vitest"
 import {
   candidateStatusLabel,
   createCandidateFromNotificationRecord,
+  SUPPORTED_NOTIFICATION_APPS,
 } from "./notificationInbox"
 
 describe("notification inbox candidate", () => {
+  it("targets the installed Lotte Card Android package", () => {
+    expect(SUPPORTED_NOTIFICATION_APPS).toEqual([
+      { name: "롯데카드", packageName: "com.lcacApp" },
+    ])
+  })
+
   it("keeps only masked text after parsing a native record", () => {
     const candidate = createCandidateFromNotificationRecord({
       record: {
@@ -17,7 +24,7 @@ describe("notification inbox candidate", () => {
         ].join("\n"),
         id: "a".repeat(64),
         receivedAt: new Date("2026-08-13T14:01:00+09:00").getTime(),
-        sourcePackageName: "com.lotte",
+        sourcePackageName: "com.lcacApp",
         text: "45,000원 승인",
         title: "테스트주유소",
       },
@@ -49,7 +56,7 @@ describe("notification inbox candidate", () => {
           transactionAt: "2026-08-13T15:10:00+09:00",
           updatedAt: new Date("2026-08-13T15:11:00+09:00").getTime(),
         },
-        sourcePackageName: "com.lotte",
+        sourcePackageName: "com.lcacApp",
         text: "45,000원 승인",
         title: "테스트상점",
       },

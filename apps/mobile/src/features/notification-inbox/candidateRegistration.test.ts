@@ -22,7 +22,7 @@ const candidate: LocalSmsCandidate = {
   },
   promptCount: 0,
   reviewDeadlineAt: "2026-08-20T05:00:00.000Z",
-  sourceApp: "com.lotte",
+  sourceApp: "com.lcacApp",
   sourceHash: "hash-1",
   status: "notified",
   targetLedgerId: "ledger-1",
@@ -93,7 +93,7 @@ describe("candidate registration", () => {
         input: expect.objectContaining({
           actorUserId: "user-1",
           amount: 45_000,
-          sourceApp: "com.lotte",
+          sourceApp: "com.lcacApp",
           sourceHash: "hash-1",
           sourceType: "android_sms_notification",
         }),
