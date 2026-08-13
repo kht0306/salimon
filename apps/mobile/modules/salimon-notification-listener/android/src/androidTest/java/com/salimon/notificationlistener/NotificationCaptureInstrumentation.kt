@@ -14,6 +14,7 @@ class NotificationCaptureInstrumentation : Instrumentation() {
 
   override fun onStart() {
     try {
+      verifyDisclosureGating()
       verifyEncryptedStorageLifecycle()
       finish(Activity.RESULT_OK, Bundle())
     } catch (error: Throwable) {
@@ -25,6 +26,33 @@ class NotificationCaptureInstrumentation : Instrumentation() {
       )
       throw error
     }
+  }
+
+  private fun verifyDisclosureGating() {
+    val context = targetContext.applicationContext
+    val preferences = NotificationCapturePreferences(context)
+    preferences.clearSession()
+
+    check(
+      runCatching { preferences.acceptDisclosure() }.isFailure,
+    )
+    preferences.setAuthenticatedUser("instrumentation-user")
+    check(!preferences.snapshot().hasDisclosureConsent)
+
+    preferences.acceptDisclosure(1_786_547_200_000)
+    preferences.configureCollection(
+      enabled = true,
+      allowedPackageNames = listOf("com.example.card"),
+      ownPackageName = context.packageName,
+      targetLedgerId = "ledger-1",
+      reviewNotificationsEnabled = false,
+    )
+    check(preferences.snapshot().isCaptureActive)
+
+    preferences.revokeDisclosure()
+    check(!preferences.snapshot().hasDisclosureConsent)
+    check(!preferences.snapshot().isCaptureActive)
+    preferences.clearSession()
   }
 
   private fun verifyEncryptedStorageLifecycle() {

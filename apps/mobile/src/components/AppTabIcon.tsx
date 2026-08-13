@@ -3,7 +3,7 @@ import { mobileTheme } from "../theme"
 
 interface AppTabIconProps {
   active: boolean
-  name: "home" | "settings" | "settlement" | "transactions"
+  name: "home" | "inbox" | "settings" | "settlement" | "transactions"
 }
 
 interface IconShapeProps {
@@ -21,8 +21,19 @@ export function AppTabIcon({ active, name }: AppTabIconProps) {
     >
       {name === "home" ? <HomeIcon color={color} /> : null}
       {name === "transactions" ? <TransactionsIcon color={color} /> : null}
+      {name === "inbox" ? <InboxIcon color={color} /> : null}
       {name === "settlement" ? <SettlementIcon color={color} /> : null}
       {name === "settings" ? <SettingsIcon color={color} /> : null}
+    </View>
+  )
+}
+
+function InboxIcon({ color }: IconShapeProps) {
+  return (
+    <View style={styles.shapeFrame}>
+      <View style={[styles.inboxBody, { borderColor: color }]}>
+        <View style={[styles.inboxSlot, { backgroundColor: color }]} />
+      </View>
     </View>
   )
 }
@@ -195,6 +206,23 @@ const styles = StyleSheet.create({
   homeDoor: {
     width: 3,
     height: 5,
+  },
+  inboxBody: {
+    position: "absolute",
+    top: 3,
+    left: 2,
+    width: 17,
+    height: 14,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    borderWidth: 2,
+    borderRadius: 3,
+    paddingBottom: 3,
+  },
+  inboxSlot: {
+    width: 7,
+    height: 2,
+    borderRadius: 1,
   },
   listDot: {
     position: "absolute",

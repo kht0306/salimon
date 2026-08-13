@@ -3,14 +3,20 @@ import { requireOptionalNativeModule } from "expo"
 export interface NativeNotificationCaptureConfiguration {
   allowedPackageNames: string[]
   enabled: boolean
+  reviewNotificationsEnabled: boolean
+  targetLedgerId: string
 }
 
 export interface NativeNotificationCaptureStatus {
   allowedPackageNames: string[]
+  disclosureAcceptedAt: number
   hasNotificationAccess: boolean
+  hasDisclosureConsent: boolean
   isCollectionEnabled: boolean
+  reviewNotificationsEnabled: boolean
   retentionDays: number
   storedRecordCount: number
+  targetLedgerId: string
 }
 
 export interface NativeNotificationRecord {
@@ -24,6 +30,7 @@ export interface NativeNotificationRecord {
 }
 
 export interface SalimonNotificationListenerNativeModule {
+  acceptDisclosure(): Promise<NativeNotificationCaptureStatus>
   clearSessionAndRecords(): Promise<void>
   configureCapture(
     configuration: NativeNotificationCaptureConfiguration,
@@ -34,6 +41,7 @@ export interface SalimonNotificationListenerNativeModule {
   getStatus(): Promise<NativeNotificationCaptureStatus>
   openNotificationAccessSettings(): Promise<void>
   readRecords(): Promise<NativeNotificationRecord[]>
+  revokeDisclosureAndDeleteRecords(): Promise<NativeNotificationCaptureStatus>
   setAuthenticatedUser(userId: string): Promise<void>
 }
 

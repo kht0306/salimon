@@ -9,6 +9,7 @@
     "android": {
       "package": "com.salimon.app",
       "versionCode": 1,
+      "permissions": ["android.permission.POST_NOTIFICATIONS"],
       "adaptiveIcon": {
         "backgroundColor": "#101c18",
         "foregroundImage": "../web/public/salimon-app-icon-128.png"

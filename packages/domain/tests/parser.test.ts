@@ -32,6 +32,31 @@ describe("parseCardSmsText", () => {
 
     expect(parsed.type).toBe("expense")
   })
+
+  it("parses a multiline Lotte Card notification without using the cumulative amount", () => {
+    const parsed = parseCardSmsText(
+      [
+        "테스트주유소",
+        "45,000원 승인",
+        "쇼핑엔 로카(8*3*)",
+        "일시불, 08/13 14:00",
+        "누적금액 3,295,290원",
+      ].join("\n"),
+      new Date("2026-08-13T14:01:00+09:00"),
+    )
+
+    expect(parsed.amount).toBe(45_000)
+    expect(parsed.merchantName).toBe("테스트주유소")
+    const transactionAt = new Date(parsed.transactionAt)
+    expect([
+      transactionAt.getMonth() + 1,
+      transactionAt.getDate(),
+      transactionAt.getHours(),
+      transactionAt.getMinutes(),
+    ]).toEqual([8, 13, 14, 0])
+    expect(parsed.rawTextMasked).toContain("쇼핑엔 로카****")
+    expect(parsed.rawTextMasked).not.toContain("(8*3*)")
+  })
 })
 
 describe("maskSensitiveText", () => {
@@ -40,5 +65,7 @@ describe("maskSensitiveText", () => {
       maskSensitiveText("카드 1234567812345678 승인번호 998877"),
     ).toContain("카드 ****")
     expect(maskSensitiveText("010-1234-5678")).toBe("****")
+    expect(maskSensitiveText("쇼핑엔 로카(8*3*)")).toBe("쇼핑엔 로카****")
+    expect(maskSensitiveText("승인 12000원")).toBe("승인 12000원")
   })
 })
