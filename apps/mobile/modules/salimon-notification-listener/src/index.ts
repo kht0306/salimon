@@ -27,6 +27,17 @@ export interface NativeNotificationRecord {
   sourcePackageName: string
   text: string
   title: string
+  registrationState?: NativeNotificationRegistrationState
+}
+
+export interface NativeNotificationRegistrationState {
+  amount: number
+  categoryId: string
+  merchantName: string
+  paymentMethodId: string
+  targetLedgerId: string
+  transactionAt: string
+  updatedAt: number
 }
 
 export interface SalimonNotificationListenerNativeModule {
@@ -41,6 +52,10 @@ export interface SalimonNotificationListenerNativeModule {
   getStatus(): Promise<NativeNotificationCaptureStatus>
   openNotificationAccessSettings(): Promise<void>
   readRecords(): Promise<NativeNotificationRecord[]>
+  saveRegistrationState(
+    id: string,
+    state: Omit<NativeNotificationRegistrationState, "updatedAt">,
+  ): Promise<boolean>
   revokeDisclosureAndDeleteRecords(): Promise<NativeNotificationCaptureStatus>
   setAuthenticatedUser(userId: string): Promise<void>
 }

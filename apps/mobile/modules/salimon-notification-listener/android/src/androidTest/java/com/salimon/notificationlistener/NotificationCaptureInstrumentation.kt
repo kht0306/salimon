@@ -94,6 +94,24 @@ class NotificationCaptureInstrumentation : Instrumentation() {
     check(records.size == 1)
     check(!records.single().expandedText.contains("1234567812345678"))
     check(records.single().expandedText.contains("[민감번호 숨김]"))
+    check(
+      store.saveRegistrationState(
+        recordId = records.single().id,
+        expectedSessionFingerprint = sessionFingerprint,
+        registrationState = NotificationRegistrationState(
+          amount = 12_000,
+          categoryId = "category-1",
+          merchantName = "암호화 테스트상점",
+          paymentMethodId = "card-1",
+          targetLedgerId = "ledger-1",
+          transactionAt = "2026-08-13T14:00:00+09:00",
+          updatedAt = now,
+        ),
+      ),
+    )
+    val pendingRecord = store.readRecords(sessionFingerprint, now).single()
+    check(pendingRecord.registrationState?.amount == 12_000L)
+    check(pendingRecord.registrationState?.categoryId == "category-1")
     checkEncryptedFilesDoNotContainPlaintext(context)
 
     store.capture(
@@ -125,5 +143,6 @@ class NotificationCaptureInstrumentation : Instrumentation() {
     check(!storedText.contains("테스트 카드"))
     check(!storedText.contains("승인 12,000원"))
     check(!storedText.contains("1234567812345678"))
+    check(!storedText.contains("암호화 테스트상점"))
   }
 }

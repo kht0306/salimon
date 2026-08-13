@@ -17,6 +17,16 @@ class NotificationCaptureConfiguration(
   @Field val targetLedgerId: String = "",
 ) : Record
 
+@OptimizedRecord
+class NotificationRegistrationStateInput(
+  @Field val amount: Double = 0.0,
+  @Field val categoryId: String = "",
+  @Field val merchantName: String = "",
+  @Field val paymentMethodId: String = "",
+  @Field val targetLedgerId: String = "",
+  @Field val transactionAt: String = "",
+) : Record
+
 class SalimonNotificationListenerModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("SalimonNotificationListener")
@@ -96,6 +106,44 @@ class SalimonNotificationListenerModule : Module() {
     AsyncFunction("deleteRecord") { recordId: String ->
       EncryptedNotificationStore(requireApplicationContext())
         .deleteRecord(recordId)
+    }
+
+    AsyncFunction("saveRegistrationState") {
+        recordId: String,
+        state: NotificationRegistrationStateInput,
+      ->
+      require(
+        state.amount.isFinite() &&
+          state.amount > 0 &&
+          state.amount % 1.0 == 0.0,
+      ) { "등록 금액이 올바르지 않습니다." }
+      require(state.categoryId.isNotBlank()) {
+        "등록 카테고리가 필요합니다."
+      }
+      require(state.targetLedgerId.isNotBlank()) {
+        "등록 가계부가 필요합니다."
+      }
+      require(state.transactionAt.isNotBlank()) {
+        "등록 거래 시각이 필요합니다."
+      }
+
+      val context = requireApplicationContext()
+      val sessionFingerprint = NotificationCapturePreferences(context)
+        .snapshot()
+        .sessionFingerprint
+      EncryptedNotificationStore(context).saveRegistrationState(
+        recordId = recordId,
+        expectedSessionFingerprint = sessionFingerprint,
+        registrationState = NotificationRegistrationState(
+          amount = state.amount.toLong(),
+          categoryId = state.categoryId,
+          merchantName = state.merchantName,
+          paymentMethodId = state.paymentMethodId,
+          targetLedgerId = state.targetLedgerId,
+          transactionAt = state.transactionAt,
+          updatedAt = System.currentTimeMillis(),
+        ),
+      )
     }
 
     AsyncFunction("deleteExpiredRecords") {

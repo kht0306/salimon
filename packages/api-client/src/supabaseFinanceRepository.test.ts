@@ -10,6 +10,7 @@ vi.mock("./supabaseClient", () => ({
 }))
 
 import {
+  DuplicateTransactionSourceError,
   mapPaymentMethodType,
   SupabaseFinanceRepository,
 } from "./supabaseFinanceRepository"
@@ -46,7 +47,7 @@ class LoadQueryDouble implements PromiseLike<QueryResult> {
 
 class MutationQueryDouble implements PromiseLike<QueryResult> {
   readonly abortSignal = vi.fn(() => this)
-  readonly insert = vi.fn(() => this)
+  readonly insert = vi.fn((_values: unknown) => this)
   readonly select = vi.fn(() => this)
   readonly single = vi.fn(() => this)
 
@@ -220,6 +221,70 @@ describe("mapPaymentMethodType", () => {
 })
 
 describe("saveTransaction", () => {
+  it.each([
+    "transactions_ledger_source_hash_uidx",
+    "transactions_creator_source_hash_uidx",
+  ])(
+    "maps the %s collision to an already-registered error",
+    async (constraintName) => {
+      const query = new MutationQueryDouble({
+        data: null,
+        error: {
+          code: "23505",
+          details: "Key (source_hash)=(hash-1) already exists.",
+          message: `duplicate key value violates unique constraint "${constraintName}"`,
+        },
+      })
+      const repository = new SupabaseFinanceRepository({
+        from: vi.fn(() => query),
+      } as unknown as SalimonSupabaseClient)
+
+      await expect(
+        repository.saveTransaction("user-1", {
+          amount: 12_000,
+          ledgerId: "ledger-1",
+          sourceHash: "hash-1",
+          sourceType: "android_sms_notification",
+          status: "confirmed",
+          transactionAt: "2026-08-12T20:30:00+09:00",
+          type: "expense",
+        }),
+      ).rejects.toBeInstanceOf(DuplicateTransactionSourceError)
+    },
+  )
+
+  it("sends notification provenance without sending candidate message text", async () => {
+    const query = new MutationQueryDouble({
+      data: { id: "transaction-1" },
+      error: null,
+    })
+    const clientFrom = vi.fn(() => query)
+    const repository = new SupabaseFinanceRepository({
+      from: clientFrom,
+    } as unknown as SalimonSupabaseClient)
+
+    await repository.saveTransaction("user-1", {
+      amount: 12_000,
+      ledgerId: "ledger-1",
+      sourceApp: "com.lotte",
+      sourceHash: "hash-1",
+      sourceType: "android_sms_notification",
+      status: "confirmed",
+      transactionAt: "2026-08-12T20:30:00+09:00",
+      type: "expense",
+    })
+
+    expect(query.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source_app: "com.lotte",
+        source_hash: "hash-1",
+        source_type: "android_sms_notification",
+      }),
+    )
+    expect(query.insert.mock.calls[0]?.[0]).not.toHaveProperty("maskedMessage")
+    expect(query.insert.mock.calls[0]?.[0]).not.toHaveProperty("rawMessage")
+  })
+
   it("passes the abort signal to a new transaction request", async () => {
     const query = new MutationQueryDouble({
       data: { id: "transaction-1" },

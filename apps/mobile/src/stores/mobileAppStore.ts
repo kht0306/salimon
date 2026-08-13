@@ -1,5 +1,6 @@
 import {
   createEmptyFinanceData,
+  DuplicateTransactionSourceError,
   SupabaseFinanceRepository,
   type AuthSessionEvent,
   type AuthSessionInfo,
@@ -37,6 +38,11 @@ import {
 } from "../features/dashboard/dashboardPresentation"
 import { isGeneralMobileTransaction } from "../features/transactions/transactionDraft"
 import { createCandidateFromNotificationRecord } from "../features/notification-inbox/notificationInbox"
+import {
+  isRetryableCandidateRegistrationError,
+  validateCandidateRegistrationDraft,
+  type CandidateRegistrationDraft,
+} from "../features/notification-inbox/candidateRegistration"
 import { QueryCache } from "../infrastructure/queryCache"
 import { requireSupabaseMobileClient } from "../infrastructure/supabase"
 import {
@@ -51,6 +57,7 @@ import {
   readStoredNotificationRecords,
   revokeNotificationDisclosure,
   setAuthenticatedNotificationCaptureUser,
+  saveStoredNotificationRegistrationState,
   type NotificationCaptureStatus,
 } from "../native/notificationListener"
 
@@ -81,9 +88,16 @@ export type MobileDataStatus =
 export type MobileConsentStatus = "idle" | "saving" | "error"
 export type MobileTransactionMutationState = "idle" | "saving" | "deleting"
 export type NotificationInboxStatus = "idle" | "loading" | "ready" | "error"
+export type NotificationRegistrationState = "idle" | "saving"
 
 export type MobileTransactionSaveResult =
   | { status: "saved"; transactionId: string }
+  | { status: "error" }
+
+export type NotificationCandidateRegistrationResult =
+  | { status: "saved"; transactionId: string }
+  | { status: "already_registered" }
+  | { status: "pending" }
   | { status: "error" }
 
 const TRANSACTION_SAVE_TIMEOUT_MS = 15_000
@@ -117,11 +131,14 @@ export class MobileAppStore {
     createEmptyNotificationCaptureStatus()
   notificationCandidates: LocalSmsCandidate[] = []
   notificationInboxStatus: NotificationInboxStatus = "idle"
+  notificationRegistrationState: NotificationRegistrationState = "idle"
   authErrorMessage?: string
   dataErrorMessage?: string
   consentErrorMessage?: string
   transactionMutationErrorMessage?: string
   notificationInboxErrorMessage?: string
+  notificationInboxNoticeMessage?: string
+  notificationRegistrationErrorMessage?: string
 
   private activeSessionUserId?: string
   private dataRequestSequence = 0
@@ -751,7 +768,7 @@ export class MobileAppStore {
     this.notificationInboxErrorMessage = undefined
 
     try {
-      await deleteExpiredNotificationRecords()
+      const expiredCount = await deleteExpiredNotificationRecords()
       const status = await getNotificationCaptureStatus()
       const records = status.hasDisclosureConsent
         ? await readStoredNotificationRecords()
@@ -784,6 +801,9 @@ export class MobileAppStore {
         }
         this.notificationCandidates = candidates
         this.notificationInboxStatus = "ready"
+        if (expiredCount > 0) {
+          this.notificationInboxNoticeMessage = `7일이 지난 알림 후보 ${expiredCount}건을 기기에서 자동 삭제했습니다.`
+        }
       })
     } catch (error) {
       runInAction(() => {
@@ -808,6 +828,176 @@ export class MobileAppStore {
             }
           : candidate,
     )
+  }
+
+  clearNotificationRegistrationError(): void {
+    this.notificationRegistrationErrorMessage = undefined
+  }
+
+  async registerNotificationCandidate(
+    draft: CandidateRegistrationDraft,
+  ): Promise<NotificationCandidateRegistrationResult> {
+    if (this.notificationRegistrationState === "saving") {
+      return { status: "error" }
+    }
+
+    const candidate = this.notificationCandidates.find(
+      (item) => item.id === draft.candidateId,
+    )
+    const userId = this.authUser?.id
+    if (!candidate || !userId) {
+      this.notificationRegistrationErrorMessage =
+        "등록할 알림 후보를 찾지 못했습니다. 후보함을 새로고침해 주세요."
+      return { status: "error" }
+    }
+
+    const validation = validateCandidateRegistrationDraft(draft, candidate, {
+      authUserId: userId,
+      canWriteData: this.dataStatus !== "stale" && this.dataStatus !== "error",
+      categories: this.financeData.categories,
+      ledgers: this.selectableLedgers,
+      members: this.financeData.members,
+      paymentMethods: this.financeData.paymentMethods,
+    })
+    if (!validation.valid) {
+      this.notificationRegistrationErrorMessage = validation.message
+      return { status: "error" }
+    }
+
+    this.notificationRegistrationState = "saving"
+    this.notificationRegistrationErrorMessage = undefined
+
+    const { input, registrationState } = validation.value
+    try {
+      const persisted = await saveStoredNotificationRegistrationState(
+        candidate.id,
+        {
+          amount: registrationState.amount,
+          categoryId: registrationState.categoryId,
+          merchantName: registrationState.merchantName ?? "",
+          paymentMethodId: registrationState.paymentMethodId ?? "",
+          targetLedgerId: registrationState.targetLedgerId,
+          transactionAt: registrationState.transactionAt,
+        },
+      )
+      if (!persisted) {
+        runInAction(() => {
+          this.notificationRegistrationState = "idle"
+          this.notificationRegistrationErrorMessage =
+            "기기의 암호화 저장소에 등록 대기 정보를 보관하지 못했습니다. 거래는 서버로 전송하지 않았습니다."
+        })
+        return { status: "error" }
+      }
+    } catch {
+      runInAction(() => {
+        this.notificationRegistrationState = "idle"
+        this.notificationRegistrationErrorMessage =
+          "기기의 암호화 저장소에 등록 대기 정보를 보관하지 못했습니다. 거래는 서버로 전송하지 않았습니다."
+      })
+      return { status: "error" }
+    }
+
+    runInAction(() => {
+      this.notificationCandidates = this.notificationCandidates.map((item) =>
+        item.id === candidate.id
+          ? {
+              ...item,
+              parsed: {
+                ...item.parsed,
+                amount: registrationState.amount,
+                merchantName: registrationState.merchantName,
+                targetLedgerId: registrationState.targetLedgerId,
+                transactionAt: registrationState.transactionAt,
+              },
+              registrationState,
+              status: "registration_pending",
+              targetLedgerId: registrationState.targetLedgerId,
+            }
+          : item,
+      )
+    })
+
+    const abortController = new AbortController()
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    let serverResult: "saved" | "already_registered"
+    let transactionId: string | undefined
+
+    try {
+      try {
+        transactionId = await Promise.race([
+          this.repository.saveTransaction(userId, input, {
+            signal: abortController.signal,
+          }),
+          new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => {
+              reject(new TransactionSaveTimeoutError())
+              abortController.abort()
+            }, TRANSACTION_SAVE_TIMEOUT_MS)
+          }),
+        ])
+        if (timeoutId !== undefined) {
+          clearTimeout(timeoutId)
+          timeoutId = undefined
+        }
+        if (!transactionId) {
+          throw new Error("저장된 거래를 확인하지 못했습니다.")
+        }
+        serverResult = "saved"
+      } catch (error) {
+        if (error instanceof DuplicateTransactionSourceError) {
+          serverResult = "already_registered"
+        } else {
+          runInAction(() => {
+            this.notificationRegistrationState = "idle"
+            this.notificationRegistrationErrorMessage =
+              isRetryableCandidateRegistrationError(error)
+                ? "네트워크 연결을 확인하지 못해 암호화된 등록 대기로 보관했습니다. 연결 후 다시 등록해 주세요."
+                : "거래를 등록하지 못했습니다. 후보는 암호화된 등록 대기로 유지됩니다."
+          })
+          return { status: "pending" }
+        }
+      }
+
+      const deleted = await deleteStoredNotificationRecord(candidate.id)
+      if (!deleted) {
+        runInAction(() => {
+          this.notificationRegistrationState = "idle"
+          this.notificationRegistrationErrorMessage =
+            "거래는 확인됐지만 기기의 후보를 정리하지 못했습니다. 다시 등록하면 중복 없이 정리를 재시도합니다."
+        })
+        return { status: "pending" }
+      }
+
+      runInAction(() => {
+        this.notificationCandidates = this.notificationCandidates.filter(
+          (item) => item.id !== candidate.id,
+        )
+        this.notificationCaptureStatus = {
+          ...this.notificationCaptureStatus,
+          storedRecordCount: this.notificationCandidates.length,
+        }
+        this.notificationRegistrationState = "idle"
+        this.notificationRegistrationErrorMessage = undefined
+      })
+      await this.loadSelectedMonth(this.selectedMonth, true)
+
+      if (serverResult === "already_registered") {
+        return { status: "already_registered" }
+      }
+      if (!transactionId) {
+        return { status: "pending" }
+      }
+      return { status: "saved", transactionId }
+    } catch {
+      runInAction(() => {
+        this.notificationRegistrationState = "idle"
+        this.notificationRegistrationErrorMessage =
+          "거래 저장 결과를 정리하지 못했습니다. 후보는 암호화된 등록 대기로 유지됩니다."
+      })
+      return { status: "pending" }
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+    }
   }
 
   async excludeNotificationCandidate(candidateId: string): Promise<boolean> {
@@ -1012,6 +1202,9 @@ export class MobileAppStore {
     this.notificationCandidates = []
     this.notificationInboxStatus = "idle"
     this.notificationInboxErrorMessage = undefined
+    this.notificationInboxNoticeMessage = undefined
+    this.notificationRegistrationState = "idle"
+    this.notificationRegistrationErrorMessage = undefined
     this.financeQueryCache.clear()
   }
 

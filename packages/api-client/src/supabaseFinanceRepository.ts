@@ -44,6 +44,8 @@ export interface RemoteTransactionInput {
   memo?: string
   actorUserId?: string
   sourceType?: TransactionSourceType
+  sourceApp?: string
+  sourceSender?: string
   sourceHash?: string
   parseConfidence?: number
   recurringType?: "fixed" | "installment"
@@ -87,6 +89,13 @@ export interface FinanceLoadOptions {
 
 export interface FinanceMutationOptions {
   signal?: AbortSignal
+}
+
+export class DuplicateTransactionSourceError extends Error {
+  constructor() {
+    super("이미 등록된 알림 거래입니다.")
+    this.name = "DuplicateTransactionSourceError"
+  }
 }
 
 export class SupabaseFinanceRepository {
@@ -324,6 +333,8 @@ export class SupabaseFinanceRepository {
       actor_user_id: input.actorUserId || null,
       payment_method_id: input.paymentMethodId ?? null,
       source_type: input.sourceType ?? "manual",
+      source_app: input.sourceApp ?? null,
+      source_sender: input.sourceSender ?? null,
       source_hash: input.sourceHash ?? null,
       parse_confidence: input.parseConfidence ?? null,
       tags: input.tags ?? [],
@@ -1114,10 +1125,28 @@ function validateTransactionDateRange(
   }
 }
 
-function throwIfError(error: { message: string } | null): void {
+interface RepositoryErrorLike {
+  code?: string
+  details?: string
+  message: string
+}
+
+function throwIfError(error: RepositoryErrorLike | null): void {
   if (error) {
+    if (isDuplicateTransactionSourceError(error)) {
+      throw new DuplicateTransactionSourceError()
+    }
     throw new Error(error.message)
   }
+}
+
+function isDuplicateTransactionSourceError(
+  error: RepositoryErrorLike,
+): boolean {
+  if (error.code !== "23505") return false
+  return /transactions_(?:ledger|creator)_source_hash_uidx|(?:ledger_id|created_by), source_hash/i.test(
+    `${error.message} ${error.details ?? ""}`,
+  )
 }
 
 function toError(error: unknown, fallbackMessage: string): Error {
