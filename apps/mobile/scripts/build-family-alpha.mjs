@@ -82,7 +82,6 @@ function run(command, args, options = {}) {
   }
   if (options.capture) {
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`
-    process.stdout.write(output)
     return output
   }
   return ""
