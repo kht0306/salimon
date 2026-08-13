@@ -34,6 +34,7 @@ const statusLabels: Record<SmsCandidateStatus, string> = {
   detected: "감지됨",
   notified: "알림",
   deferred: "보류",
+  registration_pending: "등록 대기",
   opened: "확인 중",
   registered: "등록됨",
   ignored: "제외됨",

@@ -1,5 +1,6 @@
 import {
   createEmptyFinanceData,
+  DuplicateTransactionSourceError,
   type AuthSessionInfo,
   type FinanceData,
   type FinanceMutationOptions,
@@ -19,6 +20,7 @@ import {
   readStoredNotificationRecords,
   revokeNotificationDisclosure,
   setAuthenticatedNotificationCaptureUser,
+  saveStoredNotificationRegistrationState,
 } from "../native/notificationListener"
 import { MobileAppStore } from "./mobileAppStore"
 
@@ -42,6 +44,7 @@ vi.mock("../native/notificationListener", () => ({
   readStoredNotificationRecords: vi.fn(async () => []),
   revokeNotificationDisclosure: vi.fn(),
   setAuthenticatedNotificationCaptureUser: vi.fn(async () => undefined),
+  saveStoredNotificationRegistrationState: vi.fn(async () => true),
 }))
 
 const emptyNotificationStatus = {
@@ -141,10 +144,13 @@ describe("MobileAppStore authentication", () => {
     vi.restoreAllMocks()
     vi.mocked(clearNotificationCaptureSession).mockClear()
     vi.mocked(setAuthenticatedNotificationCaptureUser).mockClear()
+    vi.mocked(deleteStoredNotificationRecord).mockClear()
+    vi.mocked(saveStoredNotificationRegistrationState).mockClear()
     vi.mocked(getNotificationCaptureStatus).mockResolvedValue(
       emptyNotificationStatus,
     )
     vi.mocked(readStoredNotificationRecords).mockResolvedValue([])
+    vi.mocked(saveStoredNotificationRegistrationState).mockResolvedValue(true)
   })
 
   afterEach(() => {
@@ -356,6 +362,132 @@ describe("MobileAppStore authentication", () => {
     await expect(
       store.excludeNotificationCandidate("a".repeat(64)),
     ).resolves.toBe(true)
+    expect(deleteStoredNotificationRecord).toHaveBeenCalledWith("a".repeat(64))
+    expect(store.notificationCandidateCount).toBe(0)
+  })
+
+  it("persists a candidate before saving and deletes it only after success", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-08-13T14:01:00+09:00"))
+    const data = createReadyFinanceData()
+    data.categories = [createExpenseCategory()]
+    const repository = createRepository(data)
+    mockCapturedNotification()
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+
+    const result = await store.registerNotificationCandidate({
+      amount: "45000",
+      candidateId: "a".repeat(64),
+      categoryId: "category-1",
+      date: "2026-08-13",
+      ledgerId: "ledger-1",
+      merchantName: "테스트주유소",
+      paymentMethodId: "",
+      time: "14:00",
+    })
+
+    expect(result).toEqual({
+      status: "saved",
+      transactionId: "transaction-new",
+    })
+    expect(saveStoredNotificationRegistrationState).toHaveBeenCalledWith(
+      "a".repeat(64),
+      expect.objectContaining({
+        amount: 45_000,
+        categoryId: "category-1",
+        targetLedgerId: "ledger-1",
+      }),
+    )
+    expect(repository.saveTransaction).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({
+        sourceApp: "com.lotte",
+        sourceHash: expect.any(String),
+        sourceType: "android_sms_notification",
+      }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    )
+    expect(
+      vi.mocked(saveStoredNotificationRegistrationState).mock
+        .invocationCallOrder[0],
+    ).toBeLessThan(repository.saveTransaction.mock.invocationCallOrder[0]!)
+    expect(repository.saveTransaction.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(deleteStoredNotificationRecord).mock.invocationCallOrder[0]!,
+    )
+    expect(store.notificationCandidateCount).toBe(0)
+  })
+
+  it("keeps an encrypted pending candidate on network failure and retries once", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-08-13T14:01:00+09:00"))
+    const data = createReadyFinanceData()
+    data.categories = [createExpenseCategory()]
+    const repository = createRepository(data)
+    repository.saveTransaction.mockRejectedValueOnce(
+      new Error("network unavailable"),
+    )
+    mockCapturedNotification()
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+    const draft = {
+      amount: "45000",
+      candidateId: "a".repeat(64),
+      categoryId: "category-1",
+      date: "2026-08-13",
+      ledgerId: "ledger-1",
+      merchantName: "수정한 주유소",
+      paymentMethodId: "",
+      time: "14:00",
+    }
+
+    await expect(store.registerNotificationCandidate(draft)).resolves.toEqual({
+      status: "pending",
+    })
+    expect(deleteStoredNotificationRecord).not.toHaveBeenCalled()
+    expect(store.notificationCandidates[0]).toMatchObject({
+      status: "registration_pending",
+      registrationState: {
+        amount: 45_000,
+        categoryId: "category-1",
+        merchantName: "수정한 주유소",
+      },
+    })
+
+    repository.saveTransaction.mockResolvedValueOnce("transaction-retry")
+    await expect(store.registerNotificationCandidate(draft)).resolves.toEqual({
+      status: "saved",
+      transactionId: "transaction-retry",
+    })
+    expect(repository.saveTransaction).toHaveBeenCalledTimes(2)
+    expect(deleteStoredNotificationRecord).toHaveBeenCalledOnce()
+  })
+
+  it("turns a source hash collision into already registered and cleans the candidate", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-08-13T14:01:00+09:00"))
+    const data = createReadyFinanceData()
+    data.categories = [createExpenseCategory()]
+    const repository = createRepository(data)
+    repository.saveTransaction.mockRejectedValueOnce(
+      new DuplicateTransactionSourceError(),
+    )
+    mockCapturedNotification()
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+
+    await expect(
+      store.registerNotificationCandidate({
+        amount: "45000",
+        candidateId: "a".repeat(64),
+        categoryId: "category-1",
+        date: "2026-08-13",
+        ledgerId: "ledger-1",
+        merchantName: "테스트주유소",
+        paymentMethodId: "",
+        time: "14:00",
+      }),
+    ).resolves.toEqual({ status: "already_registered" })
     expect(deleteStoredNotificationRecord).toHaveBeenCalledWith("a".repeat(64))
     expect(store.notificationCandidateCount).toBe(0)
   })
@@ -791,4 +923,43 @@ function createTransaction(
     createdAt: date,
     updatedAt: date,
   }
+}
+
+function createExpenseCategory() {
+  return {
+    color: "#238276",
+    icon: "food",
+    id: "category-1",
+    isArchived: false,
+    isDefault: true,
+    ledgerId: "ledger-1",
+    name: "식비",
+    sortOrder: 1,
+    type: "expense" as const,
+    usageTypes: ["expense" as const],
+  }
+}
+
+function mockCapturedNotification(): void {
+  vi.mocked(getNotificationCaptureStatus).mockResolvedValue({
+    ...emptyNotificationStatus,
+    allowedPackageNames: ["com.lotte"],
+    disclosureAcceptedAt: Date.now(),
+    hasDisclosureConsent: true,
+    hasNotificationAccess: true,
+    isCollectionEnabled: true,
+    storedRecordCount: 1,
+    targetLedgerId: "ledger-1",
+  })
+  vi.mocked(readStoredNotificationRecords).mockResolvedValue([
+    {
+      capturedAt: Date.now(),
+      expandedText: "45,000원 승인\n쇼핑엔 로카(8*3*)\n08/13 14:00",
+      id: "a".repeat(64),
+      receivedAt: Date.now(),
+      sourcePackageName: "com.lotte",
+      text: "45,000원 승인",
+      title: "테스트주유소",
+    },
+  ])
 }

@@ -2,6 +2,7 @@ import SalimonNotificationListener, {
   type NativeNotificationCaptureConfiguration,
   type NativeNotificationCaptureStatus,
   type NativeNotificationRecord,
+  type NativeNotificationRegistrationState,
 } from "../../modules/salimon-notification-listener/src"
 
 const unsupportedStatus: NativeNotificationCaptureStatus = {
@@ -20,6 +21,10 @@ export type NotificationCaptureConfiguration =
   NativeNotificationCaptureConfiguration
 export type NotificationCaptureStatus = NativeNotificationCaptureStatus
 export type StoredNotificationRecord = NativeNotificationRecord
+export type StoredNotificationRegistrationState = Omit<
+  NativeNotificationRegistrationState,
+  "updatedAt"
+>
 
 export async function acceptNotificationDisclosure(): Promise<NotificationCaptureStatus> {
   return (
@@ -71,6 +76,18 @@ export async function deleteStoredNotificationRecord(
   recordId: string,
 ): Promise<boolean> {
   return (await SalimonNotificationListener?.deleteRecord(recordId)) ?? false
+}
+
+export async function saveStoredNotificationRegistrationState(
+  recordId: string,
+  state: StoredNotificationRegistrationState,
+): Promise<boolean> {
+  return (
+    (await SalimonNotificationListener?.saveRegistrationState(
+      recordId,
+      state,
+    )) ?? false
+  )
 }
 
 export async function deleteExpiredNotificationRecords(): Promise<number> {

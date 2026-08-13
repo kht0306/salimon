@@ -17,6 +17,7 @@ export type SmsCandidateStatus =
   | "detected"
   | "notified"
   | "deferred"
+  | "registration_pending"
   | "opened"
   | "registered"
   | "ignored"
@@ -275,6 +276,17 @@ export interface LocalSmsCandidate {
   firstDetectedAt: string
   lastPromptedAt?: string
   reviewDeadlineAt: string
+  registrationState?: SmsCandidateRegistrationState
+}
+
+export interface SmsCandidateRegistrationState {
+  amount: number
+  categoryId: string
+  merchantName?: string
+  paymentMethodId?: string
+  targetLedgerId: string
+  transactionAt: string
+  updatedAt: string
 }
 
 export interface CardMessageSample {

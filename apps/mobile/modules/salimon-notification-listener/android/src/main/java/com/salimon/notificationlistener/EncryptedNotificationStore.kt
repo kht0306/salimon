@@ -51,22 +51,7 @@ internal class EncryptedNotificationStore(context: Context) {
       text = sanitizedText.text,
       expandedText = sanitizedText.expandedText,
     )
-    val plaintext = recordToJson(record, sessionFingerprint)
-      .toString()
-      .toByteArray(Charsets.UTF_8)
-    val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
-    cipher.init(Cipher.ENCRYPT_MODE, encryptionKey)
-    cipher.updateAAD(recordId.toByteArray(Charsets.UTF_8))
-    val ciphertext = cipher.doFinal(plaintext)
-    val envelope = JSONObject()
-      .put("version", STORAGE_VERSION)
-      .put("id", recordId)
-      .put("sourcePackageName", sourcePackageName)
-      .put("receivedAt", receivedAt)
-      .put("iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
-      .put("ciphertext", Base64.encodeToString(ciphertext, Base64.NO_WRAP))
-
-    writeEnvelope(targetFile, envelope)
+    writeRecord(targetFile, record, sessionFingerprint, encryptionKey)
     return true
   }
 
@@ -98,6 +83,31 @@ internal class EncryptedNotificationStore(context: Context) {
   fun deleteRecord(recordId: String): Boolean {
     if (!RECORD_ID_PATTERN.matches(recordId)) return false
     return recordFile(recordId).delete()
+  }
+
+  @Synchronized
+  fun saveRegistrationState(
+    recordId: String,
+    expectedSessionFingerprint: String,
+    registrationState: NotificationRegistrationState,
+  ): Boolean {
+    if (
+      !RECORD_ID_PATTERN.matches(recordId) ||
+      expectedSessionFingerprint.isBlank()
+    ) return false
+
+    val file = recordFile(recordId)
+    if (!file.exists()) return false
+    val key = getExistingKey() ?: return false
+    val record = readRecord(file, key, expectedSessionFingerprint)
+      ?: return false
+    writeRecord(
+      file,
+      record.copy(registrationState = registrationState),
+      expectedSessionFingerprint,
+      key,
+    )
+    return true
   }
 
   @Synchronized
@@ -177,6 +187,9 @@ internal class EncryptedNotificationStore(context: Context) {
         title = payload.optString("title"),
         text = payload.optString("text"),
         expandedText = payload.optString("expandedText"),
+        registrationState = payload
+          .optJSONObject("registrationState")
+          ?.toRegistrationState(),
       )
     } catch (_: Exception) {
       discard(file)
@@ -195,6 +208,56 @@ internal class EncryptedNotificationStore(context: Context) {
     .put("title", record.title)
     .put("text", record.text)
     .put("expandedText", record.expandedText)
+    .apply {
+      record.registrationState?.let { state ->
+        put("registrationState", state.toJson())
+      }
+    }
+
+  private fun writeRecord(
+    file: File,
+    record: NotificationCaptureRecord,
+    sessionFingerprint: String,
+    encryptionKey: SecretKey,
+  ) {
+    val plaintext = recordToJson(record, sessionFingerprint)
+      .toString()
+      .toByteArray(Charsets.UTF_8)
+    val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+    cipher.init(Cipher.ENCRYPT_MODE, encryptionKey)
+    cipher.updateAAD(record.id.toByteArray(Charsets.UTF_8))
+    val ciphertext = cipher.doFinal(plaintext)
+    val envelope = JSONObject()
+      .put("version", STORAGE_VERSION)
+      .put("id", record.id)
+      .put("sourcePackageName", record.sourcePackageName)
+      .put("receivedAt", record.receivedAt)
+      .put("iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+      .put("ciphertext", Base64.encodeToString(ciphertext, Base64.NO_WRAP))
+
+    writeEnvelope(file, envelope)
+  }
+
+  private fun NotificationRegistrationState.toJson(): JSONObject =
+    JSONObject()
+      .put("amount", amount)
+      .put("categoryId", categoryId)
+      .put("merchantName", merchantName)
+      .put("paymentMethodId", paymentMethodId)
+      .put("targetLedgerId", targetLedgerId)
+      .put("transactionAt", transactionAt)
+      .put("updatedAt", updatedAt)
+
+  private fun JSONObject.toRegistrationState(): NotificationRegistrationState =
+    NotificationRegistrationState(
+      amount = getLong("amount"),
+      categoryId = getString("categoryId"),
+      merchantName = optString("merchantName"),
+      paymentMethodId = optString("paymentMethodId"),
+      targetLedgerId = getString("targetLedgerId"),
+      transactionAt = getString("transactionAt"),
+      updatedAt = getLong("updatedAt"),
+    )
 
   private fun readEnvelope(file: File): JSONObject? = try {
     val bytes = AtomicFile(file).openRead().use { input -> input.readBytes() }

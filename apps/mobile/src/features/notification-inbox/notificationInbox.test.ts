@@ -32,4 +32,36 @@ describe("notification inbox candidate", () => {
     expect(candidate).not.toHaveProperty("rawMessage")
     expect(candidateStatusLabel(candidate)).toBe("등록 가능")
   })
+
+  it("restores an encrypted pending registration draft", () => {
+    const candidate = createCandidateFromNotificationRecord({
+      record: {
+        capturedAt: 1_786_600_000_000,
+        expandedText: "45,000원 승인",
+        id: "b".repeat(64),
+        receivedAt: new Date("2026-08-13T14:01:00+09:00").getTime(),
+        registrationState: {
+          amount: 43_000,
+          categoryId: "category-1",
+          merchantName: "수정한 상점",
+          paymentMethodId: "card-1",
+          targetLedgerId: "ledger-2",
+          transactionAt: "2026-08-13T15:10:00+09:00",
+          updatedAt: new Date("2026-08-13T15:11:00+09:00").getTime(),
+        },
+        sourcePackageName: "com.lotte",
+        text: "45,000원 승인",
+        title: "테스트상점",
+      },
+      targetLedgerId: "ledger-1",
+      userId: "user-1",
+    })
+
+    expect(candidate.status).toBe("registration_pending")
+    expect(candidate.targetLedgerId).toBe("ledger-2")
+    expect(candidate.parsed.amount).toBe(43_000)
+    expect(candidate.parsed.merchantName).toBe("수정한 상점")
+    expect(candidate.registrationState?.categoryId).toBe("category-1")
+    expect(candidateStatusLabel(candidate)).toBe("등록 대기")
+  })
 })

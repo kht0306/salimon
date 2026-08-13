@@ -22,15 +22,39 @@ internal data class NotificationCaptureRecord(
   val title: String,
   val text: String,
   val expandedText: String,
+  val registrationState: NotificationRegistrationState? = null,
+) {
+  fun toBridgeMap(): Map<String, Any> = buildMap {
+    put("id", id)
+    put("sourcePackageName", sourcePackageName)
+    put("receivedAt", receivedAt)
+    put("capturedAt", capturedAt)
+    put("title", title)
+    put("text", text)
+    put("expandedText", expandedText)
+    registrationState?.let { state ->
+      put("registrationState", state.toBridgeMap())
+    }
+  }
+}
+
+internal data class NotificationRegistrationState(
+  val amount: Long,
+  val categoryId: String,
+  val merchantName: String,
+  val paymentMethodId: String,
+  val targetLedgerId: String,
+  val transactionAt: String,
+  val updatedAt: Long,
 ) {
   fun toBridgeMap(): Map<String, Any> = mapOf(
-    "id" to id,
-    "sourcePackageName" to sourcePackageName,
-    "receivedAt" to receivedAt,
-    "capturedAt" to capturedAt,
-    "title" to title,
-    "text" to text,
-    "expandedText" to expandedText,
+    "amount" to amount,
+    "categoryId" to categoryId,
+    "merchantName" to merchantName,
+    "paymentMethodId" to paymentMethodId,
+    "targetLedgerId" to targetLedgerId,
+    "transactionAt" to transactionAt,
+    "updatedAt" to updatedAt,
   )
 }
 

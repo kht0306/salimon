@@ -3,17 +3,12 @@ import type { LocalSmsCandidate } from "@salimon/types"
 import { useFocusEffect, useRouter } from "expo-router"
 import { observer } from "mobx-react-lite"
 import { useCallback, useState } from "react"
-import {
-  Alert,
-  FlatList,
-  Modal,
-  RefreshControl,
-  StyleSheet,
-} from "react-native"
+import { Alert, FlatList, RefreshControl } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppButton } from "../../components/AppButton"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
+import { CandidateEditor } from "./CandidateEditor"
 import { candidateStatusLabel, notificationAppName } from "./notificationInbox"
 
 const safeAreaEdges = ["top"] as const
@@ -34,7 +29,7 @@ export const NotificationInboxScreen = observer(
     function confirmDeleteAll(): void {
       Alert.alert(
         "후보를 모두 삭제할까요?",
-        "기기에 암호화 보관된 알림 원문도 함께 삭제되며 복구할 수 없습니다.",
+        "기기에 암호화 보관된 알림 원문과 등록 대기 정보도 함께 삭제되며 복구할 수 없습니다.",
         [
           { text: "취소", style: "cancel" },
           {
@@ -49,7 +44,7 @@ export const NotificationInboxScreen = observer(
     function confirmExclude(candidate: LocalSmsCandidate): void {
       Alert.alert(
         "이 후보를 제외할까요?",
-        "기기에 암호화 보관된 해당 알림 원문도 함께 삭제됩니다.",
+        "기기에 암호화 보관된 해당 알림 원문과 등록 대기 정보도 함께 삭제됩니다.",
         [
           { text: "취소", style: "cancel" },
           {
@@ -98,11 +93,14 @@ export const NotificationInboxScreen = observer(
                 ) : null}
               </HeaderTop>
               <PrivacyNotice>
-                원문은 기기에서만 최대 7일간 암호화 보관되며 서버로 전송되지
-                않습니다.
+                원문과 등록 대기 정보는 기기에서만 최대 7일간 암호화 보관되며
+                서버로 전송되지 않습니다.
               </PrivacyNotice>
               {store.notificationInboxErrorMessage ? (
                 <ErrorNotice>{store.notificationInboxErrorMessage}</ErrorNotice>
+              ) : null}
+              {store.notificationInboxNoticeMessage ? (
+                <InfoNotice>{store.notificationInboxNoticeMessage}</InfoNotice>
               ) : null}
             </Header>
           }
@@ -134,33 +132,39 @@ export const NotificationInboxScreen = observer(
               </EmptyCard>
             )
           }
-          renderItem={({ item }) => (
-            <CandidateCard
-              accessibilityLabel={`${item.parsed.merchantName ?? "가맹점 미확인"}, ${formatWon(item.parsed.amount)}, ${candidateStatusLabel(item)}`}
-              accessibilityRole="button"
-              onPress={() => setSelectedCandidate(item)}
-            >
-              <CardTop>
-                <SourceLabel>{notificationAppName(item.sourceApp)}</SourceLabel>
-                <StatusBadge $needsReview={item.status === "needs_review"}>
-                  <StatusLabel $needsReview={item.status === "needs_review"}>
-                    {candidateStatusLabel(item)}
-                  </StatusLabel>
-                </StatusBadge>
-              </CardTop>
-              <Merchant numberOfLines={1}>
-                {item.parsed.merchantName ?? "가맹점 확인 필요"}
-              </Merchant>
-              <Amount>{formatWon(item.parsed.amount)}</Amount>
-              <ReceivedAt>
-                {formatDateTime(item.parsed.transactionAt)}
-              </ReceivedAt>
-            </CandidateCard>
-          )}
+          renderItem={({ item }) => {
+            const statusTone = candidateStatusTone(item)
+            return (
+              <CandidateCard
+                accessibilityLabel={`${item.parsed.merchantName ?? "가맹점 미확인"}, ${formatWon(item.parsed.amount)}, ${candidateStatusLabel(item)}`}
+                accessibilityRole="button"
+                onPress={() => setSelectedCandidate(item)}
+              >
+                <CardTop>
+                  <SourceLabel>
+                    {notificationAppName(item.sourceApp)}
+                  </SourceLabel>
+                  <StatusBadge $tone={statusTone}>
+                    <StatusLabel $tone={statusTone}>
+                      {candidateStatusLabel(item)}
+                    </StatusLabel>
+                  </StatusBadge>
+                </CardTop>
+                <Merchant numberOfLines={1}>
+                  {item.parsed.merchantName ?? "가맹점 확인 필요"}
+                </Merchant>
+                <Amount>{formatWon(item.parsed.amount)}</Amount>
+                <ReceivedAt>
+                  {formatDateTime(item.parsed.transactionAt)}
+                </ReceivedAt>
+              </CandidateCard>
+            )
+          }}
         />
 
         {selectedCandidate ? (
-          <CandidateDetailModal
+          <CandidateEditor
+            key={selectedCandidate.id}
             candidate={selectedCandidate}
             onClose={() => setSelectedCandidate(undefined)}
             onDefer={() => {
@@ -174,69 +178,6 @@ export const NotificationInboxScreen = observer(
     )
   },
 )
-
-interface CandidateDetailModalProps {
-  candidate: LocalSmsCandidate
-  onClose: () => void
-  onDefer: () => void
-  onExclude: () => void
-}
-
-function CandidateDetailModal({
-  candidate,
-  onClose,
-  onDefer,
-  onExclude,
-}: CandidateDetailModalProps) {
-  return (
-    <Modal animationType="slide" visible onRequestClose={onClose}>
-      <DetailPage edges={["top", "bottom"]}>
-        <DetailScroll contentContainerStyle={styles.detailContent}>
-          <DetailHeader>
-            <HeaderCopy>
-              <Eyebrow>{notificationAppName(candidate.sourceApp)}</Eyebrow>
-              <DetailTitle accessibilityRole="header">후보 상세</DetailTitle>
-            </HeaderCopy>
-            <CloseButton accessibilityRole="button" onPress={onClose}>
-              <CloseLabel>닫기</CloseLabel>
-            </CloseButton>
-          </DetailHeader>
-          <DetailCard>
-            <DetailLabel>가맹점</DetailLabel>
-            <DetailValue>
-              {candidate.parsed.merchantName ?? "확인 필요"}
-            </DetailValue>
-            <Divider />
-            <DetailLabel>금액</DetailLabel>
-            <DetailAmount>{formatWon(candidate.parsed.amount)}</DetailAmount>
-            <Divider />
-            <DetailLabel>거래 시각</DetailLabel>
-            <DetailValue>
-              {formatDateTime(candidate.parsed.transactionAt)}
-            </DetailValue>
-            <Divider />
-            <DetailLabel>판독 상태</DetailLabel>
-            <DetailValue>{candidateStatusLabel(candidate)}</DetailValue>
-          </DetailCard>
-          <MaskedCard>
-            <DetailLabel>마스킹된 알림 내용</DetailLabel>
-            <MaskedText selectable>{candidate.maskedMessage}</MaskedText>
-          </MaskedCard>
-          <DetailNotice>
-            10회차에서 금액·가맹점·카테고리를 확인한 뒤 거래로 등록하는 기능이
-            연결됩니다.
-          </DetailNotice>
-          <Actions>
-            <AppButton label="나중에 검토" onPress={onDefer} />
-            <DangerButton accessibilityRole="button" onPress={onExclude}>
-              <DangerLabel>후보 제외 및 원문 삭제</DangerLabel>
-            </DangerButton>
-          </Actions>
-        </DetailScroll>
-      </DetailPage>
-    </Modal>
-  )
-}
 
 function formatWon(amount: number): string {
   return new Intl.NumberFormat("ko-KR", {
@@ -255,18 +196,19 @@ function formatDateTime(value: string): string {
   }).format(new Date(value))
 }
 
+type CandidateStatusTone = "pending" | "ready" | "review"
+
+function candidateStatusTone(
+  candidate: LocalSmsCandidate,
+): CandidateStatusTone {
+  if (candidate.status === "registration_pending") return "pending"
+  return candidate.status === "needs_review" ? "review" : "ready"
+}
+
 const Page = styled(SafeAreaView)`
   flex: 1;
   background-color: ${mobileTheme.colors.canvas};
 `
-
-const styles = StyleSheet.create({
-  detailContent: {
-    gap: mobileTheme.spacing[4],
-    padding: mobileTheme.spacing[5],
-  },
-})
-
 const CandidateList = styled(FlatList<LocalSmsCandidate>)({ flex: 1 })
 const Header = styled.View({ gap: mobileTheme.spacing[3] })
 const HeaderTop = styled.View({
@@ -307,6 +249,14 @@ const ErrorNotice = styled.Text({
   borderRadius: mobileTheme.radii.md,
   backgroundColor: mobileTheme.colors.coralSoft,
   color: mobileTheme.colors.coral,
+  fontSize: 12,
+  lineHeight: 19,
+  padding: mobileTheme.spacing[3],
+})
+const InfoNotice = styled.Text({
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor: mobileTheme.colors.amberSoft,
+  color: mobileTheme.colors.amber,
   fontSize: 12,
   lineHeight: 19,
   padding: mobileTheme.spacing[3],
@@ -354,19 +304,21 @@ const SourceLabel = styled.Text({
   fontSize: 11,
   fontWeight: "700",
 })
-const StatusBadge = styled.View<{ $needsReview: boolean }>(
-  ({ $needsReview }) => ({
+const StatusBadge = styled.View<{ $tone: CandidateStatusTone }>(
+  ({ $tone }) => ({
     borderRadius: mobileTheme.radii.round,
-    backgroundColor: $needsReview
-      ? mobileTheme.colors.amberSoft
-      : mobileTheme.colors.tealSoft,
+    backgroundColor:
+      $tone === "ready"
+        ? mobileTheme.colors.tealSoft
+        : mobileTheme.colors.amberSoft,
     paddingVertical: mobileTheme.spacing[1],
     paddingHorizontal: mobileTheme.spacing[2],
   }),
 )
-const StatusLabel = styled.Text<{ $needsReview: boolean }>(
-  ({ $needsReview }) => ({
-    color: $needsReview ? mobileTheme.colors.amber : mobileTheme.colors.teal,
+const StatusLabel = styled.Text<{ $tone: CandidateStatusTone }>(
+  ({ $tone }) => ({
+    color:
+      $tone === "ready" ? mobileTheme.colors.teal : mobileTheme.colors.amber,
     fontSize: 10,
     fontWeight: "800",
   }),
@@ -384,90 +336,4 @@ const Amount = styled.Text({
 const ReceivedAt = styled.Text({
   color: mobileTheme.colors.muted,
   fontSize: 11,
-})
-const DetailPage = styled(SafeAreaView)`
-  flex: 1;
-  background-color: ${mobileTheme.colors.canvas};
-`
-const DetailScroll = styled.ScrollView``
-const DetailHeader = styled.View({
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-})
-const DetailTitle = styled.Text({
-  color: mobileTheme.colors.ink,
-  fontSize: 24,
-  fontWeight: "900",
-})
-const CloseButton = styled.Pressable({
-  minWidth: 52,
-  minHeight: 44,
-  alignItems: "flex-end",
-  justifyContent: "center",
-})
-const CloseLabel = styled.Text({
-  color: mobileTheme.colors.teal,
-  fontSize: 13,
-  fontWeight: "800",
-})
-const DetailCard = styled.View({
-  gap: mobileTheme.spacing[2],
-  borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
-  borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
-  padding: mobileTheme.spacing[4],
-})
-const DetailLabel = styled.Text({
-  color: mobileTheme.colors.muted,
-  fontSize: 11,
-  fontWeight: "700",
-})
-const DetailValue = styled.Text({
-  color: mobileTheme.colors.ink,
-  fontSize: 15,
-  fontWeight: "700",
-  lineHeight: 22,
-})
-const DetailAmount = styled.Text({
-  color: mobileTheme.colors.ink,
-  fontSize: 28,
-  fontWeight: "900",
-})
-const Divider = styled.View({
-  height: 1,
-  marginVertical: mobileTheme.spacing[1],
-  backgroundColor: mobileTheme.colors.border,
-})
-const MaskedCard = styled.View({
-  gap: mobileTheme.spacing[2],
-  borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panelSubtle,
-  padding: mobileTheme.spacing[4],
-})
-const MaskedText = styled.Text({
-  color: mobileTheme.colors.ink,
-  fontSize: 13,
-  lineHeight: 21,
-})
-const DetailNotice = styled.Text({
-  color: mobileTheme.colors.muted,
-  fontSize: 12,
-  lineHeight: 19,
-})
-const Actions = styled.View({ gap: mobileTheme.spacing[2] })
-const DangerButton = styled.Pressable({
-  minHeight: 48,
-  alignItems: "center",
-  justifyContent: "center",
-  borderWidth: 1,
-  borderColor: mobileTheme.colors.coral,
-  borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
-})
-const DangerLabel = styled.Text({
-  color: mobileTheme.colors.coral,
-  fontSize: 14,
-  fontWeight: "800",
 })

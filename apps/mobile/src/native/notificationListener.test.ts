@@ -10,6 +10,7 @@ import {
   readStoredNotificationRecords,
   revokeNotificationDisclosure,
   setAuthenticatedNotificationCaptureUser,
+  saveStoredNotificationRegistrationState,
 } from "./notificationListener"
 
 const nativeModule = vi.hoisted(() => ({
@@ -22,6 +23,7 @@ const nativeModule = vi.hoisted(() => ({
   getStatus: vi.fn(),
   openNotificationAccessSettings: vi.fn(async () => undefined),
   readRecords: vi.fn(),
+  saveRegistrationState: vi.fn(),
   revokeDisclosureAndDeleteRecords: vi.fn(),
   setAuthenticatedUser: vi.fn(async () => undefined),
 }))
@@ -101,11 +103,30 @@ describe("notification listener bridge", () => {
     nativeModule.readRecords.mockResolvedValue([record])
     nativeModule.deleteRecord.mockResolvedValue(true)
     nativeModule.deleteExpiredRecords.mockResolvedValue(2)
+    nativeModule.saveRegistrationState.mockResolvedValue(true)
 
     await expect(getNotificationCaptureStatus()).resolves.toEqual(captureStatus)
     await expect(readStoredNotificationRecords()).resolves.toEqual([record])
     await expect(deleteStoredNotificationRecord(record.id)).resolves.toBe(true)
     await expect(deleteExpiredNotificationRecords()).resolves.toBe(2)
+    await expect(
+      saveStoredNotificationRegistrationState(record.id, {
+        amount: 12_000,
+        categoryId: "category-1",
+        merchantName: "테스트상점",
+        paymentMethodId: "card-1",
+        targetLedgerId: "ledger-1",
+        transactionAt: "2026-08-13T14:00:00+09:00",
+      }),
+    ).resolves.toBe(true)
+    expect(nativeModule.saveRegistrationState).toHaveBeenCalledWith(record.id, {
+      amount: 12_000,
+      categoryId: "category-1",
+      merchantName: "테스트상점",
+      paymentMethodId: "card-1",
+      targetLedgerId: "ledger-1",
+      transactionAt: "2026-08-13T14:00:00+09:00",
+    })
     await deleteAllStoredNotificationRecords()
     expect(nativeModule.deleteAllRecords).toHaveBeenCalledOnce()
 
