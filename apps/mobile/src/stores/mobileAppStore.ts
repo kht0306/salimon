@@ -522,7 +522,7 @@ export class MobileAppStore {
         this.transactionMutationErrorMessage =
           error instanceof TransactionSaveTimeoutError
             ? TRANSACTION_SAVE_TIMEOUT_MESSAGE
-            : errorMessage(
+            : mutationErrorMessage(
                 error,
                 input.id
                   ? "거래를 수정하지 못했습니다. 입력 내용은 그대로 유지됩니다."
@@ -806,6 +806,19 @@ export function createKoreaMonthTransactionRange(
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
+}
+
+function mutationErrorMessage(error: unknown, fallback: string): string {
+  if (
+    error instanceof Error &&
+    /fetch failed|failed to fetch|network(?: request)? (?:failed|unavailable)|unknownhostexception|unable to resolve host/i.test(
+      error.message,
+    )
+  ) {
+    return "네트워크 연결이 원활하지 않아 저장 결과를 확인하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요. 입력 내용은 그대로 유지됩니다."
+  }
+
+  return errorMessage(error, fallback)
 }
 
 function createFinanceCacheKey(userId: string, month: string): string {
