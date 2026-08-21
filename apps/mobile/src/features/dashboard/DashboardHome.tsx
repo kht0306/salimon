@@ -2,9 +2,15 @@ import styled from "@emotion/native"
 import type { Transaction } from "@salimon/types"
 import { router } from "expo-router"
 import { observer } from "mobx-react-lite"
-import { FlatList, RefreshControl, useWindowDimensions } from "react-native"
+import {
+  FlatList,
+  RefreshControl,
+  type DimensionValue,
+  useWindowDimensions,
+} from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppButton } from "../../components/AppButton"
+import { AppText } from "../../components/AppText"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
 import { DashboardHeader } from "./DashboardHeader"
@@ -18,7 +24,7 @@ export const DashboardHome = observer(function DashboardHome() {
   const { width } = useWindowDimensions()
 
   if (store.dataStatus === "idle" || store.dataStatus === "loading") {
-    return <DashboardState message="가계부를 불러오고 있어요." />
+    return <DashboardLoading />
   }
   if (store.dataStatus === "error") {
     return (
@@ -84,6 +90,25 @@ interface DashboardStateProps {
   onAction?: () => void
 }
 
+function DashboardLoading() {
+  return (
+    <Page edges={safeAreaEdges}>
+      <LoadingContent accessibilityLabel="가계부를 불러오는 중입니다">
+        <LoadingTopRow>
+          <LoadingBlock $height={36} $width="42%" />
+          <LoadingBlock $height={36} $width="28%" />
+        </LoadingTopRow>
+        <LoadingBlock $height={52} $width="100%" />
+        <LoadingBlock $height={168} $width="100%" />
+        <LoadingBlock $height={18} $width="34%" />
+        <LoadingBlock $height={110} $width="100%" />
+        <LoadingBlock $height={72} $width="100%" />
+        <LoadingBlock $height={72} $width="100%" />
+      </LoadingContent>
+    </Page>
+  )
+}
+
 function DashboardState({
   actionLabel,
   message,
@@ -122,7 +147,7 @@ const StateContent = styled.View({
   padding: mobileTheme.spacing[5],
 })
 
-const StateText = styled.Text`
+const StateText = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 15px;
   line-height: 23px;
@@ -138,15 +163,39 @@ const EmptyState = styled.View({
   padding: mobileTheme.spacing[5],
 })
 
-const EmptyTitle = styled.Text`
+const EmptyTitle = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
 `
 
-const EmptyDescription = styled.Text`
+const EmptyDescription = styled(AppText)`
   margin-top: ${mobileTheme.spacing[2]}px;
   color: ${mobileTheme.colors.muted};
   font-size: 12px;
   line-height: 18px;
 `
+
+const LoadingContent = styled.View({
+  width: "100%",
+  maxWidth: 960,
+  alignSelf: "center",
+  gap: mobileTheme.spacing[4],
+  padding: mobileTheme.spacing[4],
+})
+
+const LoadingTopRow = styled.View({
+  flexDirection: "row",
+  justifyContent: "space-between",
+  gap: mobileTheme.spacing[3],
+})
+
+const LoadingBlock = styled.View<{
+  $height: number
+  $width: DimensionValue
+}>(({ $height, $width }) => ({
+  width: $width,
+  height: $height,
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor: mobileTheme.colors.border,
+}))

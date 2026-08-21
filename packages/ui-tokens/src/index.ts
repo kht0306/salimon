@@ -55,7 +55,7 @@ export const nativeColors = {
   ink: "#18181b",
   muted: "#71717a",
   subtle: "#a1a1aa",
-  canvas: "#f8f8f9",
+  canvas: "#f7f7f8",
   panel: "#ffffff",
   panelSubtle: "#fafafa",
   border: "#e4e4e7",
@@ -64,9 +64,9 @@ export const nativeColors = {
   tealSoft: "#f0fdfa",
   green: "#15803d",
   greenSoft: "#f0fdf4",
-  coral: "#dc2626",
-  coralSoft: "#fef2f2",
-  amber: "#b45309",
+  coral: "#c2413b",
+  coralSoft: "#fff5f4",
+  amber: "#a16207",
   amberSoft: "#fffbeb",
   violet: "#6d28d9",
   violetSoft: "#f5f3ff",
@@ -96,4 +96,39 @@ export const nativeSpacing = {
 export const nativeControls = {
   compact: 32,
   default: 36,
+  touch: 44,
+  prominent: 48,
+} as const
+
+export const nativeTypography = {
+  display: {
+    fontSize: 30,
+    lineHeight: 38,
+    fontWeight: "700",
+  },
+  title: {
+    fontSize: 22,
+    lineHeight: 30,
+    fontWeight: "700",
+  },
+  section: {
+    fontSize: 18,
+    lineHeight: 25,
+    fontWeight: "600",
+  },
+  body: {
+    fontSize: 15,
+    lineHeight: 23,
+    fontWeight: "400",
+  },
+  label: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "600",
+  },
+  caption: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "400",
+  },
 } as const

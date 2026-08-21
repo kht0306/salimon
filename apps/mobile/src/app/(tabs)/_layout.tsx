@@ -4,6 +4,7 @@ import { observer } from "mobx-react-lite"
 import { useWindowDimensions } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppTabIcon } from "../../components/AppTabIcon"
+import { AppText } from "../../components/AppText"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
 
@@ -37,12 +38,13 @@ export default observer(function MainTabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveBackgroundColor: mobileTheme.colors.tealSoft,
+        tabBarActiveBackgroundColor: mobileTheme.colors.panel,
         tabBarActiveTintColor: mobileTheme.colors.teal,
         tabBarInactiveTintColor: mobileTheme.colors.muted,
         tabBarLabelStyle: {
-          fontSize: 13,
-          fontWeight: "800",
+          fontFamily: "Pretendard",
+          fontSize: 12,
+          fontWeight: "600",
         },
         tabBarHideOnKeyboard: true,
         tabBarShowLabel: showTabLabels,
@@ -50,12 +52,12 @@ export default observer(function MainTabsLayout() {
           height: tabBarHeight,
           backgroundColor: mobileTheme.colors.panel,
           borderTopColor: mobileTheme.colors.border,
-          paddingHorizontal: 12,
-          paddingTop: 7,
-          paddingBottom: 7,
+          paddingHorizontal: 8,
+          paddingTop: 8,
+          paddingBottom: 6,
         },
         tabBarItemStyle: {
-          borderRadius: mobileTheme.radii.md,
+          borderRadius: 0,
         },
       }}
     >
@@ -130,7 +132,7 @@ const LoadingPage = styled(SafeAreaView)`
   padding: ${mobileTheme.spacing[5]}px;
 `
 
-const LoadingText = styled.Text`
+const LoadingText = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 15px;
   line-height: 23px;

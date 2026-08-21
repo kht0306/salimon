@@ -1,5 +1,6 @@
 import styled from "@emotion/native"
 import { mobileTheme } from "../theme"
+import { AppText } from "./AppText"
 
 interface AppButtonProps {
   accessibilityLabel?: string
@@ -33,7 +34,7 @@ export function AppButton({
 const Button = styled.Pressable<{
   $tone: NonNullable<AppButtonProps["tone"]>
 }>(({ $tone, disabled }) => ({
-  minHeight: 48,
+  minHeight: mobileTheme.controls.prominent,
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 1,
@@ -46,16 +47,16 @@ const Button = styled.Pressable<{
       : $tone === "primary"
         ? mobileTheme.colors.teal
         : mobileTheme.colors.panel,
-  paddingVertical: mobileTheme.spacing[3],
+  paddingVertical: mobileTheme.spacing[2],
   paddingHorizontal: mobileTheme.spacing[4],
   opacity: disabled ? 0.45 : 1,
 }))
 
-const ButtonLabel = styled.Text<{
+const ButtonLabel = styled(AppText)<{
   $tone: NonNullable<AppButtonProps["tone"]>
 }>`
   color: ${({ $tone }) =>
     $tone === "primary" ? mobileTheme.colors.panel : mobileTheme.colors.ink};
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
 `

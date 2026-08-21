@@ -131,8 +131,10 @@ const SearchRow = styled.View({
 const TotalsCard = styled.View({
   flexDirection: "row",
   gap: mobileTheme.spacing[3],
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.ink,
+  backgroundColor: mobileTheme.colors.panel,
   padding: mobileTheme.spacing[4],
 })
 
@@ -176,5 +178,5 @@ const SkeletonBlock = styled.View<{
 }))
 
 const SkeletonLight = styled(SkeletonBlock)({
-  backgroundColor: mobileTheme.colors.borderStrong,
+  backgroundColor: mobileTheme.colors.border,
 })

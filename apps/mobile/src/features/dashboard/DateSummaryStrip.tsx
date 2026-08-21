@@ -1,5 +1,6 @@
 import styled from "@emotion/native"
 import { ScrollView } from "react-native"
+import { AppText } from "../../components/AppText"
 import { mobileTheme } from "../../theme"
 import type { MonthDaySummary } from "./dashboardPresentation"
 
@@ -86,13 +87,13 @@ const SectionHeading = styled.View({
   gap: mobileTheme.spacing[3],
 })
 
-const SectionTitle = styled.Text`
+const SectionTitle = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 600;
 `
 
-const SectionHint = styled.Text`
+const SectionHint = styled(AppText)`
   flex-shrink: 1;
   color: ${mobileTheme.colors.muted};
   font-size: 10px;
@@ -108,21 +109,20 @@ const DayButton = styled.Pressable<{ $selected: boolean }>(({ $selected }) => ({
   borderColor: $selected ? mobileTheme.colors.teal : mobileTheme.colors.border,
   borderRadius: mobileTheme.radii.sm,
   backgroundColor: $selected
-    ? mobileTheme.colors.teal
+    ? mobileTheme.colors.tealSoft
     : mobileTheme.colors.panel,
   padding: mobileTheme.spacing[2],
 }))
 
-const DayNumber = styled.Text<{ $selected: boolean }>`
+const DayNumber = styled(AppText)<{ $selected: boolean }>`
   color: ${({ $selected }) =>
-    $selected ? mobileTheme.colors.panel : mobileTheme.colors.ink};
+    $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink};
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
 `
 
-const TransactionCount = styled.Text<{ $selected: boolean }>`
-  color: ${({ $selected }) =>
-    $selected ? "#ccfbf1" : mobileTheme.colors.muted};
+const TransactionCount = styled(AppText)<{ $selected: boolean }>`
+  color: ${mobileTheme.colors.muted};
   font-size: 10px;
   font-weight: 600;
 `
@@ -132,25 +132,18 @@ const AmountStack = styled.View({
   marginTop: mobileTheme.spacing[1],
 })
 
-const DayAmount = styled.Text<{
+const DayAmount = styled(AppText)<{
   $selected: boolean
   $tone: "expense" | "income" | "saving"
 }>`
-  color: ${({ $selected, $tone }) =>
-    $selected
-      ? mobileTheme.colors.panel
-      : $tone === "income"
-        ? mobileTheme.colors.blue
-        : $tone === "expense"
-          ? mobileTheme.colors.amber
-          : mobileTheme.colors.violet};
+  color: ${({ $tone }) =>
+    $tone === "income" ? mobileTheme.colors.green : mobileTheme.colors.muted};
   font-size: 9px;
   font-weight: 600;
   line-height: 13px;
 `
 
-const NoAmount = styled.Text<{ $selected: boolean }>`
-  color: ${({ $selected }) =>
-    $selected ? mobileTheme.colors.panel : mobileTheme.colors.subtle};
+const NoAmount = styled(AppText)<{ $selected: boolean }>`
+  color: ${mobileTheme.colors.subtle};
   font-size: 10px;
 `

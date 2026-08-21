@@ -3,6 +3,7 @@ import { getCategoryLabel } from "@salimon/domain"
 import type { Category, LedgerMember } from "@salimon/types"
 import { useMemo, useState } from "react"
 import { ScrollView } from "react-native"
+import { AppText } from "../../components/AppText"
 import { mobileTheme } from "../../theme"
 import { CategoryFilterModal } from "./CategoryFilterModal"
 import type {
@@ -244,10 +245,10 @@ const PanelHeading = styled.View({
   justifyContent: "space-between",
 })
 
-const PanelTitle = styled.Text({
+const PanelTitle = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 14,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
 const ResetButton = styled.Pressable({
@@ -256,15 +257,15 @@ const ResetButton = styled.Pressable({
   paddingHorizontal: mobileTheme.spacing[2],
 })
 
-const ResetLabel = styled.Text({
+const ResetLabel = styled(AppText)({
   color: mobileTheme.colors.teal,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
 const Group = styled.View({ gap: mobileTheme.spacing[2] })
 
-const GroupLabel = styled.Text({
+const GroupLabel = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 10,
   fontWeight: "700",
@@ -291,27 +292,27 @@ const CategorySelector = styled.Pressable<{ $selected: boolean }>(
 
 const CategorySelectorCopy = styled.View({ minWidth: 0, flex: 1 })
 
-const CategorySelectorLabel = styled.Text<{ $selected: boolean }>(
+const CategorySelectorLabel = styled(AppText)<{ $selected: boolean }>(
   ({ $selected }) => ({
     color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "600",
     lineHeight: 18,
   }),
 )
 
-const CategorySelectorHint = styled.Text({
+const CategorySelectorHint = styled(AppText)({
   marginTop: mobileTheme.spacing[1],
   color: mobileTheme.colors.muted,
   fontSize: 9,
   lineHeight: 14,
 })
 
-const CategorySelectorAction = styled.Text({
+const CategorySelectorAction = styled(AppText)({
   flexShrink: 0,
   color: mobileTheme.colors.teal,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
 const FilterChip = styled.Pressable<{ $selected: boolean }>(
@@ -330,11 +331,11 @@ const FilterChip = styled.Pressable<{ $selected: boolean }>(
   }),
 )
 
-const FilterChipLabel = styled.Text<{ $selected: boolean }>(
+const FilterChipLabel = styled(AppText)<{ $selected: boolean }>(
   ({ $selected }) => ({
     maxWidth: 180,
     color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
     fontSize: 11,
-    fontWeight: $selected ? "800" : "600",
+    fontWeight: "600",
   }),
 )

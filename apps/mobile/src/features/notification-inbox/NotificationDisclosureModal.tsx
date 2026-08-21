@@ -3,6 +3,7 @@ import { useState } from "react"
 import { Modal, StyleSheet } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppButton } from "../../components/AppButton"
+import { AppText } from "../../components/AppText"
 import { mobileTheme } from "../../theme"
 
 interface NotificationDisclosureModalProps {
@@ -111,20 +112,20 @@ const styles = StyleSheet.create({
 
 const Content = styled.ScrollView``
 
-const Eyebrow = styled.Text`
+const Eyebrow = styled(AppText)`
   color: ${mobileTheme.colors.teal};
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 `
 
-const Title = styled.Text`
+const Title = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 28px;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 36px;
 `
 
-const Description = styled.Text`
+const Description = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 14px;
   line-height: 22px;
@@ -139,7 +140,7 @@ const DisclosureList = styled.View({
   padding: mobileTheme.spacing[4],
 })
 
-const DisclosureItem = styled.Text`
+const DisclosureItem = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 13px;
   line-height: 21px;
@@ -155,7 +156,7 @@ const ConfirmRow = styled.Pressable({
   padding: mobileTheme.spacing[3],
 })
 
-const Checkbox = styled.Text<{ $checked: boolean }>(({ $checked }) => ({
+const Checkbox = styled(AppText)<{ $checked: boolean }>(({ $checked }) => ({
   width: 24,
   height: 24,
   borderWidth: 2,
@@ -168,16 +169,16 @@ const Checkbox = styled.Text<{ $checked: boolean }>(({ $checked }) => ({
     : mobileTheme.colors.panel,
   color: mobileTheme.colors.panel,
   fontSize: 16,
-  fontWeight: "900",
+  fontWeight: "600",
   lineHeight: 20,
   textAlign: "center",
 }))
 
-const ConfirmText = styled.Text`
+const ConfirmText = styled(AppText)`
   flex: 1;
   color: ${mobileTheme.colors.ink};
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 20px;
 `
 

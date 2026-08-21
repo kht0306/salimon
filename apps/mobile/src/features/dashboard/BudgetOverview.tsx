@@ -1,6 +1,7 @@
 import styled from "@emotion/native"
 import { formatKrw } from "@salimon/domain"
 import { useState } from "react"
+import { AppText } from "../../components/AppText"
 import type { MobileCategoryBudgetProgress } from "../../stores/mobileAppStore"
 import { mobileTheme } from "../../theme"
 
@@ -54,8 +55,8 @@ export function BudgetOverview({ budgets }: BudgetOverviewProps) {
                     style={{
                       width: `${percentage}%`,
                       backgroundColor: isOverBudget
-                        ? mobileTheme.colors.coral
-                        : category.color,
+                        ? mobileTheme.colors.amber
+                        : mobileTheme.colors.teal,
                     }}
                   />
                 </ProgressTrack>
@@ -81,11 +82,7 @@ export function BudgetOverview({ budgets }: BudgetOverviewProps) {
 
 const Panel = styled.View({
   gap: mobileTheme.spacing[3],
-  borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
-  borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
-  padding: mobileTheme.spacing[4],
+  paddingVertical: mobileTheme.spacing[2],
 })
 
 const PanelHeading = styled.View({
@@ -95,19 +92,19 @@ const PanelHeading = styled.View({
   gap: mobileTheme.spacing[3],
 })
 
-const PanelTitle = styled.Text`
+const PanelTitle = styled(AppText)`
   color: ${mobileTheme.colors.ink};
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 600;
 `
 
-const BudgetCount = styled.Text`
+const BudgetCount = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 10px;
   font-weight: 600;
 `
 
-const EmptyText = styled.Text`
+const EmptyText = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 12px;
   line-height: 18px;
@@ -124,17 +121,17 @@ const BudgetHeading = styled.View({
   gap: mobileTheme.spacing[3],
 })
 
-const BudgetName = styled.Text`
+const BudgetName = styled(AppText)`
   flex-shrink: 1;
   color: ${mobileTheme.colors.ink};
   font-size: 12px;
   font-weight: 600;
 `
 
-const BudgetAmount = styled.Text<{ $over: boolean }>`
+const BudgetAmount = styled(AppText)<{ $over: boolean }>`
   flex-shrink: 1;
   color: ${({ $over }) =>
-    $over ? mobileTheme.colors.coral : mobileTheme.colors.muted};
+    $over ? mobileTheme.colors.amber : mobileTheme.colors.muted};
   font-size: 10px;
   font-weight: ${({ $over }) => ($over ? 700 : 500)};
   line-height: 15px;
@@ -162,8 +159,8 @@ const ExpandButton = styled.Pressable({
   backgroundColor: mobileTheme.colors.panelSubtle,
 })
 
-const ExpandLabel = styled.Text`
+const ExpandLabel = styled(AppText)`
   color: ${mobileTheme.colors.teal};
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 `

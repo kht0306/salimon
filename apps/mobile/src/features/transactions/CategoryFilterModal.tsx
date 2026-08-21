@@ -3,6 +3,7 @@ import type { Category } from "@salimon/types"
 import { useMemo, useState } from "react"
 import { FlatList, Modal, StyleSheet } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { AppText } from "../../components/AppText"
 import { mobileTheme } from "../../theme"
 import {
   buildCategoryTreeOptions,
@@ -256,13 +257,13 @@ const SheetHeader = styled.View({
 
 const SheetHeading = styled.View({ minWidth: 0, flex: 1, gap: 2 })
 
-const SheetTitle = styled.Text({
+const SheetTitle = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 20,
-  fontWeight: "900",
+  fontWeight: "700",
 })
 
-const SheetDescription = styled.Text({
+const SheetDescription = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 10,
   lineHeight: 15,
@@ -281,10 +282,10 @@ const CloseButton = styled.Pressable({
   justifyContent: "center",
 })
 
-const CloseButtonLabel = styled.Text({
+const CloseButtonLabel = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
 const ApplyButton = styled.Pressable({
@@ -297,10 +298,10 @@ const ApplyButton = styled.Pressable({
   paddingHorizontal: mobileTheme.spacing[3],
 })
 
-const ApplyButtonLabel = styled.Text({
+const ApplyButtonLabel = styled(AppText)({
   color: mobileTheme.colors.panel,
   fontSize: 11,
-  fontWeight: "900",
+  fontWeight: "600",
 })
 
 const SearchInput = styled.TextInput({
@@ -310,6 +311,7 @@ const SearchInput = styled.TextInput({
   borderRadius: mobileTheme.radii.md,
   backgroundColor: mobileTheme.colors.panelSubtle,
   color: mobileTheme.colors.ink,
+  fontFamily: "Pretendard",
   fontSize: 13,
   paddingHorizontal: mobileTheme.spacing[4],
   marginBottom: mobileTheme.spacing[3],
@@ -336,7 +338,7 @@ const TreeControl = styled.Pressable({
 
 const TreeControlSpacer = styled.View({ width: 42, flexShrink: 0 })
 
-const TreeControlLabel = styled.Text({
+const TreeControlLabel = styled(AppText)({
   width: 24,
   height: 24,
   borderWidth: 1,
@@ -375,21 +377,23 @@ const CategoryMarker = styled.View({
 
 const CategoryCopy = styled.View({ minWidth: 0, flex: 1 })
 
-const CategoryName = styled.Text<{ $selected: boolean }>(({ $selected }) => ({
-  color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
-  fontSize: 13,
-  fontWeight: $selected ? "800" : "600",
-  lineHeight: 19,
-}))
+const CategoryName = styled(AppText)<{ $selected: boolean }>(
+  ({ $selected }) => ({
+    color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 19,
+  }),
+)
 
-const CategoryStatus = styled.Text({
+const CategoryStatus = styled(AppText)({
   marginTop: mobileTheme.spacing[1],
   color: mobileTheme.colors.muted,
   fontSize: 10,
   lineHeight: 15,
 })
 
-const EmptyMessage = styled.Text({
+const EmptyMessage = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 12,
   textAlign: "center",

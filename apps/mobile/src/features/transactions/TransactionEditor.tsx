@@ -19,6 +19,7 @@ import {
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppButton } from "../../components/AppButton"
+import { AppText } from "../../components/AppText"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
 import {
@@ -727,42 +728,42 @@ const BackButton = styled.Pressable({
   justifyContent: "center",
 })
 
-const BackLabel = styled.Text({
+const BackLabel = styled(AppText)({
   color: mobileTheme.colors.teal,
   fontSize: 13,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
-const ScreenLabel = styled.Text({
+const ScreenLabel = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 15,
-  fontWeight: "900",
+  fontWeight: "600",
 })
 
 const TopBarSpacer = styled.View({ width: 56 })
 
 const Intro = styled.View({ gap: mobileTheme.spacing[1] })
 
-const IntroEyebrow = styled.Text({
+const IntroEyebrow = styled(AppText)({
   color: mobileTheme.colors.teal,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
-const IntroTitle = styled.Text({
+const IntroTitle = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 24,
-  fontWeight: "900",
+  fontWeight: "700",
   lineHeight: 31,
 })
 
-const IntroDescription = styled.Text({
+const IntroDescription = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 12,
   lineHeight: 18,
 })
 
-const ErrorNotice = styled.Text({
+const ErrorNotice = styled(AppText)({
   borderLeftWidth: 3,
   borderLeftColor: mobileTheme.colors.coral,
   backgroundColor: mobileTheme.colors.coralSoft,
@@ -783,10 +784,10 @@ const Section = styled.View({
   padding: mobileTheme.spacing[4],
 })
 
-const SectionTitle = styled.Text({
+const SectionTitle = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 14,
-  fontWeight: "900",
+  fontWeight: "600",
 })
 
 const SegmentedRow = styled.View({
@@ -812,16 +813,18 @@ const SegmentButton = styled.Pressable<{ $selected: boolean }>(
   }),
 )
 
-const SegmentLabel = styled.Text<{ $selected: boolean }>(({ $selected }) => ({
-  color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.muted,
-  fontSize: 12,
-  fontWeight: "800",
-}))
+const SegmentLabel = styled(AppText)<{ $selected: boolean }>(
+  ({ $selected }) => ({
+    color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.muted,
+    fontSize: 12,
+    fontWeight: "600",
+  }),
+)
 
-const InlineNotice = styled.Text({
+const InlineNotice = styled(AppText)({
   borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.violet,
-  backgroundColor: mobileTheme.colors.violetSoft,
+  borderLeftColor: mobileTheme.colors.teal,
+  backgroundColor: mobileTheme.colors.tealSoft,
   color: mobileTheme.colors.muted,
   fontSize: 10,
   lineHeight: 16,
@@ -831,10 +834,10 @@ const InlineNotice = styled.Text({
 
 const Field = styled.View({ gap: mobileTheme.spacing[2] })
 
-const FieldLabel = styled.Text({
+const FieldLabel = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
 const Input = styled.TextInput({
@@ -844,6 +847,7 @@ const Input = styled.TextInput({
   borderRadius: mobileTheme.radii.sm,
   backgroundColor: mobileTheme.colors.panel,
   color: mobileTheme.colors.ink,
+  fontFamily: "Pretendard",
   fontSize: 13,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[3],
@@ -852,14 +856,14 @@ const Input = styled.TextInput({
 const AmountInput = styled(Input)({
   minHeight: 56,
   fontSize: 24,
-  fontWeight: "900",
+  fontWeight: "700",
   textAlign: "right",
 })
 
-const AmountPreview = styled.Text({
+const AmountPreview = styled(AppText)({
   color: mobileTheme.colors.teal,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
   textAlign: "right",
 })
 
@@ -880,10 +884,10 @@ const QuickDateButton = styled.Pressable({
   backgroundColor: mobileTheme.colors.panelSubtle,
 })
 
-const QuickDateLabel = styled.Text({
+const QuickDateLabel = styled(AppText)({
   color: mobileTheme.colors.teal,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
 const SelectionButton = styled.Pressable({
@@ -900,26 +904,26 @@ const SelectionButton = styled.Pressable({
   paddingHorizontal: mobileTheme.spacing[3],
 })
 
-const SelectionValue = styled.Text<{ $placeholder: boolean }>(
+const SelectionValue = styled(AppText)<{ $placeholder: boolean }>(
   ({ $placeholder }) => ({
     minWidth: 0,
     flex: 1,
     color: $placeholder ? mobileTheme.colors.subtle : mobileTheme.colors.ink,
     fontSize: 12,
-    fontWeight: $placeholder ? "500" : "700",
+    fontWeight: $placeholder ? "400" : "600",
     lineHeight: 18,
   }),
 )
 
-const SelectionAction = styled.Text({
+const SelectionAction = styled(AppText)({
   color: mobileTheme.colors.teal,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
 const MemoInput = styled(Input)({ minHeight: 96 })
 
-const FieldHint = styled.Text({
+const FieldHint = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 10,
   lineHeight: 16,
@@ -927,7 +931,7 @@ const FieldHint = styled.Text({
 
 const SubmitArea = styled.View({ gap: mobileTheme.spacing[2] })
 
-const SubmitHint = styled.Text({
+const SubmitHint = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 10,
   lineHeight: 16,
@@ -944,7 +948,7 @@ const StateContent = styled.View({
   padding: mobileTheme.spacing[5],
 })
 
-const StateMessage = styled.Text({
+const StateMessage = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 14,
   lineHeight: 21,

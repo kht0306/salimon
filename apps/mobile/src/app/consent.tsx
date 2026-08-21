@@ -1,10 +1,12 @@
 import styled from "@emotion/native"
 import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "@salimon/types"
 import { Redirect } from "expo-router"
+import { Check } from "lucide-react-native"
 import { observer } from "mobx-react-lite"
 import { useState } from "react"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppButton } from "../components/AppButton"
+import { AppText } from "../components/AppText"
 import { openLegalDocument } from "../features/auth/legalDocuments"
 import { useMobileAppStore } from "../stores/MobileStoreProvider"
 import { mobileTheme } from "../theme"
@@ -59,7 +61,9 @@ export default observer(function LegalConsentScreen() {
               onPress={() => setTermsChecked((checked) => !checked)}
             >
               <Checkbox $checked={termsChecked}>
-                <Checkmark>{termsChecked ? "✓" : ""}</Checkmark>
+                {termsChecked ? (
+                  <Check color={mobileTheme.colors.panel} size={15} />
+                ) : null}
               </Checkbox>
               <ConsentCopy>
                 <ConsentTitle>[필수] 이용약관 동의</ConsentTitle>
@@ -83,7 +87,9 @@ export default observer(function LegalConsentScreen() {
               onPress={() => setPrivacyChecked((checked) => !checked)}
             >
               <Checkbox $checked={privacyChecked}>
-                <Checkmark>{privacyChecked ? "✓" : ""}</Checkmark>
+                {privacyChecked ? (
+                  <Check color={mobileTheme.colors.panel} size={15} />
+                ) : null}
               </Checkbox>
               <ConsentCopy>
                 <ConsentTitle>[필수] 개인정보 처리방침 동의</ConsentTitle>
@@ -149,20 +155,20 @@ const Content = styled.View({
   paddingHorizontal: mobileTheme.spacing[5],
 })
 
-const Eyebrow = styled.Text`
+const Eyebrow = styled(AppText)`
   color: ${mobileTheme.colors.teal};
   font-size: 12px;
   font-weight: 700;
 `
 
-const Title = styled.Text`
+const Title = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 26px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 34px;
 `
 
-const Description = styled.Text`
+const Description = styled(AppText)`
   margin-bottom: ${mobileTheme.spacing[2]}px;
   color: ${mobileTheme.colors.muted};
   font-size: 14px;
@@ -200,45 +206,39 @@ const Checkbox = styled.View<{ $checked: boolean }>(({ $checked }) => ({
     : mobileTheme.colors.panel,
 }))
 
-const Checkmark = styled.Text`
-  color: ${mobileTheme.colors.panel};
-  font-size: 15px;
-  font-weight: 800;
-`
-
 const ConsentCopy = styled.View`
   flex: 1;
 `
 
-const ConsentTitle = styled.Text`
+const ConsentTitle = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 20px;
 `
 
-const ConsentDescription = styled.Text`
+const ConsentDescription = styled(AppText)`
   margin-top: 2px;
   color: ${mobileTheme.colors.muted};
   font-size: 12px;
   line-height: 18px;
 `
 
-const DocumentLink = styled.Text`
+const DocumentLink = styled(AppText)`
   min-height: 32px;
   color: ${mobileTheme.colors.teal};
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 32px;
 `
 
-const Notice = styled.Text`
+const Notice = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 11px;
   line-height: 17px;
 `
 
-const ErrorText = styled.Text({
+const ErrorText = styled(AppText)({
   borderRadius: mobileTheme.radii.sm,
   backgroundColor: mobileTheme.colors.coralSoft,
   color: mobileTheme.colors.coral,

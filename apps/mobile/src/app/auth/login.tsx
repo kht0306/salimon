@@ -3,6 +3,7 @@ import { Redirect } from "expo-router"
 import { observer } from "mobx-react-lite"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppButton } from "../../components/AppButton"
+import { AppText } from "../../components/AppText"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
 
@@ -24,7 +25,7 @@ export default observer(function LoginScreen() {
         <TopBar>
           <BrandLockup accessibilityLabel="살림온">
             <BrandMark>
-              <BrandInitial>S</BrandInitial>
+              <BrandInitial>살</BrandInitial>
             </BrandMark>
             <BrandName>살림온</BrandName>
           </BrandLockup>
@@ -113,23 +114,23 @@ const BrandMark = styled.View({
   alignItems: "center",
   justifyContent: "center",
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.ink,
+  backgroundColor: mobileTheme.colors.teal,
 })
 
-const BrandInitial = styled.Text`
+const BrandInitial = styled(AppText)`
   color: ${mobileTheme.colors.panel};
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 700;
 `
 
-const BrandName = styled.Text`
+const BrandName = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 17px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.3px;
 `
 
-const ProductLabel = styled.Text`
+const ProductLabel = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 11px;
   font-weight: 700;
@@ -137,21 +138,21 @@ const ProductLabel = styled.Text`
 
 const Hero = styled.View({ gap: mobileTheme.spacing[3] })
 
-const Eyebrow = styled.Text`
+const Eyebrow = styled(AppText)`
   color: ${mobileTheme.colors.teal};
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
 `
 
-const Title = styled.Text`
+const Title = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 29px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.7px;
   line-height: 38px;
 `
 
-const Description = styled.Text`
+const Description = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 14px;
   line-height: 22px;
@@ -175,7 +176,7 @@ const BenefitDot = styled.View({
   backgroundColor: mobileTheme.colors.teal,
 })
 
-const BenefitText = styled.Text`
+const BenefitText = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 12px;
   font-weight: 600;
@@ -191,19 +192,19 @@ const ActionArea = styled.View({
   padding: mobileTheme.spacing[5],
 })
 
-const CardTitle = styled.Text`
+const CardTitle = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 600;
 `
 
-const CardDescription = styled.Text`
+const CardDescription = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 13px;
   line-height: 20px;
 `
 
-const ErrorText = styled.Text({
+const ErrorText = styled(AppText)({
   borderRadius: mobileTheme.radii.sm,
   backgroundColor: mobileTheme.colors.coralSoft,
   color: mobileTheme.colors.coral,

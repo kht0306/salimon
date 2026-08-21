@@ -1,6 +1,7 @@
 import styled from "@emotion/native"
 import { formatKoreanTime, formatKrw, getCategoryLabel } from "@salimon/domain"
 import type { Category, Transaction } from "@salimon/types"
+import { AppText } from "../../components/AppText"
 import { mobileTheme } from "../../theme"
 import { transactionTypeLabel } from "./dashboardPresentation"
 
@@ -79,21 +80,21 @@ const TypeMark = styled.View<{ $type: Transaction["type"] }>(({ $type }) => ({
   borderRadius: mobileTheme.radii.round,
   backgroundColor:
     $type === "income"
-      ? mobileTheme.colors.blueSoft
+      ? mobileTheme.colors.greenSoft
       : $type === "expense"
-        ? mobileTheme.colors.amberSoft
-        : mobileTheme.colors.violetSoft,
+        ? mobileTheme.colors.panelSubtle
+        : mobileTheme.colors.tealSoft,
 }))
 
-const TypeInitial = styled.Text<{ $type: Transaction["type"] }>`
+const TypeInitial = styled(AppText)<{ $type: Transaction["type"] }>`
   color: ${({ $type }) =>
     $type === "income"
-      ? mobileTheme.colors.blue
+      ? mobileTheme.colors.green
       : $type === "expense"
-        ? mobileTheme.colors.amber
-        : mobileTheme.colors.violet};
+        ? mobileTheme.colors.muted
+        : mobileTheme.colors.teal};
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
 `
 
 const TransactionCopy = styled.View`
@@ -101,30 +102,26 @@ const TransactionCopy = styled.View`
   flex: 1;
 `
 
-const Title = styled.Text`
+const Title = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 20px;
 `
 
-const Metadata = styled.Text`
+const Metadata = styled(AppText)`
   margin-top: ${mobileTheme.spacing[1]}px;
   color: ${mobileTheme.colors.muted};
   font-size: 10px;
   line-height: 15px;
 `
 
-const Amount = styled.Text<{ $type: Transaction["type"] }>`
+const Amount = styled(AppText)<{ $type: Transaction["type"] }>`
   max-width: 40%;
   color: ${({ $type }) =>
-    $type === "income"
-      ? mobileTheme.colors.blue
-      : $type === "expense"
-        ? mobileTheme.colors.amber
-        : mobileTheme.colors.violet};
+    $type === "income" ? mobileTheme.colors.green : mobileTheme.colors.ink};
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 20px;
   text-align: right;
 `

@@ -1,6 +1,7 @@
 import styled from "@emotion/native"
 import { formatKoreanTime, formatKrw } from "@salimon/domain"
 import type { Category, LedgerMember, Transaction } from "@salimon/types"
+import { AppText } from "../../components/AppText"
 import { mobileTheme } from "../../theme"
 import {
   transactionCategoryLabel,
@@ -94,22 +95,22 @@ const TypeMark = styled.View<{ $type: Transaction["type"] }>(({ $type }) => ({
   borderRadius: mobileTheme.radii.round,
   backgroundColor:
     $type === "income"
-      ? mobileTheme.colors.blueSoft
+      ? mobileTheme.colors.greenSoft
       : $type === "expense"
-        ? mobileTheme.colors.amberSoft
-        : mobileTheme.colors.violetSoft,
+        ? mobileTheme.colors.panelSubtle
+        : mobileTheme.colors.tealSoft,
 }))
 
-const TypeInitial = styled.Text<{ $type: Transaction["type"] }>(
+const TypeInitial = styled(AppText)<{ $type: Transaction["type"] }>(
   ({ $type }) => ({
     color:
       $type === "income"
-        ? mobileTheme.colors.blue
+        ? mobileTheme.colors.green
         : $type === "expense"
-          ? mobileTheme.colors.amber
-          : mobileTheme.colors.violet,
+          ? mobileTheme.colors.muted
+          : mobileTheme.colors.teal,
     fontSize: 12,
-    fontWeight: "900",
+    fontWeight: "600",
   }),
 )
 
@@ -119,14 +120,14 @@ const MainCopy = styled.View({
   gap: mobileTheme.spacing[1],
 })
 
-const Title = styled.Text({
+const Title = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 13,
-  fontWeight: "800",
+  fontWeight: "600",
   lineHeight: 19,
 })
 
-const Metadata = styled.Text({
+const Metadata = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 10,
   lineHeight: 15,
@@ -138,7 +139,7 @@ const BadgeRow = styled.View({
   gap: mobileTheme.spacing[1],
 })
 
-const Badge = styled.Text({
+const Badge = styled(AppText)({
   alignSelf: "flex-start",
   borderRadius: mobileTheme.radii.round,
   backgroundColor: mobileTheme.colors.panelSubtle,
@@ -154,16 +155,11 @@ const WarningBadge = styled(Badge)({
   color: mobileTheme.colors.coral,
 })
 
-const Amount = styled.Text<{ $type: Transaction["type"] }>(({ $type }) => ({
+const Amount = styled(AppText)<{ $type: Transaction["type"] }>(({ $type }) => ({
   maxWidth: "38%",
-  color:
-    $type === "income"
-      ? mobileTheme.colors.blue
-      : $type === "expense"
-        ? mobileTheme.colors.amber
-        : mobileTheme.colors.violet,
+  color: $type === "income" ? mobileTheme.colors.green : mobileTheme.colors.ink,
   fontSize: 12,
-  fontWeight: "900",
+  fontWeight: "600",
   lineHeight: 19,
   textAlign: "right",
 }))
