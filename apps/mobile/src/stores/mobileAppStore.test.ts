@@ -366,6 +366,43 @@ describe("MobileAppStore authentication", () => {
     expect(store.notificationCandidateCount).toBe(0)
   })
 
+  it("deletes only the selected notification candidates", async () => {
+    const captureStatus = {
+      ...emptyNotificationStatus,
+      allowedPackageNames: ["com.lcacApp"],
+      disclosureAcceptedAt: Date.now(),
+      hasDisclosureConsent: true,
+      hasNotificationAccess: true,
+      isCollectionEnabled: true,
+      storedRecordCount: 2,
+      targetLedgerId: "ledger-1",
+    }
+    vi.mocked(getNotificationCaptureStatus).mockResolvedValue(captureStatus)
+    vi.mocked(readStoredNotificationRecords).mockResolvedValue(
+      ["a", "b"].map((prefix, index) => ({
+        capturedAt: Date.now(),
+        expandedText: `${12_000 + index * 1_000}원 승인`,
+        id: prefix.repeat(64),
+        receivedAt: new Date("2026-08-13T14:00:00+09:00").getTime(),
+        sourcePackageName: "com.lcacApp",
+        text: `${12_000 + index * 1_000}원 승인`,
+        title: `테스트상점 ${index + 1}`,
+      })),
+    )
+    const store = new MobileAppStore(createRepository(), createAuthGateway())
+    await store.initializeAuth()
+
+    await expect(
+      store.deleteNotificationCandidates(["a".repeat(64)]),
+    ).resolves.toBe(1)
+
+    expect(deleteStoredNotificationRecord).toHaveBeenCalledWith("a".repeat(64))
+    expect(
+      store.notificationCandidates.map((candidate) => candidate.id),
+    ).toEqual(["b".repeat(64)])
+    expect(store.notificationCaptureStatus.storedRecordCount).toBe(1)
+  })
+
   it("persists a candidate before saving and deletes it only after success", async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date("2026-08-13T14:01:00+09:00"))

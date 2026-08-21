@@ -5,6 +5,7 @@ import { observer } from "mobx-react-lite"
 import { useEffect, useRef, useState } from "react"
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -26,7 +27,11 @@ import {
   validateCandidateRegistrationDraft,
   type CandidateRegistrationDraft,
 } from "./candidateRegistration"
-import { notificationAppName } from "./notificationInbox"
+import {
+  candidateAmountLabel,
+  cardNotificationEventLabel,
+  notificationAppName,
+} from "./notificationInbox"
 
 interface CandidateEditorProps {
   candidate: LocalSmsCandidate
@@ -37,7 +42,7 @@ interface CandidateEditorProps {
 
 type PickerKind = "category" | "ledger" | "payment"
 
-const keyboardBehavior = Platform.OS === "ios" ? "padding" : undefined
+const keyboardBehavior = Platform.OS === "ios" ? "padding" : "height"
 const safeAreaEdges = ["top", "bottom"] as const
 
 export const CandidateEditor = observer(function CandidateEditor({
@@ -56,6 +61,7 @@ export const CandidateEditor = observer(function CandidateEditor({
   )
   const [formError, setFormError] = useState<string>()
   const [picker, setPicker] = useState<PickerKind>()
+  const keyboardVisibleRef = useRef(false)
   const savingRef = useRef(false)
   const isSaving = store.notificationRegistrationState === "saving"
   const isPending = candidate.status === "registration_pending"
@@ -92,10 +98,26 @@ export const CandidateEditor = observer(function CandidateEditor({
     Number.isSafeInteger(amount) && amount > 0
       ? formatKrw(amount)
       : "금액 미입력"
+  const eventLabel = cardNotificationEventLabel(candidate)
+  const originalCurrencyAmount = candidate.parsed.originalCurrencyAmount
 
   useEffect(() => {
     store.clearNotificationRegistrationError()
   }, [store])
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
+      keyboardVisibleRef.current = true
+    })
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      keyboardVisibleRef.current = false
+    })
+
+    return () => {
+      showSubscription.remove()
+      hideSubscription.remove()
+    }
+  }, [])
 
   function updateDraft(nextDraft: CandidateRegistrationDraft): void {
     setDraft(nextDraft)
@@ -135,6 +157,14 @@ export const CandidateEditor = observer(function CandidateEditor({
         { text: "등록", onPress: () => void persistRegistration() },
       ],
     )
+  }
+
+  function requestSystemClose(): void {
+    if (keyboardVisibleRef.current) {
+      Keyboard.dismiss()
+      return
+    }
+    if (!isSaving) onClose()
   }
 
   async function persistRegistration(): Promise<void> {
@@ -227,13 +257,7 @@ export const CandidateEditor = observer(function CandidateEditor({
   }
 
   return (
-    <Modal
-      animationType="slide"
-      visible
-      onRequestClose={() => {
-        if (!isSaving) onClose()
-      }}
-    >
+    <Modal animationType="slide" visible onRequestClose={requestSystemClose}>
       <Page
         accessibilityViewIsModal
         edges={safeAreaEdges}
@@ -260,7 +284,26 @@ export const CandidateEditor = observer(function CandidateEditor({
               </TopBar>
 
               <Intro>
-                <Eyebrow>{notificationAppName(candidate.sourceApp)}</Eyebrow>
+                <IntroMeta>
+                  <Eyebrow>{notificationAppName(candidate.sourceApp)}</Eyebrow>
+                  {eventLabel ? (
+                    <EventBadge
+                      $cancelled={
+                        candidate.parsed.cardNotificationEvent ===
+                        "approval_cancellation"
+                      }
+                    >
+                      <EventLabel
+                        $cancelled={
+                          candidate.parsed.cardNotificationEvent ===
+                          "approval_cancellation"
+                        }
+                      >
+                        {eventLabel}
+                      </EventLabel>
+                    </EventBadge>
+                  ) : null}
+                </IntroMeta>
                 <IntroTitle accessibilityRole="header">
                   거래 내용을 확인해 주세요.
                 </IntroTitle>
@@ -274,6 +317,17 @@ export const CandidateEditor = observer(function CandidateEditor({
                   이전 등록 결과를 확인하지 못했습니다. 중복 방지를 위해
                   저장했던 내용은 잠겨 있으며 동일한 내용으로만 다시 시도합니다.
                 </PendingNotice>
+              ) : null}
+              {originalCurrencyAmount ? (
+                <ForeignAmountNotice>
+                  <ForeignAmountTitle>
+                    원승인금액 {candidateAmountLabel(candidate)}
+                  </ForeignAmountTitle>
+                  <ForeignAmountDescription>
+                    누적금액은 결제금액으로 사용하지 않았습니다. 가계부에 반영할
+                    실제 원화 금액을 아래에 입력해 주세요.
+                  </ForeignAmountDescription>
+                </ForeignAmountNotice>
               ) : null}
               {formError || store.notificationRegistrationErrorMessage ? (
                 <ErrorNotice accessibilityLiveRegion="assertive">
@@ -295,11 +349,15 @@ export const CandidateEditor = observer(function CandidateEditor({
               <Section>
                 <SectionTitle>금액과 일시</SectionTitle>
                 <Field>
-                  <FieldLabel>금액 *</FieldLabel>
+                  <FieldLabel>
+                    {originalCurrencyAmount
+                      ? "가계부 반영금액 (KRW) *"
+                      : "금액 *"}
+                  </FieldLabel>
                   <AmountInput
                     accessibilityLabel="후보 거래 금액"
                     keyboardType="number-pad"
-                    placeholder="0"
+                    placeholder={originalCurrencyAmount ? "원화 금액" : "0"}
                     placeholderTextColor={mobileTheme.colors.subtle}
                     value={draft.amount}
                     editable={!isPending}
@@ -528,11 +586,29 @@ const ScreenLabel = styled.Text({
 })
 const TopBarSpacer = styled.View({ width: 56 })
 const Intro = styled.View({ gap: mobileTheme.spacing[1] })
+const IntroMeta = styled.View({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: mobileTheme.spacing[2],
+})
 const Eyebrow = styled.Text({
   color: mobileTheme.colors.teal,
   fontSize: 11,
   fontWeight: "800",
 })
+const EventBadge = styled.View<{ $cancelled: boolean }>(({ $cancelled }) => ({
+  borderRadius: mobileTheme.radii.round,
+  backgroundColor: $cancelled
+    ? mobileTheme.colors.coralSoft
+    : mobileTheme.colors.blueSoft,
+  paddingVertical: mobileTheme.spacing[1],
+  paddingHorizontal: mobileTheme.spacing[2],
+}))
+const EventLabel = styled.Text<{ $cancelled: boolean }>(({ $cancelled }) => ({
+  color: $cancelled ? mobileTheme.colors.coral : mobileTheme.colors.blue,
+  fontSize: 10,
+  fontWeight: "800",
+}))
 const IntroTitle = styled.Text({
   color: mobileTheme.colors.ink,
   fontSize: 24,
@@ -551,6 +627,22 @@ const PendingNotice = styled.Text({
   fontSize: 12,
   lineHeight: 19,
   padding: mobileTheme.spacing[3],
+})
+const ForeignAmountNotice = styled.View({
+  gap: mobileTheme.spacing[1],
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor: mobileTheme.colors.blueSoft,
+  padding: mobileTheme.spacing[3],
+})
+const ForeignAmountTitle = styled.Text({
+  color: mobileTheme.colors.blue,
+  fontSize: 14,
+  fontWeight: "900",
+})
+const ForeignAmountDescription = styled.Text({
+  color: mobileTheme.colors.muted,
+  fontSize: 11,
+  lineHeight: 17,
 })
 const ErrorNotice = styled.Text({
   borderRadius: mobileTheme.radii.md,

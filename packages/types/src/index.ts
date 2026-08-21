@@ -13,6 +13,13 @@ export type TransactionSourceType =
   | "import"
   | "receipt_ai"
 
+export type CardNotificationEvent = "approval" | "approval_cancellation"
+
+export interface OriginalCurrencyAmount {
+  amount: number
+  currencyCode: string
+}
+
 export type SmsCandidateStatus =
   | "detected"
   | "notified"
@@ -235,6 +242,8 @@ export interface ParsedTransaction {
   type: TransactionType
   amount: number
   currency: Currency
+  cardNotificationEvent?: CardNotificationEvent
+  originalCurrencyAmount?: OriginalCurrencyAmount
   transactionAt: string
   merchantName?: string
   paymentMethodName?: string

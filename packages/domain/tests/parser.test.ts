@@ -57,6 +57,53 @@ describe("parseCardSmsText", () => {
     expect(parsed.rawTextMasked).toContain("쇼핑엔 로카****")
     expect(parsed.rawTextMasked).not.toContain("(8*3*)")
   })
+
+  it("preserves a foreign approval amount and never substitutes the cumulative KRW amount", () => {
+    const parsed = parseCardSmsText(
+      [
+        "ALIEXPRESS",
+        "USD 7.24 해외승인",
+        "쇼핑엔 로카(8*3*)",
+        "일시불, 08/15 21:23",
+        "누적금액 3,357,207원",
+      ].join("\n"),
+      new Date("2026-08-15T21:24:00+09:00"),
+    )
+
+    expect(parsed).toMatchObject({
+      amount: 0,
+      cardNotificationEvent: "approval",
+      currency: "KRW",
+      merchantName: "ALIEXPRESS",
+      originalCurrencyAmount: {
+        amount: 7.24,
+        currencyCode: "USD",
+      },
+      type: "expense",
+    })
+    expect(parsed.amount).not.toBe(3_357_207)
+  })
+
+  it("marks an approval cancellation separately from its income transaction type", () => {
+    const parsed = parseCardSmsText(
+      [
+        "(주)소모 뉴평내셀프주유소",
+        "10,000원 승인취소",
+        "쇼핑엔 로카(8*3*)",
+        "일시불, 08/14 19:26",
+        "누적금액 3,308,688원",
+      ].join("\n"),
+      new Date("2026-08-14T19:27:00+09:00"),
+    )
+
+    expect(parsed).toMatchObject({
+      amount: 10_000,
+      cardNotificationEvent: "approval_cancellation",
+      merchantName: "(주)소모 뉴평내셀프주유소",
+      type: "income",
+    })
+    expect(parsed.amount).not.toBe(3_308_688)
+  })
 })
 
 describe("maskSensitiveText", () => {

@@ -85,7 +85,11 @@ export function createCandidateRegistrationDraft(
   )
 
   return {
-    amount: String(registrationState?.amount ?? candidate.parsed.amount),
+    amount: registrationState
+      ? String(registrationState.amount)
+      : candidate.parsed.originalCurrencyAmount
+        ? ""
+        : String(candidate.parsed.amount),
     candidateId: candidate.id,
     categoryId: registrationState?.categoryId ?? defaults.categoryId,
     date,
@@ -178,7 +182,7 @@ export function validateCandidateRegistrationDraft(
     categoryId: draft.categoryId,
     date: draft.date,
     merchantName: draft.merchantName,
-    memo: "",
+    memo: candidateRegistrationMemo(candidate),
     paymentMethodId: draft.paymentMethodId,
     status: "confirmed",
     tagsInput: "",
@@ -221,6 +225,20 @@ export function validateCandidateRegistrationDraft(
       },
     },
   }
+}
+
+function candidateRegistrationMemo(candidate: LocalSmsCandidate): string {
+  const details: string[] = []
+  if (candidate.parsed.cardNotificationEvent === "approval_cancellation") {
+    details.push("카드 승인취소")
+  }
+  const originalAmount = candidate.parsed.originalCurrencyAmount
+  if (originalAmount) {
+    details.push(
+      `원승인금액 ${originalAmount.currencyCode} ${originalAmount.amount}`,
+    )
+  }
+  return details.join(" · ")
 }
 
 export function isRetryableCandidateRegistrationError(error: unknown): boolean {

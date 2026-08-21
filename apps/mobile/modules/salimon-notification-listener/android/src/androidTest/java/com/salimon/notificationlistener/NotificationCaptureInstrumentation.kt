@@ -70,6 +70,15 @@ class NotificationCaptureInstrumentation : Instrumentation() {
     store.clearAll()
     check(PaymentNotificationFilter.shouldStore(notificationText))
     check(
+      PaymentNotificationFilter.shouldStore(
+        NotificationText(
+          title = "해외 승인 테스트",
+          text = "USD 7.24 해외승인",
+          expandedText = "",
+        ),
+      ),
+    )
+    check(
       store.capture(
         sourcePackageName = "com.example.card",
         notificationKey = "notification-key",

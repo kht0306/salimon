@@ -1,7 +1,18 @@
-import type { ParsedTransaction, TransactionType } from "@salimon/types"
+import type {
+  CardNotificationEvent,
+  OriginalCurrencyAmount,
+  ParsedTransaction,
+  TransactionType,
+} from "@salimon/types"
 
-const amountPattern = /(\d{1,3}(?:,\d{3})+|\d+)\s*(?:원|KRW)/i
-const allAmountPattern = /(?:₩\s*)?(?:\d{1,3}(?:,\d{3})+|\d+)\s*(?:원|KRW)/gi
+const amountPattern =
+  /(?:(?:KRW|₩)\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\.00)?|(\d{1,3}(?:,\d{3})+|\d+)\s*(?:원|KRW))/i
+const foreignAmountPattern =
+  /\b([A-Z]{3})\s*((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\b/i
+const allAmountPattern =
+  /(?:(?:KRW|₩)\s*(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|(?:\d{1,3}(?:,\d{3})+|\d+)\s*(?:원|KRW)|\b[A-Z]{3}\s*(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\b)/gi
+const summaryAmountPattern =
+  /(?:누적금액|누적|잔액)\s*(?:(?:[A-Z]{3}|₩)\s*)?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\s*(?:원|KRW)?/gi
 const datePattern = /(\d{1,2})[./-](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?/
 const sensitivePatterns = [
   /\b\d{2,4}-\d{3,4}-\d{4}\b/g,
@@ -21,13 +32,15 @@ export function parseCardSmsText(
   } = {},
 ): ParsedTransaction {
   const text = normalizeWhitespace(rawText)
-  const amountMatch = text.match(amountPattern)
-  const amount = amountMatch ? Number(amountMatch[1].replace(/,/g, "")) : 0
+  const transactionText = text.replace(summaryAmountPattern, " ")
+  const originalCurrencyAmount = extractOriginalCurrencyAmount(transactionText)
+  const amount = originalCurrencyAmount ? 0 : extractKrwAmount(transactionText)
   const transactionAt = parseTransactionDate(text, receivedAt)
   const type = inferType(text)
+  const cardNotificationEvent = inferCardNotificationEvent(text)
   const merchantName = extractMerchantName(rawText, text)
   const confidence = scoreConfidence({
-    amount,
+    hasAmount: amount > 0 || originalCurrencyAmount !== undefined,
     merchantName,
     hasDate: Boolean(text.match(datePattern)),
     type,
@@ -38,6 +51,8 @@ export function parseCardSmsText(
     type,
     amount,
     currency: "KRW",
+    cardNotificationEvent,
+    originalCurrencyAmount,
     transactionAt: transactionAt.toISOString(),
     merchantName,
     targetLedgerId: options.targetLedgerId,
@@ -54,6 +69,25 @@ export function parseCardSmsText(
     ]),
     rawTextMasked,
   }
+}
+
+function extractKrwAmount(text: string): number {
+  const match = text.match(amountPattern)
+  const amount = match?.[1] ?? match?.[2]
+  return amount ? Number(amount.replace(/,/g, "")) : 0
+}
+
+function extractOriginalCurrencyAmount(
+  text: string,
+): OriginalCurrencyAmount | undefined {
+  const match = text.match(foreignAmountPattern)
+  const currencyCode = match?.[1]?.toUpperCase()
+  const amount = match?.[2]
+  if (!currencyCode || !amount || currencyCode === "KRW") return undefined
+
+  const parsedAmount = Number(amount.replace(/,/g, ""))
+  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) return undefined
+  return { amount: parsedAmount, currencyCode }
 }
 
 export function maskSensitiveText(value: string): string {
@@ -112,6 +146,13 @@ function inferType(text: string): TransactionType {
   return "expense"
 }
 
+function inferCardNotificationEvent(
+  text: string,
+): CardNotificationEvent | undefined {
+  if (/승인\s*취소/.test(text)) return "approval_cancellation"
+  return /(?:해외\s*)?승인/.test(text) ? "approval" : undefined
+}
+
 function extractMerchantName(
   rawText: string,
   text: string,
@@ -124,8 +165,9 @@ function extractMerchantName(
         line.length > 1 &&
         line.length <= 50 &&
         !amountPattern.test(line) &&
+        !foreignAmountPattern.test(line) &&
         !datePattern.test(line) &&
-        !/[()*]/.test(line) &&
+        !/\((?=[\d* -]{4,}\))[\d* -]*\)/.test(line) &&
         !/(카드|은행|로카|승인|결제|일시불|할부|누적|잔액)/.test(line),
     )
   if (standaloneLine) return standaloneLine
@@ -152,18 +194,18 @@ function extractMerchantName(
 }
 
 function scoreConfidence({
-  amount,
+  hasAmount,
   merchantName,
   hasDate,
   type,
 }: {
-  amount: number
+  hasAmount: boolean
   merchantName?: string
   hasDate: boolean
   type: TransactionType
 }): number {
   let confidence = 0.35
-  if (amount > 0) confidence += 0.35
+  if (hasAmount) confidence += 0.35
   if (merchantName) confidence += 0.2
   if (hasDate) confidence += 0.08
   if (type === "expense") confidence += 0.02
