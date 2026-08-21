@@ -1,5 +1,6 @@
 import styled from "@emotion/native"
 import { mobileTheme } from "../theme"
+import { AppText } from "./AppText"
 
 interface StatusRowProps {
   label: string
@@ -41,20 +42,20 @@ const StatusCopy = styled.View`
   flex: 1;
 `
 
-const StatusLabel = styled.Text`
+const StatusLabel = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 14px;
   font-weight: 600;
 `
 
-const StatusDetail = styled.Text`
+const StatusDetail = styled(AppText)`
   margin-top: 3px;
   color: ${mobileTheme.colors.muted};
   font-size: 12px;
   line-height: 17px;
 `
 
-const ReadyLabel = styled.Text`
+const ReadyLabel = styled(AppText)`
   color: ${mobileTheme.colors.green};
   font-size: 11px;
   font-weight: 700;

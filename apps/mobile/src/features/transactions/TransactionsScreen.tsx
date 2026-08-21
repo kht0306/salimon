@@ -13,6 +13,7 @@ import {
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppButton } from "../../components/AppButton"
+import { AppText } from "../../components/AppText"
 import { LedgerMonthControls } from "../dashboard/LedgerMonthControls"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
@@ -373,7 +374,7 @@ const StateContent = styled.View({
   padding: mobileTheme.spacing[5],
 })
 
-const StateMessage = styled.Text({
+const StateMessage = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 15,
   lineHeight: 23,
@@ -398,31 +399,31 @@ const HeadingCopy = styled.View({
   gap: mobileTheme.spacing[1],
 })
 
-const Eyebrow = styled.Text({
+const Eyebrow = styled(AppText)({
   color: mobileTheme.colors.teal,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
-const Title = styled.Text({
+const Title = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 24,
-  fontWeight: "900",
+  fontWeight: "700",
   lineHeight: 31,
 })
 
-const Subtitle = styled.Text({
+const Subtitle = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 12,
   lineHeight: 18,
 })
 
-const ResultCount = styled.Text({
+const ResultCount = styled(AppText)({
   borderRadius: mobileTheme.radii.round,
   backgroundColor: mobileTheme.colors.panel,
   color: mobileTheme.colors.muted,
   fontSize: 11,
-  fontWeight: "700",
+  fontWeight: "600",
   paddingVertical: mobileTheme.spacing[2],
   paddingHorizontal: mobileTheme.spacing[3],
 })
@@ -441,13 +442,13 @@ const CreateButton = styled.Pressable({
   paddingHorizontal: mobileTheme.spacing[3],
 })
 
-const CreateButtonLabel = styled.Text({
+const CreateButtonLabel = styled(AppText)({
   color: mobileTheme.colors.panel,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
-const StaleNotice = styled.Text({
+const StaleNotice = styled(AppText)({
   borderLeftWidth: 3,
   borderLeftColor: mobileTheme.colors.amber,
   backgroundColor: mobileTheme.colors.amberSoft,
@@ -473,6 +474,7 @@ const SearchInput = styled.TextInput({
   borderRadius: mobileTheme.radii.md,
   backgroundColor: mobileTheme.colors.panel,
   color: mobileTheme.colors.ink,
+  fontFamily: "Pretendard",
   fontSize: 13,
   paddingHorizontal: mobileTheme.spacing[4],
 })
@@ -491,17 +493,21 @@ const FilterButton = styled.Pressable<{ $active: boolean }>(({ $active }) => ({
   paddingHorizontal: mobileTheme.spacing[3],
 }))
 
-const FilterButtonLabel = styled.Text<{ $active: boolean }>(({ $active }) => ({
-  color: $active ? mobileTheme.colors.teal : mobileTheme.colors.ink,
-  fontSize: 12,
-  fontWeight: "800",
-}))
+const FilterButtonLabel = styled(AppText)<{ $active: boolean }>(
+  ({ $active }) => ({
+    color: $active ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+    fontSize: 12,
+    fontWeight: "600",
+  }),
+)
 
 const TotalsCard = styled.View<{ $stacked: boolean }>(({ $stacked }) => ({
   flexDirection: $stacked ? "column" : "row",
   gap: mobileTheme.spacing[2],
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.ink,
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.border,
+  backgroundColor: mobileTheme.colors.panel,
   padding: mobileTheme.spacing[4],
 }))
 
@@ -514,23 +520,18 @@ const TotalItem = styled.View<{ $stacked: boolean }>(({ $stacked }) => ({
   gap: mobileTheme.spacing[1],
 }))
 
-const TotalLabel = styled.Text({
-  color: mobileTheme.colors.subtle,
+const TotalLabel = styled(AppText)({
+  color: mobileTheme.colors.muted,
   fontSize: 9,
   fontWeight: "700",
 })
 
-const TotalValue = styled.Text<{
+const TotalValue = styled(AppText)<{
   $tone: "expense" | "income" | "saving"
 }>(({ $tone }) => ({
-  color:
-    $tone === "income"
-      ? "#93c5fd"
-      : $tone === "expense"
-        ? "#fcd34d"
-        : "#c4b5fd",
-  fontSize: 11,
-  fontWeight: "900",
+  color: $tone === "income" ? mobileTheme.colors.green : mobileTheme.colors.ink,
+  fontSize: 12,
+  fontWeight: "600",
   lineHeight: 17,
 }))
 
@@ -552,22 +553,22 @@ const DateHeaderCopy = styled.View({
   gap: mobileTheme.spacing[2],
 })
 
-const DateTitle = styled.Text({
+const DateTitle = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 14,
-  fontWeight: "900",
+  fontWeight: "600",
 })
 
-const DateCount = styled.Text({
+const DateCount = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 10,
   fontWeight: "600",
 })
 
-const DateExpense = styled.Text({
-  color: mobileTheme.colors.amber,
+const DateExpense = styled(AppText)({
+  color: mobileTheme.colors.muted,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
 const EmptyState = styled.View({
@@ -581,13 +582,13 @@ const EmptyState = styled.View({
   padding: mobileTheme.spacing[6],
 })
 
-const EmptyTitle = styled.Text({
+const EmptyTitle = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 14,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
-const EmptyDescription = styled.Text({
+const EmptyDescription = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 11,
   lineHeight: 17,

@@ -1,6 +1,7 @@
 import styled from "@emotion/native"
 import { formatKrw } from "@salimon/domain"
 import type { TransactionTotals } from "./dashboardPresentation"
+import { AppText } from "../../components/AppText"
 import { mobileTheme } from "../../theme"
 
 interface MonthlySummaryProps {
@@ -28,30 +29,32 @@ export function MonthlySummary({ totals }: MonthlySummaryProps) {
 }
 
 const Panel = styled.View({
-  gap: mobileTheme.spacing[2],
+  gap: mobileTheme.spacing[3],
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.ink,
+  backgroundColor: mobileTheme.colors.panel,
   padding: mobileTheme.spacing[5],
 })
 
-const HeroLabel = styled.Text`
-  color: ${mobileTheme.colors.borderStrong};
-  font-size: 11px;
-  font-weight: 700;
+const HeroLabel = styled(AppText)`
+  color: ${mobileTheme.colors.muted};
+  font-size: 12px;
+  font-weight: 600;
 `
 
-const HeroValue = styled.Text`
-  color: ${mobileTheme.colors.panel};
-  font-size: 28px;
-  font-weight: 900;
-  letter-spacing: -0.7px;
-  line-height: 38px;
+const HeroValue = styled(AppText)`
+  color: ${mobileTheme.colors.ink};
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 40px;
 `
 
 const SummaryDivider = styled.View({
   height: 1,
   marginVertical: mobileTheme.spacing[2],
-  backgroundColor: "#3f3f46",
+  backgroundColor: mobileTheme.colors.border,
 })
 
 const SummaryGrid = styled.View({
@@ -65,23 +68,19 @@ const SummaryItem = styled.View({
   gap: mobileTheme.spacing[1],
 })
 
-const SummaryLabel = styled.Text`
-  color: ${mobileTheme.colors.subtle};
-  font-size: 10px;
+const SummaryLabel = styled(AppText)`
+  color: ${mobileTheme.colors.muted};
+  font-size: 11px;
   font-weight: 600;
 `
 
-const SummaryValue = styled.Text<{
+const SummaryValue = styled(AppText)<{
   $tone: "expense" | "income" | "saving"
 }>`
   flex-shrink: 1;
   color: ${({ $tone }) =>
-    $tone === "income"
-      ? "#93c5fd"
-      : $tone === "expense"
-        ? "#fcd34d"
-        : "#c4b5fd"};
-  font-size: 13px;
-  font-weight: 800;
+    $tone === "income" ? mobileTheme.colors.green : mobileTheme.colors.ink};
+  font-size: 14px;
+  font-weight: 600;
   line-height: 19px;
 `

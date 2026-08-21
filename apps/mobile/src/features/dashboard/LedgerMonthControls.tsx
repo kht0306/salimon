@@ -1,6 +1,8 @@
 import styled from "@emotion/native"
 import { observer } from "mobx-react-lite"
 import { ScrollView } from "react-native"
+import { ChevronLeft, ChevronRight } from "lucide-react-native"
+import { AppText } from "../../components/AppText"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
 
@@ -48,7 +50,11 @@ export const LedgerMonthControls = observer(function LedgerMonthControls() {
           accessibilityRole="button"
           onPress={() => void store.moveSelectedMonth(-1)}
         >
-          <MonthButtonLabel>‹</MonthButtonLabel>
+          <ChevronLeft
+            color={mobileTheme.colors.ink}
+            size={20}
+            strokeWidth={1.8}
+          />
         </MonthButton>
         <MonthLabel accessibilityRole="header">
           {year}년 {month}월
@@ -58,7 +64,11 @@ export const LedgerMonthControls = observer(function LedgerMonthControls() {
           accessibilityRole="button"
           onPress={() => void store.moveSelectedMonth(1)}
         >
-          <MonthButtonLabel>›</MonthButtonLabel>
+          <ChevronRight
+            color={mobileTheme.colors.ink}
+            size={20}
+            strokeWidth={1.8}
+          />
         </MonthButton>
       </MonthRow>
     </ControlsPanel>
@@ -71,7 +81,7 @@ const ControlsPanel = styled.View({ gap: mobileTheme.spacing[3] })
 
 const LedgerSection = styled.View({ gap: mobileTheme.spacing[2] })
 
-const ControlLabel = styled.Text`
+const ControlLabel = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 10px;
   font-weight: 700;
@@ -100,14 +110,14 @@ const LedgerButton = styled.Pressable<{ $selected: boolean }>(
   }),
 )
 
-const LedgerName = styled.Text<{ $selected: boolean }>`
+const LedgerName = styled(AppText)<{ $selected: boolean }>`
   color: ${({ $selected }) =>
     $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink};
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 `
 
-const DefaultLabel = styled.Text<{ $selected: boolean }>`
+const DefaultLabel = styled(AppText)<{ $selected: boolean }>`
   color: ${({ $selected }) =>
     $selected ? mobileTheme.colors.teal : mobileTheme.colors.muted};
   font-size: 10px;
@@ -135,17 +145,11 @@ const MonthButton = styled.Pressable({
   backgroundColor: mobileTheme.colors.panelSubtle,
 })
 
-const MonthButtonLabel = styled.Text`
-  color: ${mobileTheme.colors.ink};
-  font-size: 28px;
-  line-height: 30px;
-`
-
-const MonthLabel = styled.Text`
+const MonthLabel = styled(AppText)`
   flex-shrink: 1;
   color: ${mobileTheme.colors.ink};
   font-size: 17px;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 25px;
   text-align: center;
 `

@@ -2,6 +2,7 @@ import styled from "@emotion/native"
 import { useMemo, useState } from "react"
 import { FlatList, Modal, StyleSheet } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { AppText } from "../../components/AppText"
 import { mobileTheme } from "../../theme"
 
 export interface TransactionOption {
@@ -193,10 +194,10 @@ const SheetHeader = styled.View({
   gap: mobileTheme.spacing[3],
 })
 
-const SheetTitle = styled.Text({
+const SheetTitle = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 20,
-  fontWeight: "900",
+  fontWeight: "700",
 })
 
 const CloseButton = styled.Pressable({
@@ -206,10 +207,10 @@ const CloseButton = styled.Pressable({
   justifyContent: "center",
 })
 
-const CloseButtonLabel = styled.Text({
+const CloseButtonLabel = styled(AppText)({
   color: mobileTheme.colors.teal,
   fontSize: 13,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
 const SearchInput = styled.TextInput({
@@ -219,6 +220,7 @@ const SearchInput = styled.TextInput({
   borderRadius: mobileTheme.radii.md,
   backgroundColor: mobileTheme.colors.panelSubtle,
   color: mobileTheme.colors.ink,
+  fontFamily: "Pretendard",
   fontSize: 14,
   paddingHorizontal: mobileTheme.spacing[4],
   marginBottom: mobileTheme.spacing[3],
@@ -250,26 +252,28 @@ const OptionMarker = styled.View({
 
 const OptionCopy = styled.View({ minWidth: 0, flex: 1, gap: 2 })
 
-const OptionLabel = styled.Text<{ $selected: boolean }>(({ $selected }) => ({
-  color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
-  fontSize: 14,
-  fontWeight: $selected ? "900" : "700",
-  lineHeight: 20,
-}))
+const OptionLabel = styled(AppText)<{ $selected: boolean }>(
+  ({ $selected }) => ({
+    color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 20,
+  }),
+)
 
-const OptionDescription = styled.Text({
+const OptionDescription = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 10,
   lineHeight: 15,
 })
 
-const SelectedMark = styled.Text({
+const SelectedMark = styled(AppText)({
   color: mobileTheme.colors.teal,
   fontSize: 10,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
-const EmptyMessage = styled.Text({
+const EmptyMessage = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 13,
   lineHeight: 20,

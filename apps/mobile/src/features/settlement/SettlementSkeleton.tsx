@@ -14,7 +14,7 @@ export function SettlementSkeleton() {
           <SkeletonLine $width="52%" $height={30} />
           <SkeletonLine $width="78%" />
           <SkeletonPanel $height={112} />
-          <SkeletonPanel $dark $height={196} />
+          <SkeletonPanel $height={196} />
           <MetricRow>
             <SkeletonPanel $height={82} />
             <SkeletonPanel $height={82} />
@@ -51,15 +51,13 @@ const SkeletonLine = styled.View<{
   backgroundColor: mobileTheme.colors.border,
 }))
 
-const SkeletonPanel = styled.View<{ $dark?: boolean; $height: number }>(
-  ({ $dark, $height }) => ({
-    minWidth: 0,
-    flex: 1,
-    height: $height,
-    borderRadius: mobileTheme.radii.md,
-    backgroundColor: $dark ? mobileTheme.colors.ink : mobileTheme.colors.border,
-  }),
-)
+const SkeletonPanel = styled.View<{ $height: number }>(({ $height }) => ({
+  minWidth: 0,
+  flex: 1,
+  height: $height,
+  borderRadius: mobileTheme.radii.md,
+  backgroundColor: mobileTheme.colors.border,
+}))
 
 const MetricRow = styled.View({
   flexDirection: "row",

@@ -2,6 +2,7 @@ import styled from "@emotion/native"
 import { router, useLocalSearchParams } from "expo-router"
 import { useEffect, useRef } from "react"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { AppText } from "../../components/AppText"
 import { MOBILE_AUTH_REDIRECT_URL } from "../../features/auth/mobileAuth"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
@@ -74,7 +75,7 @@ const Page = styled(SafeAreaView)({
   padding: mobileTheme.spacing[5],
 })
 
-const Progress = styled.Text`
+const Progress = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 15px;
   line-height: 23px;

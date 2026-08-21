@@ -6,6 +6,7 @@ import type {
   LedgerMember,
   Transaction,
 } from "@salimon/types"
+import { AppText } from "../../components/AppText"
 import { mobileTheme } from "../../theme"
 import {
   getSettlementRoleAccess,
@@ -334,19 +335,19 @@ const SectionHeading = styled.View({
 
 const SectionHeadingCopy = styled.View({ minWidth: 0, flex: 1, gap: 3 })
 
-const SectionTitle = styled.Text({
+const SectionTitle = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 14,
-  fontWeight: "900",
+  fontWeight: "600",
 })
 
-const SectionDescription = styled.Text({
+const SectionDescription = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 10,
   lineHeight: 15,
 })
 
-const SectionCount = styled.Text({
+const SectionCount = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 10,
   fontWeight: "700",
@@ -381,30 +382,30 @@ const MemberAvatar = styled.View({
   backgroundColor: mobileTheme.colors.tealSoft,
 })
 
-const MemberInitial = styled.Text({
+const MemberInitial = styled(AppText)({
   color: mobileTheme.colors.teal,
   fontSize: 12,
-  fontWeight: "900",
+  fontWeight: "600",
 })
 
 const MemberCopy = styled.View({ minWidth: 0, flex: 1, gap: 2 })
 
-const MemberName = styled.Text({
+const MemberName = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 12,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
-const MemberMeta = styled.Text({
+const MemberMeta = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 9,
   lineHeight: 14,
 })
 
-const MemberAmount = styled.Text({
+const MemberAmount = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 12,
-  fontWeight: "900",
+  fontWeight: "600",
 })
 
 const ProgressTrack = styled.View({
@@ -420,7 +421,7 @@ const ProgressFill = styled.View({
   backgroundColor: mobileTheme.colors.teal,
 })
 
-const Explanation = styled.Text({
+const Explanation = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 9,
   lineHeight: 14,
@@ -429,19 +430,19 @@ const Explanation = styled.Text({
 const PrivacyNotice = styled.View({
   gap: 3,
   borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.violet,
-  backgroundColor: mobileTheme.colors.violetSoft,
+  borderLeftColor: mobileTheme.colors.teal,
+  backgroundColor: mobileTheme.colors.tealSoft,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[3],
 })
 
-const PrivacyTitle = styled.Text({
-  color: mobileTheme.colors.violet,
+const PrivacyTitle = styled(AppText)({
+  color: mobileTheme.colors.teal,
   fontSize: 10,
-  fontWeight: "900",
+  fontWeight: "600",
 })
 
-const PrivacyDescription = styled.Text({
+const PrivacyDescription = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 9,
   lineHeight: 14,
@@ -472,22 +473,24 @@ const CategoryMarker = styled.View({
   borderRadius: mobileTheme.radii.round,
 })
 
-const BreakdownName = styled.Text({
+const BreakdownName = styled(AppText)({
   minWidth: 0,
   flex: 1,
   color: mobileTheme.colors.ink,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
   lineHeight: 17,
 })
 
-const BreakdownValue = styled.Text<{ $warning: boolean }>(({ $warning }) => ({
-  color: $warning ? mobileTheme.colors.amber : mobileTheme.colors.muted,
-  fontSize: 10,
-  fontWeight: "800",
-  lineHeight: 17,
-  textAlign: "right",
-}))
+const BreakdownValue = styled(AppText)<{ $warning: boolean }>(
+  ({ $warning }) => ({
+    color: $warning ? mobileTheme.colors.amber : mobileTheme.colors.muted,
+    fontSize: 10,
+    fontWeight: "600",
+    lineHeight: 17,
+    textAlign: "right",
+  }),
+)
 
 const BreakdownTrack = styled.View({
   height: 6,
@@ -504,17 +507,17 @@ const CategoryFill = styled.View({
 const WeekFill = styled.View({
   height: "100%",
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.blue,
+  backgroundColor: mobileTheme.colors.teal,
 })
 
-const WarningLabel = styled.Text({
+const WarningLabel = styled(AppText)({
   color: mobileTheme.colors.amber,
   fontSize: 9,
   fontWeight: "700",
   textAlign: "right",
 })
 
-const EmptyText = styled.Text({
+const EmptyText = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
@@ -522,13 +525,13 @@ const EmptyText = styled.Text({
   paddingVertical: mobileTheme.spacing[4],
 })
 
-const ReadOnlyLabel = styled.Text({
+const ReadOnlyLabel = styled(AppText)({
   color: mobileTheme.colors.teal,
   fontSize: 9,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
-const MonthNote = styled.Text<{ $empty: boolean }>(({ $empty }) => ({
+const MonthNote = styled(AppText)<{ $empty: boolean }>(({ $empty }) => ({
   minHeight: 68,
   borderWidth: 1,
   borderColor: mobileTheme.colors.border,
@@ -558,28 +561,24 @@ const RecentTopLine = styled.View({
   gap: mobileTheme.spacing[3],
 })
 
-const RecentTitle = styled.Text({
+const RecentTitle = styled(AppText)({
   minWidth: 0,
   flex: 1,
   color: mobileTheme.colors.ink,
   fontSize: 12,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
-const RecentAmount = styled.Text<{ $type: Transaction["type"] }>(
+const RecentAmount = styled(AppText)<{ $type: Transaction["type"] }>(
   ({ $type }) => ({
     color:
-      $type === "income"
-        ? mobileTheme.colors.blue
-        : $type === "saving"
-          ? mobileTheme.colors.violet
-          : mobileTheme.colors.amber,
+      $type === "income" ? mobileTheme.colors.green : mobileTheme.colors.ink,
     fontSize: 11,
-    fontWeight: "900",
+    fontWeight: "600",
   }),
 )
 
-const RecentMeta = styled.Text({
+const RecentMeta = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 9,
   lineHeight: 14,

@@ -1,9 +1,12 @@
 import styled from "@emotion/native"
+import { useFonts } from "expo-font"
 import { Stack } from "expo-router"
+import * as SplashScreen from "expo-splash-screen"
 import { StatusBar } from "expo-status-bar"
 import { useEffect, useState } from "react"
 import { AppState } from "react-native"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
+import { AppText } from "../components/AppText"
 import { MobileStoreProvider } from "../stores/MobileStoreProvider"
 import {
   createMobileAppStore,
@@ -13,6 +16,8 @@ import { mobileTheme } from "../theme"
 
 export { ErrorBoundary } from "expo-router"
 
+void SplashScreen.preventAutoHideAsync()
+
 const stackScreenOptions = { headerShown: false } as const
 const safeAreaEdges = ["top", "bottom"] as const
 
@@ -21,6 +26,9 @@ type StoreCreationResult =
   | { store?: never; error: string }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    Pretendard: require("pretendard/dist/public/variable/PretendardVariable.ttf"),
+  })
   const [storeResult] = useState<StoreCreationResult>(() => {
     try {
       return { store: createMobileAppStore() }
@@ -33,6 +41,16 @@ export default function RootLayout() {
       }
     }
   })
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      void SplashScreen.hideAsync()
+    }
+  }, [fontError, fontsLoaded])
+
+  if (!fontsLoaded && !fontError) {
+    return null
+  }
 
   return (
     <SafeAreaProvider>
@@ -120,26 +138,26 @@ const ConfigurationCard = styled.View`
   padding: ${mobileTheme.spacing[6]}px;
 `
 
-const ConfigurationLabel = styled.Text`
+const ConfigurationLabel = styled(AppText)`
   color: ${mobileTheme.colors.coral};
   font-size: 12px;
   font-weight: 700;
 `
 
-const ConfigurationTitle = styled.Text`
+const ConfigurationTitle = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 22px;
   font-weight: 700;
   line-height: 29px;
 `
 
-const ConfigurationDescription = styled.Text`
+const ConfigurationDescription = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 14px;
   line-height: 21px;
 `
 
-const ConfigurationHint = styled.Text`
+const ConfigurationHint = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 12px;
   line-height: 19px;

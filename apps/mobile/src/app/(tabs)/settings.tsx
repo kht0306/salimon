@@ -1,5 +1,6 @@
 import styled from "@emotion/native"
 import { useFocusEffect } from "expo-router"
+import { Check } from "lucide-react-native"
 import { observer } from "mobx-react-lite"
 import { useCallback, useEffect, useState } from "react"
 import {
@@ -11,6 +12,7 @@ import {
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppButton } from "../../components/AppButton"
+import { AppText } from "../../components/AppText"
 import { NotificationDisclosureModal } from "../../features/notification-inbox/NotificationDisclosureModal"
 import { SUPPORTED_NOTIFICATION_APPS } from "../../features/notification-inbox/notificationInbox"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
@@ -167,7 +169,7 @@ export default observer(function SettingsScreen() {
               <Title accessibilityRole="header">설정</Title>
             </HeaderCopy>
             <BrandMark>
-              <BrandInitial>S</BrandInitial>
+              <BrandInitial>살</BrandInitial>
             </BrandMark>
           </ScreenHeader>
 
@@ -245,10 +247,15 @@ export default observer(function SettingsScreen() {
                         <SelectionMark
                           $selected={selected}
                           accessibilityElementsHidden
-                          allowFontScaling={false}
                           importantForAccessibility="no"
                         >
-                          {selected ? "✓" : ""}
+                          {selected ? (
+                            <Check
+                              color={mobileTheme.colors.panel}
+                              size={16}
+                              strokeWidth={2.2}
+                            />
+                          ) : null}
                         </SelectionMark>
                         <SelectionCopy>
                           <SelectionTitle>{app.name}</SelectionTitle>
@@ -423,16 +430,16 @@ const ScreenHeader = styled.View({
 
 const HeaderCopy = styled.View({ gap: mobileTheme.spacing[1] })
 
-const Eyebrow = styled.Text`
+const Eyebrow = styled(AppText)`
   color: ${mobileTheme.colors.teal};
   font-size: 12px;
   font-weight: 700;
 `
 
-const Title = styled.Text`
+const Title = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 24px;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 31px;
 `
 
@@ -442,13 +449,13 @@ const BrandMark = styled.View({
   alignItems: "center",
   justifyContent: "center",
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.ink,
+  backgroundColor: mobileTheme.colors.teal,
 })
 
-const BrandInitial = styled.Text`
+const BrandInitial = styled(AppText)`
   color: ${mobileTheme.colors.panel};
   font-size: 17px;
-  font-weight: 900;
+  font-weight: 700;
 `
 
 const ProfileCard = styled.View({
@@ -472,10 +479,10 @@ const Avatar = styled.View({
   backgroundColor: mobileTheme.colors.tealSoft,
 })
 
-const AvatarText = styled.Text`
+const AvatarText = styled(AppText)`
   color: ${mobileTheme.colors.teal};
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 600;
 `
 
 const ProfileCopy = styled.View({
@@ -484,23 +491,23 @@ const ProfileCopy = styled.View({
   gap: mobileTheme.spacing[1],
 })
 
-const ProfileName = styled.Text`
+const ProfileName = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 600;
 `
 
-const ProfileProvider = styled.Text`
+const ProfileProvider = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 11px;
 `
 
-const ConnectedBadge = styled.Text({
+const ConnectedBadge = styled(AppText)({
   borderRadius: mobileTheme.radii.round,
   backgroundColor: mobileTheme.colors.tealSoft,
   color: mobileTheme.colors.teal,
   fontSize: 10,
-  fontWeight: "800",
+  fontWeight: "600",
   paddingVertical: mobileTheme.spacing[1],
   paddingHorizontal: mobileTheme.spacing[2],
 })
@@ -514,7 +521,7 @@ const Section = styled.View({
   padding: mobileTheme.spacing[4],
 })
 
-const SectionTitle = styled.Text`
+const SectionTitle = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 15px;
   font-weight: 700;
@@ -527,22 +534,22 @@ const SectionHeader = styled.View({
   gap: mobileTheme.spacing[3],
 })
 
-const StatusText = styled.Text<{
+const StatusText = styled(AppText)<{
   $tone: "active" | "inactive" | "warning"
 }>(({ $tone }) => ({
   color:
     $tone === "active"
       ? mobileTheme.colors.teal
       : $tone === "warning"
-        ? mobileTheme.colors.coral
+        ? mobileTheme.colors.amber
         : mobileTheme.colors.muted,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
 }))
 
 const SettingGroup = styled.View({ gap: mobileTheme.spacing[2] })
 
-const SettingGroupLabel = styled.Text({
+const SettingGroupLabel = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 11,
   fontWeight: "700",
@@ -566,7 +573,7 @@ const SelectionButton = styled.Pressable<{ $selected: boolean }>(
   }),
 )
 
-const SelectionMark = styled.Text<{ $selected: boolean }>(({ $selected }) => ({
+const SelectionMark = styled.View<{ $selected: boolean }>(({ $selected }) => ({
   width: 24,
   height: 24,
   borderWidth: 2,
@@ -577,20 +584,17 @@ const SelectionMark = styled.Text<{ $selected: boolean }>(({ $selected }) => ({
   backgroundColor: $selected
     ? mobileTheme.colors.teal
     : mobileTheme.colors.panel,
-  color: mobileTheme.colors.panel,
-  fontSize: 16,
-  fontWeight: "900",
-  lineHeight: 20,
-  textAlign: "center",
+  alignItems: "center",
+  justifyContent: "center",
 }))
 
 const SelectionCopy = styled.View({ flex: 1, gap: 2 })
-const SelectionTitle = styled.Text({
+const SelectionTitle = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 14,
-  fontWeight: "800",
+  fontWeight: "600",
 })
-const SelectionDescription = styled.Text({
+const SelectionDescription = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 10,
 })
@@ -615,11 +619,13 @@ const LedgerButton = styled.Pressable<{ $selected: boolean }>(
     paddingHorizontal: mobileTheme.spacing[3],
   }),
 )
-const LedgerLabel = styled.Text<{ $selected: boolean }>(({ $selected }) => ({
-  color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
-  fontSize: 12,
-  fontWeight: "800",
-}))
+const LedgerLabel = styled(AppText)<{ $selected: boolean }>(
+  ({ $selected }) => ({
+    color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+    fontSize: 12,
+    fontWeight: "600",
+  }),
+)
 
 const PermissionRow = styled.View({
   minHeight: 52,
@@ -636,12 +642,12 @@ const InlineButton = styled.Pressable({
   backgroundColor: mobileTheme.colors.tealSoft,
   paddingHorizontal: mobileTheme.spacing[3],
 })
-const InlineButtonLabel = styled.Text({
+const InlineButtonLabel = styled(AppText)({
   color: mobileTheme.colors.teal,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
 })
-const ErrorText = styled.Text({
+const ErrorText = styled(AppText)({
   borderRadius: mobileTheme.radii.md,
   backgroundColor: mobileTheme.colors.coralSoft,
   color: mobileTheme.colors.coral,
@@ -654,7 +660,7 @@ const TextAction = styled.Pressable({
   alignItems: "center",
   justifyContent: "center",
 })
-const TextActionLabel = styled.Text({
+const TextActionLabel = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 11,
   textDecorationLine: "underline",
@@ -668,13 +674,13 @@ const SettingRow = styled.View({
   gap: mobileTheme.spacing[4],
 })
 
-const SettingLabel = styled.Text`
+const SettingLabel = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 13px;
   line-height: 20px;
 `
 
-const SettingValue = styled.Text`
+const SettingValue = styled(AppText)`
   flex-shrink: 1;
   color: ${mobileTheme.colors.ink};
   font-size: 13px;
@@ -683,7 +689,7 @@ const SettingValue = styled.Text`
   text-align: right;
 `
 
-const Description = styled.Text`
+const Description = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 13px;
   line-height: 20px;
@@ -709,7 +715,7 @@ const SecurityCopy = styled.View({
   gap: mobileTheme.spacing[1],
 })
 
-const SecurityTitle = styled.Text`
+const SecurityTitle = styled(AppText)`
   color: ${mobileTheme.colors.ink};
   font-size: 13px;
   font-weight: 700;
@@ -725,7 +731,7 @@ const LogoutArea = styled.View({
   marginTop: mobileTheme.spacing[2],
 })
 
-const VersionText = styled.Text`
+const VersionText = styled(AppText)`
   color: ${mobileTheme.colors.subtle};
   font-size: 10px;
   text-align: center;

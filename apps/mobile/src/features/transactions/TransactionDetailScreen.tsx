@@ -6,6 +6,7 @@ import * as WebBrowser from "expo-web-browser"
 import { observer } from "mobx-react-lite"
 import { Alert, ScrollView } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { AppText } from "../../components/AppText"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
 import {
@@ -375,15 +376,15 @@ function formatTransactionDateTime(value: string): string {
 }
 
 function typeSoftColor(type: Transaction["type"]): string {
-  if (type === "income") return mobileTheme.colors.blueSoft
-  if (type === "saving") return mobileTheme.colors.violetSoft
-  return mobileTheme.colors.amberSoft
+  if (type === "income") return mobileTheme.colors.greenSoft
+  if (type === "saving") return mobileTheme.colors.tealSoft
+  return mobileTheme.colors.panel
 }
 
 function typeColor(type: Transaction["type"]): string {
-  if (type === "income") return mobileTheme.colors.blue
-  if (type === "saving") return mobileTheme.colors.violet
-  return mobileTheme.colors.amber
+  if (type === "income") return mobileTheme.colors.green
+  if (type === "saving") return mobileTheme.colors.teal
+  return mobileTheme.colors.border
 }
 
 const Page = styled(SafeAreaView)({
@@ -412,16 +413,16 @@ const BackButton = styled.Pressable({
   justifyContent: "center",
 })
 
-const BackLabel = styled.Text({
+const BackLabel = styled(AppText)({
   color: mobileTheme.colors.teal,
   fontSize: 13,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
-const ScreenLabel = styled.Text({
+const ScreenLabel = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 15,
-  fontWeight: "900",
+  fontWeight: "600",
 })
 
 const TopBarSpacer = styled.View({ width: 56 })
@@ -435,28 +436,30 @@ const AmountCard = styled.View<{ $type: Transaction["type"] }>(({ $type }) => ({
   padding: mobileTheme.spacing[5],
 }))
 
-const TypeLabel = styled.Text<{ $type: Transaction["type"] }>(({ $type }) => ({
-  color: typeColor($type),
-  fontSize: 11,
-  fontWeight: "800",
-}))
+const TypeLabel = styled(AppText)<{ $type: Transaction["type"] }>(
+  ({ $type }) => ({
+    color: typeColor($type),
+    fontSize: 11,
+    fontWeight: "600",
+  }),
+)
 
-const Amount = styled.Text({
+const Amount = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 30,
-  fontWeight: "900",
+  fontWeight: "700",
   letterSpacing: -0.8,
   lineHeight: 39,
 })
 
-const TransactionTitle = styled.Text({
+const TransactionTitle = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 16,
-  fontWeight: "800",
+  fontWeight: "600",
   lineHeight: 23,
 })
 
-const TransactionDate = styled.Text({
+const TransactionDate = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
@@ -465,19 +468,19 @@ const TransactionDate = styled.Text({
 const ReadOnlyNotice = styled.View({
   gap: mobileTheme.spacing[1],
   borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.violet,
-  backgroundColor: mobileTheme.colors.violetSoft,
+  borderLeftColor: mobileTheme.colors.teal,
+  backgroundColor: mobileTheme.colors.tealSoft,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[4],
 })
 
-const ReadOnlyTitle = styled.Text({
-  color: mobileTheme.colors.violet,
+const ReadOnlyTitle = styled(AppText)({
+  color: mobileTheme.colors.teal,
   fontSize: 12,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
-const ReadOnlyDescription = styled.Text({
+const ReadOnlyDescription = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
@@ -489,16 +492,16 @@ const WebManageButton = styled.Pressable({
   justifyContent: "center",
   marginTop: mobileTheme.spacing[2],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.violet,
+  borderColor: mobileTheme.colors.teal,
   borderRadius: mobileTheme.radii.sm,
   backgroundColor: mobileTheme.colors.panel,
   paddingHorizontal: mobileTheme.spacing[3],
 })
 
-const WebManageButtonLabel = styled.Text({
-  color: mobileTheme.colors.violet,
+const WebManageButtonLabel = styled(AppText)({
+  color: mobileTheme.colors.teal,
   fontSize: 11,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
 const ActionRow = styled.View({
@@ -516,10 +519,10 @@ const EditButton = styled.Pressable(({ disabled }) => ({
   opacity: disabled ? 0.45 : 1,
 }))
 
-const EditButtonLabel = styled.Text({
+const EditButtonLabel = styled(AppText)({
   color: mobileTheme.colors.panel,
   fontSize: 13,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
 const DeleteButton = styled.Pressable(({ disabled }) => ({
@@ -534,13 +537,13 @@ const DeleteButton = styled.Pressable(({ disabled }) => ({
   opacity: disabled ? 0.45 : 1,
 }))
 
-const DeleteButtonLabel = styled.Text({
+const DeleteButtonLabel = styled(AppText)({
   color: mobileTheme.colors.coral,
   fontSize: 13,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
-const MutationError = styled.Text({
+const MutationError = styled(AppText)({
   borderLeftWidth: 3,
   borderLeftColor: mobileTheme.colors.coral,
   backgroundColor: mobileTheme.colors.coralSoft,
@@ -567,13 +570,13 @@ const SectionHeading = styled.View({
   justifyContent: "space-between",
 })
 
-const SectionTitle = styled.Text({
+const SectionTitle = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 14,
-  fontWeight: "800",
+  fontWeight: "600",
 })
 
-const SectionCount = styled.Text({
+const SectionCount = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 10,
   fontWeight: "600",
@@ -587,25 +590,25 @@ const DetailRowContainer = styled.View({
   gap: mobileTheme.spacing[4],
 })
 
-const DetailLabel = styled.Text({
+const DetailLabel = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 11,
   lineHeight: 18,
 })
 
-const DetailValue = styled.Text<{ $subdued: boolean }>(({ $subdued }) => ({
+const DetailValue = styled(AppText)<{ $subdued: boolean }>(({ $subdued }) => ({
   minWidth: 0,
   flex: 1,
   color: $subdued ? mobileTheme.colors.subtle : mobileTheme.colors.ink,
   fontSize: $subdued ? 9 : 11,
-  fontWeight: $subdued ? "500" : "700",
+  fontWeight: $subdued ? "400" : "600",
   lineHeight: 18,
   textAlign: "right",
 }))
 
 const LongDetailContainer = styled.View({ gap: mobileTheme.spacing[1] })
 
-const LongDetailValue = styled.Text({
+const LongDetailValue = styled(AppText)({
   color: mobileTheme.colors.ink,
   fontSize: 13,
   lineHeight: 20,
@@ -624,7 +627,7 @@ const SplitMarker = styled.View({
   borderRadius: mobileTheme.radii.round,
 })
 
-const SplitName = styled.Text({
+const SplitName = styled(AppText)({
   minWidth: 0,
   flex: 1,
   color: mobileTheme.colors.ink,
@@ -632,7 +635,7 @@ const SplitName = styled.Text({
   fontWeight: "600",
 })
 
-const SplitAmount = styled.Text({
+const SplitAmount = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 11,
   fontWeight: "700",
@@ -644,7 +647,7 @@ const TagList = styled.View({
   gap: mobileTheme.spacing[2],
 })
 
-const Tag = styled.Text({
+const Tag = styled(AppText)({
   borderRadius: mobileTheme.radii.round,
   backgroundColor: mobileTheme.colors.tealSoft,
   color: mobileTheme.colors.teal,
@@ -664,7 +667,7 @@ const StateContent = styled.View({
   padding: mobileTheme.spacing[5],
 })
 
-const StateMessage = styled.Text({
+const StateMessage = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 14,
   lineHeight: 21,
@@ -680,8 +683,8 @@ const StateButton = styled.Pressable({
   paddingHorizontal: mobileTheme.spacing[4],
 })
 
-const StateButtonLabel = styled.Text({
+const StateButtonLabel = styled(AppText)({
   color: mobileTheme.colors.panel,
   fontSize: 13,
-  fontWeight: "800",
+  fontWeight: "600",
 })
