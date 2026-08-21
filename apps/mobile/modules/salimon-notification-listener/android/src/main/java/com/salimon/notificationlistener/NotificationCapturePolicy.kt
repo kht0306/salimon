@@ -4,7 +4,7 @@ import java.security.MessageDigest
 
 internal object PaymentNotificationFilter {
   private val amountPattern = Regex(
-    pattern = """(?i)(?:₩\s*)?\d{1,3}(?:,\d{3})+(?:\s*원)?|\d+\s*원|KRW\s*\d+""",
+    pattern = """(?i)(?:₩\s*)?\d{1,3}(?:,\d{3})+(?:\s*원)?|\d+\s*원|[A-Z]{3}\s*(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?""",
   )
   private val paymentKeywordPattern = Regex(
     pattern = """승인|결제|이용|사용|출금|입금|취소|환불|체크|신용|일시불|할부""",

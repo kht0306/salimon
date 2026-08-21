@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import {
+  candidateAmountLabel,
   candidateStatusLabel,
+  cardNotificationEventLabel,
   createCandidateFromNotificationRecord,
   SUPPORTED_NOTIFICATION_APPS,
 } from "./notificationInbox"
@@ -38,6 +40,54 @@ describe("notification inbox candidate", () => {
     expect(candidate.maskedMessage).not.toContain("(8*3*)")
     expect(candidate).not.toHaveProperty("rawMessage")
     expect(candidateStatusLabel(candidate)).toBe("등록 가능")
+    expect(cardNotificationEventLabel(candidate)).toBe("정상 승인")
+    expect(candidateAmountLabel(candidate)).toBe("₩45,000")
+  })
+
+  it("shows foreign approvals without using the cumulative KRW amount", () => {
+    const candidate = createCandidateFromNotificationRecord({
+      record: {
+        capturedAt: 1_786_600_000_000,
+        expandedText: [
+          "USD 7.24 해외승인",
+          "쇼핑엔 로카(8*3*)",
+          "일시불, 08/15 21:23",
+          "누적금액 3,357,207원",
+        ].join("\n"),
+        id: "f".repeat(64),
+        receivedAt: new Date("2026-08-15T21:24:00+09:00").getTime(),
+        sourcePackageName: "com.lcacApp",
+        text: "USD 7.24 해외승인",
+        title: "ALIEXPRESS",
+      },
+      targetLedgerId: "ledger-1",
+      userId: "user-1",
+    })
+
+    expect(candidate.status).toBe("needs_review")
+    expect(candidateStatusLabel(candidate)).toBe("원화 금액 필요")
+    expect(cardNotificationEventLabel(candidate)).toBe("해외 승인")
+    expect(candidateAmountLabel(candidate)).toBe("USD 7.24")
+    expect(candidate.parsed.amount).toBe(0)
+  })
+
+  it("labels approval cancellations separately", () => {
+    const candidate = createCandidateFromNotificationRecord({
+      record: {
+        capturedAt: 1_786_600_000_000,
+        expandedText: "10,000원 승인취소\n일시불, 08/14 19:26",
+        id: "c".repeat(64),
+        receivedAt: new Date("2026-08-14T19:27:00+09:00").getTime(),
+        sourcePackageName: "com.lcacApp",
+        text: "10,000원 승인취소",
+        title: "(주)소모 뉴평내셀프주유소",
+      },
+      targetLedgerId: "ledger-1",
+      userId: "user-1",
+    })
+
+    expect(candidate.parsed.type).toBe("income")
+    expect(cardNotificationEventLabel(candidate)).toBe("승인취소")
   })
 
   it("restores an encrypted pending registration draft", () => {

@@ -146,15 +146,86 @@ describe("candidate registration", () => {
     }
     const incomeCandidate: LocalSmsCandidate = {
       ...candidate,
-      parsed: { ...candidate.parsed, type: "income" },
+      parsed: {
+        ...candidate.parsed,
+        cardNotificationEvent: "approval_cancellation",
+        type: "income",
+      },
     }
-    const draft = createCandidateRegistrationDraft(incomeCandidate, {
+    const incomeContext = {
       ...context,
       categories: [...context.categories, incomeCategory],
-    })
+    }
+    const draft = createCandidateRegistrationDraft(
+      incomeCandidate,
+      incomeContext,
+    )
 
     expect(draft.categoryId).toBe("category-income")
     expect(draft.paymentMethodId).toBe("")
+    expect(
+      validateCandidateRegistrationDraft(
+        draft,
+        incomeCandidate,
+        incomeContext,
+        new Date("2026-08-13T06:00:00.000Z"),
+      ),
+    ).toEqual({
+      valid: true,
+      value: {
+        input: expect.objectContaining({
+          memo: "카드 승인취소",
+          type: "income",
+        }),
+        registrationState: expect.any(Object),
+      },
+    })
+  })
+
+  it("requires a KRW ledger amount for a foreign approval", () => {
+    const foreignCandidate: LocalSmsCandidate = {
+      ...candidate,
+      parsed: {
+        ...candidate.parsed,
+        amount: 0,
+        originalCurrencyAmount: {
+          amount: 7.24,
+          currencyCode: "USD",
+        },
+      },
+      status: "needs_review",
+    }
+    const draft = createCandidateRegistrationDraft(foreignCandidate, context)
+
+    expect(draft.amount).toBe("")
+    expect(
+      validateCandidateRegistrationDraft(
+        draft,
+        foreignCandidate,
+        context,
+        new Date("2026-08-13T06:00:00.000Z"),
+      ),
+    ).toEqual({
+      valid: false,
+      message: "금액을 1원 이상 숫자로 입력해 주세요.",
+    })
+    expect(
+      validateCandidateRegistrationDraft(
+        { ...draft, amount: "10500" },
+        foreignCandidate,
+        context,
+        new Date("2026-08-13T06:00:00.000Z"),
+      ),
+    ).toEqual({
+      valid: true,
+      value: {
+        input: expect.objectContaining({
+          amount: 10_500,
+          memo: "원승인금액 USD 7.24",
+        }),
+        registrationState: expect.any(Object),
+      },
+    })
   })
 
   it("locks a pending registration to the previously persisted values", () => {

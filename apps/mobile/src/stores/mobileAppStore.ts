@@ -1025,6 +1025,47 @@ export class MobileAppStore {
     }
   }
 
+  async deleteNotificationCandidates(candidateIds: string[]): Promise<number> {
+    const requestedIds = new Set(candidateIds)
+    const existingIds = this.notificationCandidates
+      .map((candidate) => candidate.id)
+      .filter((candidateId) => requestedIds.has(candidateId))
+    if (existingIds.length === 0) return 0
+
+    this.notificationInboxErrorMessage = undefined
+    const results = await Promise.all(
+      existingIds.map(async (candidateId) => {
+        try {
+          return {
+            candidateId,
+            deleted: await deleteStoredNotificationRecord(candidateId),
+          }
+        } catch {
+          return { candidateId, deleted: false }
+        }
+      }),
+    )
+    const deletedIds = new Set(
+      results
+        .filter((result) => result.deleted)
+        .map((result) => result.candidateId),
+    )
+
+    runInAction(() => {
+      this.notificationCandidates = this.notificationCandidates.filter(
+        (candidate) => !deletedIds.has(candidate.id),
+      )
+      this.notificationCaptureStatus = {
+        ...this.notificationCaptureStatus,
+        storedRecordCount: this.notificationCandidates.length,
+      }
+      if (deletedIds.size < existingIds.length) {
+        this.notificationInboxErrorMessage = `선택한 후보 ${existingIds.length}건 중 ${deletedIds.size}건만 삭제했습니다. 남은 후보를 다시 시도해 주세요.`
+      }
+    })
+    return deletedIds.size
+  }
+
   async deleteAllNotificationCandidates(): Promise<boolean> {
     try {
       await deleteAllStoredNotificationRecords()

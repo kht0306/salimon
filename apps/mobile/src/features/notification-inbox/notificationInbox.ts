@@ -5,6 +5,15 @@ export const SUPPORTED_NOTIFICATION_APPS = [
   { name: "롯데카드", packageName: "com.lcacApp" },
 ] as const
 
+const foreignAmountFormatter = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 4,
+})
+const krwAmountFormatter = new Intl.NumberFormat("ko-KR", {
+  style: "currency",
+  currency: "KRW",
+  maximumFractionDigits: 0,
+})
+
 export interface NotificationRecordInput {
   capturedAt: number
   expandedText: string
@@ -69,9 +78,11 @@ export function createCandidateFromNotificationRecord(input: {
     parsed: candidateParsed,
     status: registrationState
       ? "registration_pending"
-      : parsed.confidence >= 0.85
-        ? "notified"
-        : "needs_review",
+      : parsed.originalCurrencyAmount
+        ? "needs_review"
+        : parsed.confidence >= 0.85
+          ? "notified"
+          : "needs_review",
     promptCount: 0,
     firstDetectedAt: receivedAt.toISOString(),
     reviewDeadlineAt: new Date(
@@ -84,7 +95,29 @@ export function createCandidateFromNotificationRecord(input: {
 export function candidateStatusLabel(candidate: LocalSmsCandidate): string {
   if (candidate.status === "registration_pending") return "등록 대기"
   if (candidate.status === "deferred") return "미룸"
+  if (candidate.parsed.originalCurrencyAmount) return "원화 금액 필요"
   return candidate.status === "needs_review" ? "검토 필요" : "등록 가능"
+}
+
+export function candidateAmountLabel(candidate: LocalSmsCandidate): string {
+  const originalAmount = candidate.parsed.originalCurrencyAmount
+  if (originalAmount) {
+    return `${originalAmount.currencyCode} ${foreignAmountFormatter.format(originalAmount.amount)}`
+  }
+
+  return krwAmountFormatter.format(candidate.parsed.amount)
+}
+
+export function cardNotificationEventLabel(
+  candidate: LocalSmsCandidate,
+): string | undefined {
+  if (candidate.parsed.cardNotificationEvent === "approval_cancellation") {
+    return "승인취소"
+  }
+  if (candidate.parsed.originalCurrencyAmount) return "해외 승인"
+  return candidate.parsed.cardNotificationEvent === "approval"
+    ? "정상 승인"
+    : undefined
 }
 
 export function notificationAppName(packageName?: string): string {
