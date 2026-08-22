@@ -46,6 +46,7 @@ const context: CandidateRegistrationContext = {
       usageTypes: ["expense"],
     },
   ],
+  defaultLedgerId: "ledger-1",
   ledgers: [
     {
       currency: "KRW",
@@ -255,6 +256,59 @@ describe("candidate registration", () => {
       message:
         "등록 결과가 불명확한 후보는 중복 방지를 위해 내용을 변경할 수 없습니다. 저장했던 내용으로 다시 시도해 주세요.",
     })
+  })
+
+  it("prefers the default ledger for a new candidate", () => {
+    const secondaryCategory = {
+      ...context.categories[0]!,
+      id: "category-2",
+      ledgerId: "ledger-2",
+    }
+    const secondaryLedger = {
+      ...context.ledgers[0]!,
+      id: "ledger-2",
+      name: "내 가계부",
+    }
+    const draft = createCandidateRegistrationDraft(
+      { ...candidate, targetLedgerId: "ledger-2" },
+      {
+        ...context,
+        categories: [...context.categories, secondaryCategory],
+        ledgers: [...context.ledgers, secondaryLedger],
+      },
+    )
+
+    expect(draft.ledgerId).toBe("ledger-1")
+    expect(draft.categoryId).toBe("category-1")
+  })
+
+  it("keeps the persisted ledger when retrying a pending registration", () => {
+    const pendingCandidate: LocalSmsCandidate = {
+      ...candidate,
+      registrationState: {
+        amount: 45_000,
+        categoryId: "category-2",
+        merchantName: "테스트주유소",
+        targetLedgerId: "ledger-2",
+        transactionAt: "2026-08-13T14:00:00+09:00",
+        updatedAt: "2026-08-13T05:01:00.000Z",
+      },
+      status: "registration_pending",
+    }
+    const draft = createCandidateRegistrationDraft(pendingCandidate, {
+      ...context,
+      categories: [
+        ...context.categories,
+        { ...context.categories[0]!, id: "category-2", ledgerId: "ledger-2" },
+      ],
+      ledgers: [
+        ...context.ledgers,
+        { ...context.ledgers[0]!, id: "ledger-2", name: "내 가계부" },
+      ],
+    })
+
+    expect(draft.ledgerId).toBe("ledger-2")
+    expect(draft.categoryId).toBe("category-2")
   })
 
   it("classifies only connection failures as retryable", () => {

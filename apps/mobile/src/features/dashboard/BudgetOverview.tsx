@@ -11,15 +11,26 @@ interface BudgetOverviewProps {
 
 export function BudgetOverview({ budgets }: BudgetOverviewProps) {
   const [expanded, setExpanded] = useState(false)
-  const visibleBudgets = expanded ? budgets : budgets.slice(0, 4)
+  const visibleBudgets = expanded ? budgets : budgets.slice(0, 3)
 
   return (
     <Panel>
       <PanelHeading>
         <PanelTitle>예산 사용</PanelTitle>
-        {budgets.length > 0 ? (
-          <BudgetCount>{budgets.length}개 항목</BudgetCount>
-        ) : null}
+        <PanelMeta>
+          {budgets.length > 0 ? (
+            <BudgetCount>{budgets.length}개 항목</BudgetCount>
+          ) : null}
+          {budgets.length > 3 ? (
+            <ExpandButton
+              accessibilityRole="button"
+              accessibilityState={{ expanded }}
+              onPress={() => setExpanded((value) => !value)}
+            >
+              <ExpandLabel>{expanded ? "간단히" : "전체 보기"}</ExpandLabel>
+            </ExpandButton>
+          ) : null}
+        </PanelMeta>
       </PanelHeading>
       {budgets.length === 0 ? (
         <EmptyText>웹에서 설정한 지출 예산이 없습니다.</EmptyText>
@@ -63,17 +74,6 @@ export function BudgetOverview({ budgets }: BudgetOverviewProps) {
               </BudgetRow>
             )
           })}
-          {budgets.length > 4 ? (
-            <ExpandButton
-              accessibilityRole="button"
-              accessibilityState={{ expanded }}
-              onPress={() => setExpanded((value) => !value)}
-            >
-              <ExpandLabel>
-                {expanded ? "간단히 보기" : "전체 보기"}
-              </ExpandLabel>
-            </ExpandButton>
-          ) : null}
         </BudgetList>
       )}
     </Panel>
@@ -82,7 +82,9 @@ export function BudgetOverview({ budgets }: BudgetOverviewProps) {
 
 const Panel = styled.View({
   gap: mobileTheme.spacing[3],
-  paddingVertical: mobileTheme.spacing[2],
+  borderBottomWidth: 1,
+  borderBottomColor: mobileTheme.colors.border,
+  paddingBottom: mobileTheme.spacing[4],
 })
 
 const PanelHeading = styled.View({
@@ -103,6 +105,12 @@ const BudgetCount = styled(AppText)`
   font-size: 10px;
   font-weight: 600;
 `
+
+const PanelMeta = styled.View({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: mobileTheme.spacing[2],
+})
 
 const EmptyText = styled(AppText)`
   color: ${mobileTheme.colors.muted};
@@ -151,16 +159,15 @@ const ProgressFill = styled.View({
 })
 
 const ExpandButton = styled.Pressable({
-  minHeight: 40,
+  minHeight: mobileTheme.controls.touch,
   alignItems: "center",
   justifyContent: "center",
-  marginTop: mobileTheme.spacing[1],
-  borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.panelSubtle,
+  marginVertical: -mobileTheme.spacing[3],
+  paddingLeft: mobileTheme.spacing[1],
 })
 
 const ExpandLabel = styled(AppText)`
   color: ${mobileTheme.colors.teal};
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
 `

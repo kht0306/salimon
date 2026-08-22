@@ -36,15 +36,10 @@ export function TransactionRow({
       accessibilityRole="button"
       onPress={onPress}
     >
-      <TypeMark $type={transaction.type}>
-        <TypeInitial $type={transaction.type}>
-          {typeLabel.slice(0, 1)}
-        </TypeInitial>
-      </TypeMark>
       <TransactionCopy>
         <Title>{title}</Title>
         <Metadata>
-          {formatKoreanTime(transaction.transactionAt)} · {categoryLabel}
+          {categoryLabel} · {formatKoreanTime(transaction.transactionAt)}
           {transaction.status === "excluded" ? " · 합계 제외" : ""}
         </Metadata>
       </TransactionCopy>
@@ -57,45 +52,15 @@ export function TransactionRow({
 }
 
 const Row = styled.Pressable({
-  minHeight: 68,
+  minHeight: 60,
   flexDirection: "row",
   alignItems: "center",
   gap: mobileTheme.spacing[3],
   marginHorizontal: mobileTheme.spacing[4],
-  marginBottom: mobileTheme.spacing[2],
-  borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
-  borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  borderBottomWidth: 1,
+  borderBottomColor: mobileTheme.colors.border,
   paddingVertical: mobileTheme.spacing[3],
-  paddingHorizontal: mobileTheme.spacing[4],
 })
-
-const TypeMark = styled.View<{ $type: Transaction["type"] }>(({ $type }) => ({
-  width: 36,
-  height: 36,
-  flexShrink: 0,
-  alignItems: "center",
-  justifyContent: "center",
-  borderRadius: mobileTheme.radii.round,
-  backgroundColor:
-    $type === "income"
-      ? mobileTheme.colors.greenSoft
-      : $type === "expense"
-        ? mobileTheme.colors.panelSubtle
-        : mobileTheme.colors.tealSoft,
-}))
-
-const TypeInitial = styled(AppText)<{ $type: Transaction["type"] }>`
-  color: ${({ $type }) =>
-    $type === "income"
-      ? mobileTheme.colors.green
-      : $type === "expense"
-        ? mobileTheme.colors.muted
-        : mobileTheme.colors.teal};
-  font-size: 12px;
-  font-weight: 600;
-`
 
 const TransactionCopy = styled.View`
   min-width: 0;

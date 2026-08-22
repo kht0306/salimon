@@ -60,7 +60,7 @@ export default observer(function SettingsScreen() {
       selectedPackages.length > 0
         ? selectedPackages
         : [SUPPORTED_NOTIFICATION_APPS[0].packageName]
-    const ledgerId = targetLedgerId || store.selectedLedgerId
+    const ledgerId = targetLedgerId || store.defaultLedgerId
     const configured = await store.configureNotificationInbox({
       allowedPackageNames,
       enabled: true,
@@ -84,7 +84,7 @@ export default observer(function SettingsScreen() {
     const saved = await store.configureNotificationInbox({
       allowedPackageNames: selectedPackages,
       enabled: true,
-      targetLedgerId: targetLedgerId || store.selectedLedgerId,
+      targetLedgerId: targetLedgerId || store.defaultLedgerId,
     })
     if (saved) Alert.alert("알림 후보함 설정을 저장했습니다.")
   }
@@ -119,7 +119,7 @@ export default observer(function SettingsScreen() {
       allowedPackageNames: selectedPackages,
       enabled: true,
       reviewNotificationsEnabled: enabled,
-      targetLedgerId: targetLedgerId || store.selectedLedgerId,
+      targetLedgerId: targetLedgerId || store.defaultLedgerId,
     })
   }
 
@@ -137,7 +137,7 @@ export default observer(function SettingsScreen() {
               allowedPackageNames: selectedPackages,
               enabled: false,
               reviewNotificationsEnabled: false,
-              targetLedgerId: targetLedgerId || store.selectedLedgerId,
+              targetLedgerId: targetLedgerId || store.defaultLedgerId,
             }),
         },
       ],

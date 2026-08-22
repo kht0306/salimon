@@ -56,6 +56,7 @@ export const CandidateEditor = observer(function CandidateEditor({
   const [draft, setDraft] = useState<CandidateRegistrationDraft>(() =>
     createCandidateRegistrationDraft(candidate, {
       categories: store.financeData.categories,
+      defaultLedgerId: store.defaultLedgerId,
       ledgers: store.selectableLedgers,
       paymentMethods: store.financeData.paymentMethods,
     }),
@@ -141,6 +142,7 @@ export const CandidateEditor = observer(function CandidateEditor({
       canWriteData:
         store.dataStatus !== "stale" && store.dataStatus !== "error",
       categories: store.financeData.categories,
+      defaultLedgerId: store.defaultLedgerId,
       ledgers,
       members: store.financeData.members,
       paymentMethods: store.financeData.paymentMethods,

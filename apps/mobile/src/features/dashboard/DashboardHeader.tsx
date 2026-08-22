@@ -1,5 +1,4 @@
 import styled from "@emotion/native"
-import { formatKoreanDate } from "@salimon/domain"
 import { router } from "expo-router"
 import { Plus, RefreshCw } from "lucide-react-native"
 import { observer } from "mobx-react-lite"
@@ -98,7 +97,7 @@ export const DashboardHeader = observer(function DashboardHeader({
 
       <SelectedDateHeading>
         <SelectedDateTitle>
-          {formatKoreanDate(store.selectedDate)} 거래
+          {formatSelectedDate(store.selectedDate)} 거래
         </SelectedDateTitle>
         <SelectedDateCount>
           {store.selectedDateTransactions.length}건
@@ -107,6 +106,11 @@ export const DashboardHeader = observer(function DashboardHeader({
     </HeaderContent>
   )
 })
+
+function formatSelectedDate(date: string): string {
+  const [, month = "", day = ""] = date.split("-")
+  return `${Number(month)}월 ${Number(day)}일`
+}
 
 const HeaderContent = styled.View({
   gap: mobileTheme.spacing[4],
