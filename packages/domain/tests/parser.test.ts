@@ -82,6 +82,35 @@ describe("parseCardSmsText", () => {
       type: "expense",
     })
     expect(parsed.amount).not.toBe(3_357_207)
+    const transactionAt = new Date(parsed.transactionAt)
+    expect([
+      transactionAt.getMonth() + 1,
+      transactionAt.getDate(),
+      transactionAt.getHours(),
+      transactionAt.getMinutes(),
+    ]).toEqual([8, 15, 21, 23])
+  })
+
+  it("does not parse a foreign decimal amount as the transaction date", () => {
+    const parsed = parseCardSmsText(
+      [
+        "GOOGLE SERVICES",
+        "USD 25.00 해외승인",
+        "쇼핑엔 로카(8*3*)",
+        "일시불, 08/22 22:04",
+        "누적금액 3,694,802원",
+      ].join("\n"),
+      new Date("2026-08-22T22:04:00+09:00"),
+    )
+
+    const transactionAt = new Date(parsed.transactionAt)
+    expect([
+      transactionAt.getFullYear(),
+      transactionAt.getMonth() + 1,
+      transactionAt.getDate(),
+      transactionAt.getHours(),
+      transactionAt.getMinutes(),
+    ]).toEqual([2026, 8, 22, 22, 4])
   })
 
   it("marks an approval cancellation separately from its income transaction type", () => {

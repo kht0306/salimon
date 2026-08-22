@@ -13,7 +13,8 @@ const allAmountPattern =
   /(?:(?:KRW|₩)\s*(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|(?:\d{1,3}(?:,\d{3})+|\d+)\s*(?:원|KRW)|\b[A-Z]{3}\s*(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\b)/gi
 const summaryAmountPattern =
   /(?:누적금액|누적|잔액)\s*(?:(?:[A-Z]{3}|₩)\s*)?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\s*(?:원|KRW)?/gi
-const datePattern = /(\d{1,2})[./-](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?/
+const datePattern =
+  /(?:^|[^\d])((?:0?[1-9]|1[0-2]))[./-]((?:0?[1-9]|[12]\d|3[01]))(?:\s+([01]?\d|2[0-3]):([0-5]\d))?(?!\d)/
 const sensitivePatterns = [
   /\b\d{2,4}-\d{3,4}-\d{4}\b/g,
   /\b\d{3,6}-\d{2,6}-\d{2,8}\b/g,
@@ -33,16 +34,17 @@ export function parseCardSmsText(
 ): ParsedTransaction {
   const text = normalizeWhitespace(rawText)
   const transactionText = text.replace(summaryAmountPattern, " ")
+  const dateMatch = text.replace(allAmountPattern, " ").match(datePattern)
   const originalCurrencyAmount = extractOriginalCurrencyAmount(transactionText)
   const amount = originalCurrencyAmount ? 0 : extractKrwAmount(transactionText)
-  const transactionAt = parseTransactionDate(text, receivedAt)
+  const transactionAt = parseTransactionDate(dateMatch, receivedAt)
   const type = inferType(text)
   const cardNotificationEvent = inferCardNotificationEvent(text)
   const merchantName = extractMerchantName(rawText, text)
   const confidence = scoreConfidence({
     hasAmount: amount > 0 || originalCurrencyAmount !== undefined,
     merchantName,
-    hasDate: Boolean(text.match(datePattern)),
+    hasDate: Boolean(dateMatch),
     type,
   })
   const rawTextMasked = maskSensitiveText(text)
@@ -116,8 +118,10 @@ export function createNormalizedHash(
   return `sms_${(hash >>> 0).toString(16).padStart(8, "0")}`
 }
 
-function parseTransactionDate(text: string, receivedAt: Date): Date {
-  const match = text.match(datePattern)
+function parseTransactionDate(
+  match: RegExpMatchArray | null,
+  receivedAt: Date,
+): Date {
   if (!match) {
     return receivedAt
   }
@@ -129,13 +133,24 @@ function parseTransactionDate(text: string, receivedAt: Date): Date {
     hour = String(receivedAt.getHours()),
     minute = String(receivedAt.getMinutes()),
   ] = match
-  return new Date(
+  const transactionAt = new Date(
     receivedAt.getFullYear(),
     Number(month) - 1,
     Number(day),
     Number(hour),
     Number(minute),
   )
+  if (
+    transactionAt.getFullYear() !== receivedAt.getFullYear() ||
+    transactionAt.getMonth() !== Number(month) - 1 ||
+    transactionAt.getDate() !== Number(day) ||
+    transactionAt.getHours() !== Number(hour) ||
+    transactionAt.getMinutes() !== Number(minute)
+  ) {
+    return receivedAt
+  }
+
+  return transactionAt
 }
 
 function inferType(text: string): TransactionType {
