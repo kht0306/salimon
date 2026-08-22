@@ -35,9 +35,10 @@ pnpm prebuild:mobile --clean
 salimon://auth/callback
 ```
 
-SecureStore, WebBrowser, 살림온 알림 수신 네이티브 모듈이 포함되므로 10회차
-Development APK로 업데이트해야 한다. 같은 디버그 서명을 사용하면 기존 앱을
-제거하지 않고 `adb install -r`로 업데이트할 수 있다.
+SecureStore, WebBrowser, 이미지 선택·처리, 문서 선택·파일 공유, 살림온 알림
+수신 네이티브 모듈이 포함되므로 네이티브 설정 변경 후 Development APK를 다시
+빌드해야 한다. 같은 디버그 서명을 사용하면 기존 앱을 제거하지 않고
+`adb install -r`로 업데이트할 수 있다.
 
 ## 가족 알파 APK 빌드
 
@@ -53,7 +54,7 @@ pnpm build:mobile:family-alpha
 따른다. 전용 서명이 없으면 릴리스 빌드는 실패하며 디버그 인증서로 가족 APK를
 생성하지 않는다.
 
-## 현재 구현 범위 (12회차 진행 중)
+## 현재 구현 범위
 
 - Expo Router와 Development Client 기반 앱 셸
 - Emotion Native와 공용 모바일 UI 토큰
@@ -79,7 +80,13 @@ pnpm build:mobile:family-alpha
 - 고정·할부·분할 거래의 조회 전용 안내
 - 제외 거래, 삭제된 결제수단, 보관 카테고리 표시
 - 일반 거래 등록·수정·삭제와 분할 금액 검증
+- 고정·급여·할부 거래 등록·수정 범위와 반복 규칙 종료 관리
+- 카테고리·월 예산, 카드·계좌, 가계부·공동 멤버 관리
 - 공동 가계부 멤버·역할·월 정산·분담금 조회
+- 월 정산 메모 수정, 최근 3개월 지출 추이, 선택 월 정산 CSV 공유
+- 카메라·사진 영수증의 메타데이터 제거·축소 후 웹 AI 파서로 거래 초안 생성
+- 전체 계정 JSON 백업, 현재 가계부 CSV, JSON 거래 복원
+- 7일 유예 계정 삭제 예약과 삭제 요청 취소
 - Android `NotificationListenerService`와 알림 접근 상태 브리지
 - 로그인 사용자·수집 설정·허용 앱 패키지 기반 3중 수집 차단
 - 요약·진행·자체·빈 알림 제외와 결제 가능 문구 필터

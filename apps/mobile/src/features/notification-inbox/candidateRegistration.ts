@@ -193,6 +193,7 @@ export function validateCandidateRegistrationDraft(
     applyChangesToFuture: true,
     splits: [],
     status: "confirmed",
+    sourceType: "android_sms_notification",
     tagsInput: "",
     time: draft.time,
     type: candidate.parsed.type,

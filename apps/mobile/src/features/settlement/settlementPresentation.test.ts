@@ -8,7 +8,9 @@ import type {
 } from "@salimon/types"
 import { describe, expect, it } from "vitest"
 import {
+  buildSettlementExpenseTrend,
   buildMobileSettlementSummary,
+  getSettlementTrendRange,
   getSettlementRoleAccess,
   settlementMemberName,
   summarizeVisiblePaymentMethods,
@@ -148,6 +150,29 @@ describe("mobile settlement presentation", () => {
       { label: "4주차", startDay: 22, endDay: 28, count: 0, amount: 0 },
       { label: "5주차", startDay: 29, endDay: 31, count: 0, amount: 0 },
     ])
+  })
+
+  it("builds a confirmed expense trend for the selected month and two prior months", () => {
+    const trend = buildSettlementExpenseTrend(
+      [
+        ...transactions,
+        createTransaction("june", "expense", 80_000, 10, {
+          transactionAt: "2026-06-10T12:00:00+09:00",
+        }),
+      ],
+      "ledger-1",
+      "2026-08",
+    )
+
+    expect(trend).toEqual([
+      { month: "2026-06", label: "6월", amount: 80_000 },
+      { month: "2026-07", label: "7월", amount: 999_000 },
+      { month: "2026-08", label: "8월", amount: 200_000 },
+    ])
+    expect(getSettlementTrendRange("2026-02")).toEqual({
+      startDate: "2025-12-01",
+      endDate: "2026-02-28",
+    })
   })
 
   it("maps the role matrix and blocks viewer writes", () => {

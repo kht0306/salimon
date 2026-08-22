@@ -205,12 +205,20 @@ export default observer(function SettingsScreen() {
                 onPress={() => router.push("../manage/categories")}
               />
               <AppButton
+                label="고정 거래 관리"
+                onPress={() => router.push("../manage/recurring-rules")}
+              />
+              <AppButton
                 label="카드·계좌 관리"
                 onPress={() => router.push("../manage/payment-methods")}
               />
               <AppButton
                 label="가계부·공동 멤버 관리"
                 onPress={() => router.push("../manage/ledgers")}
+              />
+              <AppButton
+                label="개인정보·데이터 관리"
+                onPress={() => router.push("../manage/data")}
               />
             </SettingGroup>
           </Section>

@@ -13,6 +13,7 @@ import {
   type TransactionDateRange,
 } from "@salimon/api-client"
 import {
+  findOtherCategory,
   getDescendantCategoryIds,
   getCategoryDepth,
   isSplitCategory,
@@ -90,12 +91,16 @@ type MobileFinanceRepository = Pick<
   | "deleteInstallmentOccurrences"
   | "leaveSharedLedger"
   | "load"
+  | "importTransactions"
   | "materializeMonth"
   | "removeLedgerMember"
+  | "requestAccountDeletion"
   | "renameLedger"
   | "restoreLedger"
   | "revokeInvite"
+  | "cancelAccountDeletion"
   | "saveTransaction"
+  | "saveMonthNote"
   | "setAccountActive"
   | "setCardActive"
   | "setCategoryBudget"
@@ -127,6 +132,7 @@ export type MobileDataStatus =
 export type MobileConsentStatus = "idle" | "saving" | "error"
 export type MobileTransactionMutationState = "idle" | "saving" | "deleting"
 export type MobileManagementMutationState = "idle" | "saving"
+export type MobileDataToolState = "idle" | "working"
 export type MobileTransactionSearchStatus =
   | "idle"
   | "loading"
@@ -134,6 +140,20 @@ export type MobileTransactionSearchStatus =
   | "error"
 export type NotificationInboxStatus = "idle" | "loading" | "ready" | "error"
 export type NotificationRegistrationState = "idle" | "saving"
+
+type MobileImportedTransaction = Pick<
+  Transaction,
+  | "type"
+  | "status"
+  | "amount"
+  | "transactionAt"
+  | "categoryId"
+  | "paymentMethodId"
+  | "merchantName"
+  | "memo"
+  | "actorUserId"
+  | "tags"
+>
 
 export type MobileTransactionSaveResult =
   | { status: "saved"; transactionId?: string }
@@ -208,6 +228,7 @@ export class MobileAppStore {
   consentStatus: MobileConsentStatus = "idle"
   transactionMutationState: MobileTransactionMutationState = "idle"
   managementMutationState: MobileManagementMutationState = "idle"
+  dataToolState: MobileDataToolState = "idle"
   transactionSearchStatus: MobileTransactionSearchStatus = "idle"
   transactionSearchTransactions?: Transaction[]
   transactionSearchSplits?: FinanceData["transactionSplits"]
@@ -223,6 +244,8 @@ export class MobileAppStore {
   transactionMutationErrorMessage?: string
   managementErrorMessage?: string
   managementNoticeMessage?: string
+  dataToolErrorMessage?: string
+  dataToolNoticeMessage?: string
   transactionSearchErrorMessage?: string
   notificationInboxErrorMessage?: string
   notificationInboxNoticeMessage?: string
@@ -947,6 +970,199 @@ export class MobileAppStore {
   clearManagementFeedback(): void {
     this.managementErrorMessage = undefined
     this.managementNoticeMessage = undefined
+  }
+
+  clearDataToolFeedback(): void {
+    this.dataToolErrorMessage = undefined
+    this.dataToolNoticeMessage = undefined
+  }
+
+  async loadFullFinanceDataForExport(): Promise<FinanceData | undefined> {
+    if (!this.authUser || this.dataToolState !== "idle") return undefined
+    this.dataToolState = "working"
+    this.clearDataToolFeedback()
+    try {
+      const financeData = await this.repository.load(this.authUser.id)
+      runInAction(() => {
+        this.dataToolState = "idle"
+      })
+      return financeData
+    } catch (error) {
+      runInAction(() => {
+        this.dataToolState = "idle"
+        this.dataToolErrorMessage = dataLoadErrorMessage(
+          error,
+          "전체 계정 데이터를 불러오지 못했습니다.",
+        )
+      })
+      return undefined
+    }
+  }
+
+  async importBackupTransactions(transactions: unknown[]): Promise<number> {
+    if (
+      !this.authUser ||
+      !this.canMutateCurrentLedger ||
+      this.dataToolState !== "idle"
+    ) {
+      this.dataToolErrorMessage =
+        "수정 가능한 가계부와 최신 데이터가 필요합니다."
+      return 0
+    }
+    this.dataToolState = "working"
+    this.clearDataToolFeedback()
+    try {
+      const fullData = await this.repository.load(this.authUser.id)
+      const existingKeys = new Set(
+        fullData.transactions
+          .filter(
+            (transaction) =>
+              transaction.ledgerId === this.selectedLedgerId &&
+              !transaction.deletedAt,
+          )
+          .map(transactionDuplicateKey),
+      )
+      const categoryIds = new Set(
+        this.currentCategories.map((category) => category.id),
+      )
+      const paymentMethodIds = new Set(
+        this.currentPaymentMethods.map((method) => method.id),
+      )
+      const memberIds = new Set(
+        this.currentMembers.map((member) => member.userId),
+      )
+      const fallbackCategoryId = findOtherCategory(
+        this.currentCategories,
+        this.selectedLedgerId,
+      )?.id
+      const valid = transactions
+        .map(normalizeImportedTransaction)
+        .filter((transaction): transaction is MobileImportedTransaction =>
+          Boolean(transaction),
+        )
+        .filter((transaction) => {
+          const key = transactionDuplicateKey(transaction)
+          if (existingKeys.has(key)) return false
+          existingKeys.add(key)
+          return true
+        })
+        .slice(0, 2_000)
+        .map((transaction) => ({
+          ...transaction,
+          categoryId:
+            transaction.categoryId && categoryIds.has(transaction.categoryId)
+              ? transaction.categoryId
+              : fallbackCategoryId,
+          paymentMethodId:
+            transaction.paymentMethodId &&
+            paymentMethodIds.has(transaction.paymentMethodId)
+              ? transaction.paymentMethodId
+              : undefined,
+          actorUserId:
+            transaction.actorUserId && memberIds.has(transaction.actorUserId)
+              ? transaction.actorUserId
+              : undefined,
+        }))
+
+      if (valid.length === 0) {
+        runInAction(() => {
+          this.dataToolState = "idle"
+          this.dataToolNoticeMessage = "복원할 새 거래가 없습니다."
+        })
+        return 0
+      }
+
+      await this.repository.importTransactions(
+        this.authUser.id,
+        this.selectedLedgerId,
+        valid,
+      )
+      this.financeQueryCache.clear()
+      await this.refreshSelectedMonth()
+      runInAction(() => {
+        this.dataToolState = "idle"
+        this.dataToolNoticeMessage =
+          String(valid.length) + "건의 거래를 복원했습니다."
+      })
+      return valid.length
+    } catch (error) {
+      runInAction(() => {
+        this.dataToolState = "idle"
+        this.dataToolErrorMessage = mutationErrorMessage(
+          error,
+          "거래를 복원하지 못했습니다.",
+        )
+      })
+      return 0
+    }
+  }
+
+  async requestAccountDeletion(): Promise<boolean> {
+    if (!this.authUser || this.dataToolState !== "idle") return false
+    this.dataToolState = "working"
+    this.clearDataToolFeedback()
+    try {
+      const purgeAfter = await this.repository.requestAccountDeletion()
+      await this.refreshSelectedMonth()
+      runInAction(() => {
+        this.dataToolState = "idle"
+        this.dataToolNoticeMessage =
+          new Date(purgeAfter).toLocaleDateString("ko-KR") +
+          "에 계정이 삭제됩니다. 그 전까지 취소할 수 있습니다."
+      })
+      return true
+    } catch (error) {
+      runInAction(() => {
+        this.dataToolState = "idle"
+        this.dataToolErrorMessage = mutationErrorMessage(
+          error,
+          "계정 삭제를 예약하지 못했습니다.",
+        )
+      })
+      return false
+    }
+  }
+
+  async cancelAccountDeletion(): Promise<boolean> {
+    if (!this.authUser || this.dataToolState !== "idle") return false
+    this.dataToolState = "working"
+    this.clearDataToolFeedback()
+    try {
+      await this.repository.cancelAccountDeletion()
+      await this.refreshSelectedMonth()
+      runInAction(() => {
+        this.dataToolState = "idle"
+        this.dataToolNoticeMessage = "계정 삭제 요청을 취소했습니다."
+      })
+      return true
+    } catch (error) {
+      runInAction(() => {
+        this.dataToolState = "idle"
+        this.dataToolErrorMessage = mutationErrorMessage(
+          error,
+          "계정 삭제 요청을 취소하지 못했습니다.",
+        )
+      })
+      return false
+    }
+  }
+
+  async saveMonthNote(note: string): Promise<boolean> {
+    if (!this.canManageCurrentLedger() || note.length > 1_000) {
+      this.managementErrorMessage =
+        "정산 메모는 수정 가능한 가계부에서 1,000자 이내로 입력해 주세요."
+      return false
+    }
+    return this.runManagementMutation(
+      () =>
+        this.repository.saveMonthNote(
+          this.selectedLedgerId,
+          this.selectedMonth,
+          note,
+          this.selectedMonthNote?.id,
+        ),
+      "월 정산 메모를 저장했습니다.",
+    )
   }
 
   categoryBudgetAmount(categoryId: string): number {
@@ -2129,6 +2345,9 @@ export class MobileAppStore {
     this.managementMutationState = "idle"
     this.managementErrorMessage = undefined
     this.managementNoticeMessage = undefined
+    this.dataToolState = "idle"
+    this.dataToolErrorMessage = undefined
+    this.dataToolNoticeMessage = undefined
     this.clearTransactionSearchRange()
     this.notificationCaptureStatus = createEmptyNotificationCaptureStatus()
     this.notificationCandidates = []
@@ -2263,6 +2482,68 @@ function validateAccountInput(
   const last4 = input.last4?.trim() || undefined
   if (!name || !bank || (last4 && !/^\d{4}$/.test(last4))) return undefined
   return { bank, last4, name }
+}
+
+function normalizeImportedTransaction(
+  value: unknown,
+): MobileImportedTransaction | undefined {
+  if (!isRecord(value)) return undefined
+  if (
+    (value.type !== "expense" &&
+      value.type !== "income" &&
+      value.type !== "saving") ||
+    (value.status !== "confirmed" && value.status !== "excluded") ||
+    !Number.isSafeInteger(value.amount) ||
+    Number(value.amount) <= 0 ||
+    typeof value.transactionAt !== "string" ||
+    Number.isNaN(Date.parse(value.transactionAt))
+  ) {
+    return undefined
+  }
+  const tags = Array.isArray(value.tags)
+    ? [
+        ...new Set(
+          value.tags
+            .filter((tag): tag is string => typeof tag === "string")
+            .map((tag) => tag.trim().slice(0, 20))
+            .filter(Boolean),
+        ),
+      ].slice(0, 10)
+    : []
+  return {
+    type: value.type,
+    status: value.status,
+    amount: Number(value.amount),
+    transactionAt: value.transactionAt,
+    categoryId: optionalImportedString(value.categoryId),
+    paymentMethodId: optionalImportedString(value.paymentMethodId),
+    merchantName: optionalImportedString(value.merchantName)?.slice(0, 100),
+    memo: optionalImportedString(value.memo)?.slice(0, 500),
+    actorUserId: optionalImportedString(value.actorUserId),
+    tags,
+  }
+}
+
+function transactionDuplicateKey(
+  transaction: Pick<
+    Transaction,
+    "type" | "amount" | "transactionAt" | "merchantName"
+  >,
+): string {
+  return [
+    transaction.type,
+    transaction.amount,
+    new Date(transaction.transactionAt).toISOString(),
+    transaction.merchantName?.trim().toLowerCase() ?? "",
+  ].join("|")
+}
+
+function optionalImportedString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value))
 }
 
 function errorMessage(error: unknown, fallback: string): string {

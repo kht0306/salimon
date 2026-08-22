@@ -2,7 +2,7 @@ import styled from "@emotion/native"
 import { formatKrw } from "@salimon/domain"
 import { router } from "expo-router"
 import { observer } from "mobx-react-lite"
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { RefreshControl, ScrollView, StyleSheet } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppButton } from "../../components/AppButton"
@@ -10,11 +10,18 @@ import { AppText } from "../../components/AppText"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
 import { LedgerMonthControls } from "../dashboard/LedgerMonthControls"
+import {
+  createLedgerTransactionsCsv,
+  safeDataFilename,
+} from "../data/dataExport"
+import { shareDataFile } from "../data/mobileDataFiles"
 import { SettlementBreakdown } from "./SettlementBreakdown"
 import { SettlementSkeleton } from "./SettlementSkeleton"
 import {
+  buildSettlementExpenseTrend,
   buildMobileSettlementSummary,
   getSettlementRoleAccess,
+  getSettlementTrendRange,
   summarizeVisiblePaymentMethods,
 } from "./settlementPresentation"
 
@@ -22,6 +29,60 @@ const safeAreaEdges = ["top"] as const
 
 export const SettlementScreen = observer(function SettlementScreen() {
   const store = useMobileAppStore()
+  const persistedMonthNote = store.selectedMonthNote?.note ?? ""
+  const [monthNote, setMonthNote] = useState(persistedMonthNote)
+  const [exportError, setExportError] = useState<string>()
+  const trendRange = useMemo(
+    () => getSettlementTrendRange(store.selectedMonth),
+    [store.selectedMonth],
+  )
+  const trendRangeKey = `${trendRange.startDate}:${trendRange.endDate}`
+
+  useEffect(() => {
+    setMonthNote(persistedMonthNote)
+  }, [persistedMonthNote, store.selectedLedgerId, store.selectedMonth])
+
+  useEffect(() => {
+    if (
+      !store.authUser?.id ||
+      store.transactionSearchRangeKey === trendRangeKey
+    )
+      return
+    void store.loadTransactionSearchRange(
+      trendRange.startDate,
+      trendRange.endDate,
+    )
+  }, [
+    store,
+    store.authUser?.id,
+    store.selectedLedgerId,
+    store.selectedMonth,
+    store.transactionSearchRangeKey,
+    trendRange.endDate,
+    trendRange.startDate,
+    trendRangeKey,
+  ])
+
+  const trend = useMemo(() => {
+    const transactions =
+      store.transactionSearchStatus === "ready" &&
+      store.transactionSearchRangeKey === trendRangeKey
+        ? (store.transactionSearchTransactions ?? [])
+        : store.financeData.transactions
+    return buildSettlementExpenseTrend(
+      transactions,
+      store.selectedLedgerId,
+      store.selectedMonth,
+    )
+  }, [
+    store.financeData.transactions,
+    store.selectedLedgerId,
+    store.selectedMonth,
+    store.transactionSearchRangeKey,
+    store.transactionSearchStatus,
+    store.transactionSearchTransactions,
+    trendRangeKey,
+  ])
   const summary = useMemo(
     () =>
       buildMobileSettlementSummary({
@@ -43,6 +104,31 @@ export const SettlementScreen = observer(function SettlementScreen() {
       store.selectedMonth,
     ],
   )
+
+  async function shareSettlementCsv(): Promise<void> {
+    const ledger = store.currentLedger
+    if (!ledger) return
+    setExportError(undefined)
+    try {
+      await shareDataFile({
+        content: createLedgerTransactionsCsv(
+          store.financeData,
+          store.selectedLedgerId,
+        ),
+        dialogTitle: `${store.selectedMonth} 월 정산 CSV`,
+        filename: `salimon-${safeDataFilename(ledger.name)}-${
+          store.selectedMonth
+        }-settlement.csv`,
+        mimeType: "text/csv",
+      })
+    } catch (error) {
+      setExportError(
+        error instanceof Error
+          ? error.message
+          : "정산 CSV를 공유하지 못했습니다.",
+      )
+    }
+  }
 
   if (store.dataStatus === "idle" || store.dataStatus === "loading") {
     return <SettlementSkeleton />
@@ -120,6 +206,28 @@ export const SettlementScreen = observer(function SettlementScreen() {
             </StaleNotice>
           ) : null}
 
+          {store.managementErrorMessage ? (
+            <FeedbackNotice $error accessibilityRole="alert">
+              {store.managementErrorMessage}
+            </FeedbackNotice>
+          ) : null}
+          {store.managementNoticeMessage ? (
+            <FeedbackNotice $error={false} accessibilityLiveRegion="polite">
+              {store.managementNoticeMessage}
+            </FeedbackNotice>
+          ) : null}
+          {store.transactionSearchStatus === "error" ? (
+            <FeedbackNotice $error accessibilityRole="alert">
+              {store.transactionSearchErrorMessage ??
+                "최근 3개월 지출을 불러오지 못했습니다."}
+            </FeedbackNotice>
+          ) : null}
+          {exportError ? (
+            <FeedbackNotice $error accessibilityRole="alert">
+              {exportError}
+            </FeedbackNotice>
+          ) : null}
+
           <RuleNotice>
             <RuleTitle>정산 기준</RuleTitle>
             <RuleDescription>
@@ -127,6 +235,11 @@ export const SettlementScreen = observer(function SettlementScreen() {
               정산 금액에서는 빠집니다.
             </RuleDescription>
           </RuleNotice>
+
+          <AppButton
+            label={`${store.selectedMonth} 정산 CSV 공유`}
+            onPress={() => void shareSettlementCsv()}
+          />
 
           <PrimaryCard>
             <PrimaryLabel>확정 지출</PrimaryLabel>
@@ -170,10 +283,18 @@ export const SettlementScreen = observer(function SettlementScreen() {
             categories={store.financeData.categories}
             ledgerType={currentLedger.type}
             members={currentMembers}
-            monthNote={store.selectedMonthNote?.note}
+            monthNote={monthNote}
+            monthNoteBusy={store.managementMutationState !== "idle"}
             paymentMethodSummary={paymentMethodSummary}
             roleAccess={roleAccess}
             summary={summary}
+            trend={trend}
+            trendLoading={
+              store.transactionSearchStatus === "loading" ||
+              store.transactionSearchRangeKey !== trendRangeKey
+            }
+            onMonthNoteChange={setMonthNote}
+            onMonthNoteSave={() => void store.saveMonthNote(monthNote)}
             onTransactionPress={(transactionId) =>
               router.push({
                 pathname: "/transactions/[id]",
@@ -285,6 +406,18 @@ const StaleNotice = styled(AppText)({
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[4],
 })
+
+const FeedbackNotice = styled(AppText)<{ $error: boolean }>(({ $error }) => ({
+  borderLeftWidth: 3,
+  borderLeftColor: $error ? mobileTheme.colors.coral : mobileTheme.colors.teal,
+  backgroundColor: $error
+    ? mobileTheme.colors.coralSoft
+    : mobileTheme.colors.tealSoft,
+  color: $error ? mobileTheme.colors.coral : mobileTheme.colors.teal,
+  padding: mobileTheme.spacing[3],
+  fontSize: 11,
+  lineHeight: 17,
+}))
 
 const RuleNotice = styled.View({
   gap: mobileTheme.spacing[1],

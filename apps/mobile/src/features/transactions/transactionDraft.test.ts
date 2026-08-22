@@ -229,6 +229,7 @@ describe("mobile transaction draft", () => {
         applyChangesToFuture: true,
         splits: [],
         status: "confirmed",
+        sourceType: "manual",
         tagsInput: "중고, 판매, 중고",
         time: "20:30",
         type: "income",

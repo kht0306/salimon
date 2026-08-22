@@ -1,5 +1,6 @@
 import {
   getDescendantCategoryIds,
+  moveMonth,
   toMonthKey,
   transactionAmountForCategoryIds,
 } from "@salimon/domain"
@@ -44,6 +45,12 @@ export interface SettlementWeekRow {
   endDay: number
   label: string
   startDay: number
+}
+
+export interface SettlementMonthTrendRow {
+  amount: number
+  label: string
+  month: string
 }
 
 export interface MobileSettlementSummary {
@@ -235,6 +242,40 @@ export function getSettlementRoleAccess(
           : role === "member"
             ? "구성원"
             : "조회자",
+  }
+}
+
+export function buildSettlementExpenseTrend(
+  transactions: Transaction[],
+  ledgerId: string,
+  selectedMonth: string,
+): SettlementMonthTrendRow[] {
+  return [-2, -1, 0].map((offset) => {
+    const month = moveMonth(selectedMonth, offset)
+    const amount = transactions
+      .filter(
+        (transaction) =>
+          transaction.ledgerId === ledgerId &&
+          !transaction.deletedAt &&
+          transaction.status === "confirmed" &&
+          transaction.type === "expense" &&
+          toMonthKey(new Date(transaction.transactionAt)) === month,
+      )
+      .reduce((sum, transaction) => sum + transaction.amount, 0)
+
+    return { amount, label: `${Number(month.slice(5))}월`, month }
+  })
+}
+
+export function getSettlementTrendRange(month: string): {
+  endDate: string
+  startDate: string
+} {
+  const [year, monthNumber] = month.split("-").map(Number)
+  const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate()
+  return {
+    startDate: `${moveMonth(month, -2)}-01`,
+    endDate: `${month}-${String(lastDay).padStart(2, "0")}`,
   }
 }
 
