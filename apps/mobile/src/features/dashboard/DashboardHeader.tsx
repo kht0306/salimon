@@ -11,6 +11,12 @@ import { DateSummaryStrip } from "./DateSummaryStrip"
 import { LedgerMonthControls } from "./LedgerMonthControls"
 import { MonthlySummary } from "./MonthlySummary"
 
+const transactionGroupingOptions = [
+  { label: "거래자", value: "actor" },
+  { label: "등록자", value: "registrant" },
+  { label: "구분 없음", value: "none" },
+] as const
+
 interface DashboardHeaderProps {
   isWide: boolean
 }
@@ -104,6 +110,34 @@ export const DashboardHeader = observer(function DashboardHeader({
           {store.selectedDateTransactions.length}건
         </SelectedDateCount>
       </SelectedDateHeading>
+
+      {store.selectedDateTransactions.length > 0 ? (
+        <GroupingControl>
+          <GroupingLabel>목록 구분</GroupingLabel>
+          <GroupingOptions>
+            {transactionGroupingOptions.map((option) => {
+              const selected =
+                store.dashboardTransactionGrouping === option.value
+              return (
+                <GroupingOption
+                  key={option.value}
+                  $selected={selected}
+                  accessibilityLabel={`거래 목록 ${option.label} 구분`}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  onPress={() =>
+                    store.setDashboardTransactionGrouping(option.value)
+                  }
+                >
+                  <GroupingOptionLabel $selected={selected}>
+                    {option.label}
+                  </GroupingOptionLabel>
+                </GroupingOption>
+              )
+            })}
+          </GroupingOptions>
+        </GroupingControl>
+      ) : null}
     </HeaderContent>
   )
 })
@@ -260,4 +294,43 @@ const SelectedDateCount = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 12px;
   font-weight: 600;
+`
+
+const GroupingControl = styled.View({ gap: mobileTheme.spacing[2] })
+
+const GroupingLabel = styled(AppText)`
+  color: ${mobileTheme.colors.muted};
+  font-size: 10px;
+  font-weight: 600;
+`
+
+const GroupingOptions = styled.View({
+  flexDirection: "row",
+  alignItems: "stretch",
+  gap: mobileTheme.spacing[2],
+})
+
+const GroupingOption = styled(Pressable)<{ $selected: boolean }>(
+  ({ $selected }) => ({
+    minHeight: mobileTheme.controls.touch,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: $selected
+      ? mobileTheme.colors.teal
+      : mobileTheme.colors.borderStrong,
+    borderRadius: mobileTheme.radii.sm,
+    backgroundColor: $selected
+      ? mobileTheme.colors.tealSoft
+      : mobileTheme.colors.panel,
+    paddingHorizontal: mobileTheme.spacing[2],
+  }),
+)
+
+const GroupingOptionLabel = styled(AppText)<{ $selected: boolean }>`
+  color: ${({ $selected }) =>
+    $selected ? mobileTheme.colors.teal : mobileTheme.colors.muted};
+  font-size: 11px;
+  font-weight: 700;
 `

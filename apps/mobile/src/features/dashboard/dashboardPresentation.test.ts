@@ -1,9 +1,33 @@
-import type { Transaction } from "@salimon/types"
+import type { LedgerMember, Transaction } from "@salimon/types"
 import { describe, expect, it } from "vitest"
 import {
+  buildDashboardListItems,
   buildMonthDaySummaries,
   calculateConfirmedTotals,
 } from "./dashboardPresentation"
+
+const members: LedgerMember[] = [
+  {
+    id: "member-1",
+    isDefault: true,
+    joinedAt: "2026-08-01T00:00:00.000Z",
+    ledgerId: "ledger-1",
+    nickname: "본인",
+    role: "owner",
+    status: "active",
+    userId: "user-1",
+  },
+  {
+    id: "member-2",
+    isDefault: false,
+    joinedAt: "2026-08-01T00:00:00.000Z",
+    ledgerId: "ledger-1",
+    nickname: "가족",
+    role: "member",
+    status: "active",
+    userId: "user-2",
+  },
+]
 
 describe("dashboardPresentation", () => {
   it("matches web totals by including only confirmed active transactions", () => {
@@ -43,6 +67,96 @@ describe("dashboardPresentation", () => {
       date: "2026-08-11",
       income: 30_000,
     })
+  })
+
+  it("separates recurring and general transactions and keeps collapsed groups hidden", () => {
+    const fixed = {
+      ...createTransaction("fixed", "expense", 10_000, "confirmed", 10),
+      recurringType: "fixed" as const,
+    }
+    const installment = {
+      ...createTransaction("installment", "expense", 20_000, "confirmed", 10),
+      recurringType: "installment" as const,
+    }
+    const general = createTransaction(
+      "general",
+      "expense",
+      30_000,
+      "confirmed",
+      10,
+    )
+
+    const items = buildDashboardListItems(
+      [fixed, installment, general],
+      members,
+      "none",
+      new Set(["recurring"]),
+    )
+
+    expect(
+      items.map((item) =>
+        item.kind === "transaction" ? item.transaction.id : item.label,
+      ),
+    ).toEqual(["반복 거래", "일반 거래", "general"])
+    expect(items[0]).toMatchObject({ collapsed: true, count: 2 })
+  })
+
+  it("orders actor groups like the web list", () => {
+    const common = createTransaction(
+      "common",
+      "expense",
+      10_000,
+      "confirmed",
+      10,
+    )
+    const family = {
+      ...createTransaction("family", "expense", 20_000, "confirmed", 10),
+      actorUserId: "user-2",
+    }
+    const unknown = {
+      ...createTransaction("unknown", "expense", 30_000, "confirmed", 10),
+      actorUserId: "removed-user",
+    }
+
+    const items = buildDashboardListItems(
+      [unknown, family, common],
+      members,
+      "actor",
+      new Set(),
+    )
+
+    expect(
+      items.filter((item) => item.kind === "member").map((item) => item.label),
+    ).toEqual(["공통", "가족", "알 수 없음"])
+  })
+
+  it("distinguishes registrants and labels missing members", () => {
+    const family = {
+      ...createTransaction("family", "expense", 20_000, "confirmed", 10),
+      createdBy: "user-2",
+    }
+    const missing = createTransaction(
+      "missing",
+      "expense",
+      10_000,
+      "confirmed",
+      10,
+    )
+    const removed = {
+      ...createTransaction("removed", "expense", 30_000, "confirmed", 10),
+      createdBy: "removed-user",
+    }
+
+    const items = buildDashboardListItems(
+      [removed, missing, family],
+      members,
+      "registrant",
+      new Set(),
+    )
+
+    expect(
+      items.filter((item) => item.kind === "member").map((item) => item.label),
+    ).toEqual(["가족", "알 수 없음", "탈퇴한 멤버"])
   })
 })
 

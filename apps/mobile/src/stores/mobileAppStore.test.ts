@@ -906,6 +906,24 @@ describe("MobileAppStore authentication", () => {
     expect(repository.load).toHaveBeenCalledTimes(2)
   })
 
+  it("updates dashboard grouping and toggles recurrence sections", () => {
+    const store = new MobileAppStore(createRepository(), createAuthGateway())
+
+    store.setDashboardTransactionGrouping("registrant")
+    store.toggleDashboardTransactionGroup("recurring")
+
+    expect(store.dashboardTransactionGrouping).toBe("registrant")
+    expect(store.collapsedDashboardTransactionGroupKeys.has("recurring")).toBe(
+      true,
+    )
+
+    store.toggleDashboardTransactionGroup("recurring")
+
+    expect(store.collapsedDashboardTransactionGroupKeys.has("recurring")).toBe(
+      false,
+    )
+  })
+
   it("ignores an older month response that finishes after the latest request", async () => {
     const repository = createRepository()
     const store = new MobileAppStore(
