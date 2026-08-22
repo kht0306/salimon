@@ -123,7 +123,7 @@ const ConfigurationPage = styled(SafeAreaView)`
   flex: 1;
   justify-content: center;
   background-color: ${mobileTheme.colors.canvas};
-  padding: ${mobileTheme.spacing[5]}px;
+  padding: ${mobileTheme.spacing[4]}px;
 `
 
 const ConfigurationCard = styled.View`

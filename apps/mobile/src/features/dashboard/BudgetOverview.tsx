@@ -96,8 +96,9 @@ const PanelHeading = styled.View({
 
 const PanelTitle = styled(AppText)`
   color: ${mobileTheme.colors.ink};
-  font-size: 16px;
-  font-weight: 600;
+  font-size: ${mobileTheme.typography.section.fontSize}px;
+  font-weight: ${mobileTheme.typography.section.fontWeight};
+  line-height: ${mobileTheme.typography.section.lineHeight}px;
 `
 
 const BudgetCount = styled(AppText)`

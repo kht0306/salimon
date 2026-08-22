@@ -1,5 +1,6 @@
 import styled from "@emotion/native"
 import type { Category } from "@salimon/types"
+import { Minus, Plus } from "lucide-react-native"
 import { useMemo, useState } from "react"
 import { FlatList, Modal, StyleSheet } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
@@ -167,13 +168,24 @@ export function CategoryFilterModal({
                       accessibilityState={{ expanded }}
                       onPress={() => toggleExpanded(item.category.id)}
                     >
-                      <TreeControlLabel
+                      <TreeControlIcon
                         accessibilityElementsHidden
-                        allowFontScaling={false}
                         importantForAccessibility="no"
                       >
-                        {expanded ? "−" : "+"}
-                      </TreeControlLabel>
+                        {expanded ? (
+                          <Minus
+                            color={mobileTheme.colors.teal}
+                            size={16}
+                            strokeWidth={2}
+                          />
+                        ) : (
+                          <Plus
+                            color={mobileTheme.colors.teal}
+                            size={16}
+                            strokeWidth={2}
+                          />
+                        )}
+                      </TreeControlIcon>
                     </TreeControl>
                   ) : (
                     <TreeControlSpacer />
@@ -277,7 +289,7 @@ const HeaderActions = styled.View({
 
 const CloseButton = styled.Pressable({
   minWidth: 44,
-  minHeight: 40,
+  minHeight: mobileTheme.controls.touch,
   alignItems: "center",
   justifyContent: "center",
 })
@@ -290,7 +302,7 @@ const CloseButtonLabel = styled(AppText)({
 
 const ApplyButton = styled.Pressable({
   minWidth: 54,
-  minHeight: 40,
+  minHeight: mobileTheme.controls.touch,
   alignItems: "center",
   justifyContent: "center",
   borderRadius: mobileTheme.radii.md,
@@ -329,26 +341,26 @@ const CategoryRow = styled.View<{ $depth: number }>(({ $depth }) => ({
 }))
 
 const TreeControl = styled.Pressable({
-  width: 42,
+  width: mobileTheme.controls.touch,
   minHeight: 52,
   flexShrink: 0,
   alignItems: "center",
   justifyContent: "center",
 })
 
-const TreeControlSpacer = styled.View({ width: 42, flexShrink: 0 })
+const TreeControlSpacer = styled.View({
+  width: mobileTheme.controls.touch,
+  flexShrink: 0,
+})
 
-const TreeControlLabel = styled(AppText)({
+const TreeControlIcon = styled.View({
   width: 24,
   height: 24,
+  alignItems: "center",
+  justifyContent: "center",
   borderWidth: 1,
   borderColor: mobileTheme.colors.borderStrong,
   borderRadius: mobileTheme.radii.xs,
-  color: mobileTheme.colors.teal,
-  fontSize: 17,
-  fontWeight: "700",
-  lineHeight: 21,
-  textAlign: "center",
 })
 
 const CategoryChoice = styled.Pressable<{ $selected: boolean }>(

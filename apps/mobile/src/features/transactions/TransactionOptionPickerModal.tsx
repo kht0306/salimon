@@ -202,7 +202,7 @@ const SheetTitle = styled(AppText)({
 
 const CloseButton = styled.Pressable({
   minWidth: 52,
-  minHeight: 40,
+  minHeight: mobileTheme.controls.touch,
   alignItems: "flex-end",
   justifyContent: "center",
 })

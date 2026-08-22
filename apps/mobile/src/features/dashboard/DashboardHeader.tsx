@@ -47,9 +47,10 @@ export const DashboardHeader = observer(function DashboardHeader({
             >
               <Plus
                 color={mobileTheme.colors.panel}
-                size={19}
+                size={17}
                 strokeWidth={2}
               />
+              <CreateButtonLabel>거래</CreateButtonLabel>
             </CreateButton>
           ) : null}
           <RefreshButton
@@ -118,10 +119,18 @@ const HeaderContent = styled.View({
 })
 
 const AppBar = styled.View({
+  minHeight: 60,
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
   gap: mobileTheme.spacing[3],
+  marginTop: -mobileTheme.spacing[4],
+  marginHorizontal: -mobileTheme.spacing[4],
+  borderBottomWidth: 1,
+  borderBottomColor: mobileTheme.colors.border,
+  backgroundColor: mobileTheme.colors.panel,
+  paddingVertical: mobileTheme.spacing[3],
+  paddingHorizontal: mobileTheme.spacing[4],
 })
 
 const BrandLockup = styled.View({
@@ -159,9 +168,10 @@ const AppBarActions = styled.View({
 })
 
 const BrandName = styled(AppText)`
+  font-size: ${mobileTheme.typography.label.fontSize}px;
+  font-weight: ${mobileTheme.typography.label.fontWeight};
+  line-height: ${mobileTheme.typography.label.lineHeight}px;
   color: ${mobileTheme.colors.ink};
-  font-size: 15px;
-  font-weight: 700;
 `
 
 const BrandContext = styled(AppText)`
@@ -186,12 +196,19 @@ const RefreshButton = styled(Pressable)<{ disabled?: boolean }>(
 )
 
 const CreateButton = styled(Pressable)({
-  width: mobileTheme.controls.touch,
   minHeight: mobileTheme.controls.touch,
+  flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
+  gap: mobileTheme.spacing[1],
   borderRadius: mobileTheme.radii.sm,
   backgroundColor: mobileTheme.colors.teal,
+  paddingHorizontal: mobileTheme.spacing[3],
+})
+
+const CreateButtonLabel = styled(AppText)({
+  color: mobileTheme.colors.panel,
+  ...mobileTheme.typography.label,
 })
 
 const OfflineNotice = styled.View({
@@ -234,9 +251,9 @@ const SelectedDateHeading = styled.View({
 const SelectedDateTitle = styled(AppText)`
   flex-shrink: 1;
   color: ${mobileTheme.colors.ink};
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 23px;
+  font-size: ${mobileTheme.typography.section.fontSize}px;
+  font-weight: ${mobileTheme.typography.section.fontWeight};
+  line-height: ${mobileTheme.typography.section.lineHeight}px;
 `
 
 const SelectedDateCount = styled(AppText)`

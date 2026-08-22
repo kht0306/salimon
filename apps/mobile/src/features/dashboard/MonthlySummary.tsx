@@ -37,14 +37,15 @@ const Panel = styled.View({
 
 const HeroLabel = styled(AppText)`
   color: ${mobileTheme.colors.muted};
-  font-size: 12px;
-  font-weight: 600;
+  font-size: ${mobileTheme.typography.label.fontSize}px;
+  font-weight: ${mobileTheme.typography.label.fontWeight};
+  line-height: ${mobileTheme.typography.label.lineHeight}px;
 `
 
 const HeroValue = styled(AppText)`
   color: ${mobileTheme.colors.ink};
-  font-size: 30px;
-  font-weight: 700;
+  font-size: ${mobileTheme.typography.display.fontSize}px;
+  font-weight: ${mobileTheme.typography.display.fontWeight};
   letter-spacing: -0.5px;
   line-height: 40px;
 `
@@ -62,8 +63,9 @@ const SummaryItem = styled.View({
 
 const SummaryLabel = styled(AppText)`
   color: ${mobileTheme.colors.muted};
-  font-size: 11px;
+  font-size: ${mobileTheme.typography.caption.fontSize}px;
   font-weight: 600;
+  line-height: ${mobileTheme.typography.caption.lineHeight}px;
 `
 
 const SummaryValue = styled(AppText)<{

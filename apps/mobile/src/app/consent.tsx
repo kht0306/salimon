@@ -152,7 +152,7 @@ const Content = styled.View({
   justifyContent: "center",
   gap: mobileTheme.spacing[3],
   paddingVertical: mobileTheme.spacing[6],
-  paddingHorizontal: mobileTheme.spacing[5],
+  paddingHorizontal: mobileTheme.spacing[4],
 })
 
 const Eyebrow = styled(AppText)`
@@ -163,16 +163,17 @@ const Eyebrow = styled(AppText)`
 
 const Title = styled(AppText)`
   color: ${mobileTheme.colors.ink};
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 34px;
+  font-size: ${mobileTheme.typography.title.fontSize}px;
+  font-weight: ${mobileTheme.typography.title.fontWeight};
+  line-height: ${mobileTheme.typography.title.lineHeight}px;
 `
 
 const Description = styled(AppText)`
   margin-bottom: ${mobileTheme.spacing[2]}px;
   color: ${mobileTheme.colors.muted};
-  font-size: 14px;
-  line-height: 21px;
+  font-size: ${mobileTheme.typography.body.fontSize}px;
+  font-weight: ${mobileTheme.typography.body.fontWeight};
+  line-height: ${mobileTheme.typography.body.lineHeight}px;
 `
 
 const ConsentCard = styled.View({
@@ -225,11 +226,11 @@ const ConsentDescription = styled(AppText)`
 `
 
 const DocumentLink = styled(AppText)`
-  min-height: 32px;
+  min-height: ${mobileTheme.controls.touch}px;
   color: ${mobileTheme.colors.teal};
   font-size: 12px;
   font-weight: 600;
-  line-height: 32px;
+  line-height: ${mobileTheme.controls.touch}px;
 `
 
 const Notice = styled(AppText)`

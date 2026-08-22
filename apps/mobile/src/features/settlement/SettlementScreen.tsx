@@ -244,9 +244,7 @@ const Eyebrow = styled(AppText)({
 
 const Title = styled(AppText)({
   color: mobileTheme.colors.ink,
-  fontSize: 24,
-  fontWeight: "700",
-  lineHeight: 31,
+  ...mobileTheme.typography.title,
 })
 
 const Subtitle = styled(AppText)({
@@ -311,11 +309,11 @@ const RuleDescription = styled(AppText)({
 
 const PrimaryCard = styled.View({
   gap: mobileTheme.spacing[3],
-  borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
-  borderRadius: mobileTheme.radii.md,
+  borderBottomWidth: 1,
+  borderBottomColor: mobileTheme.colors.border,
   backgroundColor: mobileTheme.colors.panel,
-  padding: mobileTheme.spacing[5],
+  paddingTop: mobileTheme.spacing[1],
+  paddingBottom: mobileTheme.spacing[5],
 })
 
 const PrimaryLabel = styled(AppText)({
@@ -326,8 +324,7 @@ const PrimaryLabel = styled(AppText)({
 
 const PrimaryAmount = styled(AppText)({
   color: mobileTheme.colors.ink,
-  fontSize: 31,
-  fontWeight: "700",
+  ...mobileTheme.typography.display,
   letterSpacing: -0.8,
   lineHeight: 40,
 })
@@ -401,7 +398,7 @@ const StateContent = styled.View({
   flex: 1,
   justifyContent: "center",
   gap: mobileTheme.spacing[3],
-  padding: mobileTheme.spacing[5],
+  padding: mobileTheme.spacing[4],
 })
 
 const StateMessage = styled(AppText)({

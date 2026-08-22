@@ -90,9 +90,9 @@ const Content = styled.View({
   justifyContent: "space-between",
   gap: mobileTheme.spacing[6],
   paddingTop: mobileTheme.spacing[5],
-  paddingRight: mobileTheme.spacing[5],
+  paddingRight: mobileTheme.spacing[4],
   paddingBottom: mobileTheme.spacing[6],
-  paddingLeft: mobileTheme.spacing[5],
+  paddingLeft: mobileTheme.spacing[4],
 })
 
 const TopBar = styled.View({
@@ -146,16 +146,17 @@ const Eyebrow = styled(AppText)`
 
 const Title = styled(AppText)`
   color: ${mobileTheme.colors.ink};
-  font-size: 29px;
-  font-weight: 700;
+  font-size: ${mobileTheme.typography.display.fontSize}px;
+  font-weight: ${mobileTheme.typography.display.fontWeight};
   letter-spacing: -0.7px;
   line-height: 38px;
 `
 
 const Description = styled(AppText)`
   color: ${mobileTheme.colors.muted};
-  font-size: 14px;
-  line-height: 22px;
+  font-size: ${mobileTheme.typography.body.fontSize}px;
+  font-weight: ${mobileTheme.typography.body.fontWeight};
+  line-height: ${mobileTheme.typography.body.lineHeight}px;
 `
 
 const BenefitList = styled.View({

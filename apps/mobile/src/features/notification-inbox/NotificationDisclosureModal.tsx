@@ -1,4 +1,5 @@
 import styled from "@emotion/native"
+import { Check } from "lucide-react-native"
 import { useState } from "react"
 import { Modal, StyleSheet } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
@@ -73,10 +74,15 @@ export function NotificationDisclosureModal({
             <Checkbox
               $checked={confirmed}
               accessibilityElementsHidden
-              allowFontScaling={false}
               importantForAccessibility="no"
             >
-              {confirmed ? "✓" : ""}
+              {confirmed ? (
+                <Check
+                  color={mobileTheme.colors.panel}
+                  size={16}
+                  strokeWidth={2.2}
+                />
+              ) : null}
             </Checkbox>
             <ConfirmText>
               위 내용을 이해했으며 알림 감지에 동의합니다.
@@ -106,7 +112,8 @@ const Page = styled(SafeAreaView)`
 const styles = StyleSheet.create({
   content: {
     gap: mobileTheme.spacing[4],
-    padding: mobileTheme.spacing[5],
+    paddingVertical: mobileTheme.spacing[5],
+    paddingHorizontal: mobileTheme.spacing[4],
   },
 })
 
@@ -120,9 +127,9 @@ const Eyebrow = styled(AppText)`
 
 const Title = styled(AppText)`
   color: ${mobileTheme.colors.ink};
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 36px;
+  font-size: ${mobileTheme.typography.title.fontSize}px;
+  font-weight: ${mobileTheme.typography.title.fontWeight};
+  line-height: ${mobileTheme.typography.title.lineHeight}px;
 `
 
 const Description = styled(AppText)`
@@ -156,7 +163,7 @@ const ConfirmRow = styled.Pressable({
   padding: mobileTheme.spacing[3],
 })
 
-const Checkbox = styled(AppText)<{ $checked: boolean }>(({ $checked }) => ({
+const Checkbox = styled.View<{ $checked: boolean }>(({ $checked }) => ({
   width: 24,
   height: 24,
   borderWidth: 2,
@@ -167,11 +174,6 @@ const Checkbox = styled(AppText)<{ $checked: boolean }>(({ $checked }) => ({
   backgroundColor: $checked
     ? mobileTheme.colors.teal
     : mobileTheme.colors.panel,
-  color: mobileTheme.colors.panel,
-  fontSize: 16,
-  fontWeight: "600",
-  lineHeight: 20,
-  textAlign: "center",
 }))
 
 const ConfirmText = styled(AppText)`

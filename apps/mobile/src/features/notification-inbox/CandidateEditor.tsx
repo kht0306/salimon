@@ -574,7 +574,7 @@ const TopBar = styled.View({
 })
 const TopBarButton = styled.Pressable({
   minWidth: 56,
-  minHeight: 40,
+  minHeight: mobileTheme.controls.touch,
   justifyContent: "center",
 })
 const TopBarLabel = styled(AppText)({
@@ -616,9 +616,7 @@ const EventLabel = styled(AppText)<{ $cancelled: boolean }>(
 )
 const IntroTitle = styled(AppText)({
   color: mobileTheme.colors.ink,
-  fontSize: 24,
-  fontWeight: "700",
-  lineHeight: 31,
+  ...mobileTheme.typography.title,
 })
 const IntroDescription = styled(AppText)({
   color: mobileTheme.colors.muted,
