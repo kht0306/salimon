@@ -72,7 +72,7 @@ const Page = styled(SafeAreaView)({
   alignItems: "center",
   justifyContent: "center",
   backgroundColor: mobileTheme.colors.canvas,
-  padding: mobileTheme.spacing[5],
+  padding: mobileTheme.spacing[4],
 })
 
 const Progress = styled(AppText)`

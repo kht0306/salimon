@@ -409,7 +409,7 @@ const TopBar = styled.View({
 
 const BackButton = styled.Pressable({
   minWidth: 56,
-  minHeight: 40,
+  minHeight: mobileTheme.controls.touch,
   justifyContent: "center",
 })
 
@@ -487,7 +487,7 @@ const ReadOnlyDescription = styled(AppText)({
 })
 
 const WebManageButton = styled.Pressable({
-  minHeight: 40,
+  minHeight: mobileTheme.controls.touch,
   alignSelf: "flex-start",
   justifyContent: "center",
   marginTop: mobileTheme.spacing[2],
@@ -664,7 +664,7 @@ const StateContent = styled.View({
   flex: 1,
   justifyContent: "center",
   gap: mobileTheme.spacing[3],
-  padding: mobileTheme.spacing[5],
+  padding: mobileTheme.spacing[4],
 })
 
 const StateMessage = styled(AppText)({

@@ -93,7 +93,7 @@ const LedgerScroll = styled(ScrollView)`
 
 const LedgerButton = styled.Pressable<{ $selected: boolean }>(
   ({ $selected }) => ({
-    minHeight: 36,
+    minHeight: mobileTheme.controls.touch,
     flexDirection: "row",
     alignItems: "center",
     gap: mobileTheme.spacing[2],
@@ -101,7 +101,7 @@ const LedgerButton = styled.Pressable<{ $selected: boolean }>(
     borderColor: $selected
       ? mobileTheme.colors.teal
       : mobileTheme.colors.border,
-    borderRadius: mobileTheme.radii.round,
+    borderRadius: mobileTheme.radii.sm,
     backgroundColor: $selected
       ? mobileTheme.colors.tealSoft
       : mobileTheme.colors.panel,
@@ -129,11 +129,11 @@ const MonthRow = styled.View({
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
-  borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
-  borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
-  padding: mobileTheme.spacing[1],
+  borderTopWidth: 1,
+  borderTopColor: mobileTheme.colors.border,
+  borderBottomWidth: 1,
+  borderBottomColor: mobileTheme.colors.border,
+  paddingVertical: mobileTheme.spacing[1],
 })
 
 const MonthButton = styled.Pressable({
@@ -142,7 +142,6 @@ const MonthButton = styled.Pressable({
   alignItems: "center",
   justifyContent: "center",
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.panelSubtle,
 })
 
 const MonthLabel = styled(AppText)`

@@ -43,11 +43,6 @@ export function TransactionListRow({
       accessibilityRole="button"
       onPress={onPress}
     >
-      <TypeMark $type={transaction.type}>
-        <TypeInitial $type={transaction.type}>
-          {typeLabel.slice(0, 1)}
-        </TypeInitial>
-      </TypeMark>
       <MainCopy>
         <Title numberOfLines={1}>{title}</Title>
         <Metadata numberOfLines={1}>
@@ -85,34 +80,6 @@ const Row = styled.Pressable<{ $excluded: boolean }>(({ $excluded }) => ({
   paddingHorizontal: mobileTheme.spacing[4],
   opacity: $excluded ? 0.62 : 1,
 }))
-
-const TypeMark = styled.View<{ $type: Transaction["type"] }>(({ $type }) => ({
-  width: 36,
-  height: 36,
-  flexShrink: 0,
-  alignItems: "center",
-  justifyContent: "center",
-  borderRadius: mobileTheme.radii.round,
-  backgroundColor:
-    $type === "income"
-      ? mobileTheme.colors.greenSoft
-      : $type === "expense"
-        ? mobileTheme.colors.panelSubtle
-        : mobileTheme.colors.tealSoft,
-}))
-
-const TypeInitial = styled(AppText)<{ $type: Transaction["type"] }>(
-  ({ $type }) => ({
-    color:
-      $type === "income"
-        ? mobileTheme.colors.green
-        : $type === "expense"
-          ? mobileTheme.colors.muted
-          : mobileTheme.colors.teal,
-    fontSize: 12,
-    fontWeight: "600",
-  }),
-)
 
 const MainCopy = styled.View({
   minWidth: 0,

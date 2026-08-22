@@ -724,7 +724,7 @@ const TopBar = styled.View({
 
 const BackButton = styled.Pressable({
   minWidth: 56,
-  minHeight: 40,
+  minHeight: mobileTheme.controls.touch,
   justifyContent: "center",
 })
 
@@ -752,9 +752,7 @@ const IntroEyebrow = styled(AppText)({
 
 const IntroTitle = styled(AppText)({
   color: mobileTheme.colors.ink,
-  fontSize: 24,
-  fontWeight: "700",
-  lineHeight: 31,
+  ...mobileTheme.typography.title,
 })
 
 const IntroDescription = styled(AppText)({
@@ -875,7 +873,7 @@ const DateTimeRow = styled.View({
 const DateTimeField = styled.View({ minWidth: 0, flex: 1, gap: 8 })
 
 const QuickDateButton = styled.Pressable({
-  minHeight: 40,
+  minHeight: mobileTheme.controls.touch,
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 1,
@@ -945,7 +943,7 @@ const StateContent = styled.View({
   flex: 1,
   justifyContent: "center",
   gap: mobileTheme.spacing[3],
-  padding: mobileTheme.spacing[5],
+  padding: mobileTheme.spacing[4],
 })
 
 const StateMessage = styled(AppText)({

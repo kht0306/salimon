@@ -2,6 +2,7 @@ import styled from "@emotion/native"
 import { formatKrw } from "@salimon/domain"
 import type { Category, LedgerMember, Transaction } from "@salimon/types"
 import { router } from "expo-router"
+import { Plus, Search, SlidersHorizontal } from "lucide-react-native"
 import { observer } from "mobx-react-lite"
 import { useEffect, useMemo, useState } from "react"
 import {
@@ -249,6 +250,11 @@ function TransactionListHeader({
           <ResultCount>{resultCount}건</ResultCount>
           {canCreate ? (
             <CreateButton accessibilityRole="button" onPress={onCreate}>
+              <Plus
+                color={mobileTheme.colors.panel}
+                size={16}
+                strokeWidth={2}
+              />
               <CreateButtonLabel>거래 추가</CreateButtonLabel>
             </CreateButton>
           ) : null}
@@ -264,22 +270,38 @@ function TransactionListHeader({
       ) : null}
 
       <SearchRow>
-        <SearchInput
-          accessibilityLabel="가맹점 메모 태그 검색"
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder="가맹점, 메모, 태그 검색"
-          placeholderTextColor={mobileTheme.colors.subtle}
-          returnKeyType="search"
-          value={keyword}
-          onChangeText={onKeywordChange}
-        />
+        <SearchField>
+          <Search
+            color={mobileTheme.colors.muted}
+            size={17}
+            strokeWidth={1.8}
+          />
+          <SearchInput
+            accessibilityLabel="가맹점 메모 태그 검색"
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="가맹점, 메모, 태그 검색"
+            placeholderTextColor={mobileTheme.colors.subtle}
+            returnKeyType="search"
+            value={keyword}
+            onChangeText={onKeywordChange}
+          />
+        </SearchField>
         <FilterButton
           $active={filtersOpen || activeFilterCount > 0}
           accessibilityRole="button"
           accessibilityState={{ expanded: filtersOpen }}
           onPress={onToggleFilters}
         >
+          <SlidersHorizontal
+            color={
+              filtersOpen || activeFilterCount > 0
+                ? mobileTheme.colors.teal
+                : mobileTheme.colors.ink
+            }
+            size={16}
+            strokeWidth={1.8}
+          />
           <FilterButtonLabel $active={filtersOpen || activeFilterCount > 0}>
             필터{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
           </FilterButtonLabel>
@@ -297,19 +319,19 @@ function TransactionListHeader({
       ) : null}
 
       <TotalsCard $stacked={stackTotals} accessibilityLabel="검색 결과 합계">
-        <TotalItem $stacked={stackTotals}>
+        <TotalItem $divided={false} $stacked={stackTotals}>
           <TotalLabel>지출</TotalLabel>
           <TotalValue $tone="expense" numberOfLines={1}>
             {formatKrw(totals.expense)}
           </TotalValue>
         </TotalItem>
-        <TotalItem $stacked={stackTotals}>
+        <TotalItem $divided $stacked={stackTotals}>
           <TotalLabel>수입</TotalLabel>
           <TotalValue $tone="income" numberOfLines={1}>
             {formatKrw(totals.income)}
           </TotalValue>
         </TotalItem>
-        <TotalItem $stacked={stackTotals}>
+        <TotalItem $divided $stacked={stackTotals}>
           <TotalLabel>저축</TotalLabel>
           <TotalValue $tone="saving" numberOfLines={1}>
             {formatKrw(totals.saving)}
@@ -371,7 +393,7 @@ const StateContent = styled.View({
   flex: 1,
   justifyContent: "center",
   gap: mobileTheme.spacing[3],
-  padding: mobileTheme.spacing[5],
+  padding: mobileTheme.spacing[4],
 })
 
 const StateMessage = styled(AppText)({
@@ -407,9 +429,7 @@ const Eyebrow = styled(AppText)({
 
 const Title = styled(AppText)({
   color: mobileTheme.colors.ink,
-  fontSize: 24,
-  fontWeight: "700",
-  lineHeight: 31,
+  ...mobileTheme.typography.title,
 })
 
 const Subtitle = styled(AppText)({
@@ -434,9 +454,11 @@ const HeadingActions = styled.View({
 })
 
 const CreateButton = styled.Pressable({
-  minHeight: 40,
+  minHeight: mobileTheme.controls.touch,
+  flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
+  gap: mobileTheme.spacing[1],
   borderRadius: mobileTheme.radii.sm,
   backgroundColor: mobileTheme.colors.teal,
   paddingHorizontal: mobileTheme.spacing[3],
@@ -465,25 +487,37 @@ const SearchRow = styled.View({
   gap: mobileTheme.spacing[2],
 })
 
-const SearchInput = styled.TextInput({
+const SearchField = styled.View({
   minWidth: 0,
   minHeight: 46,
   flex: 1,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: mobileTheme.spacing[2],
   borderWidth: 1,
   borderColor: mobileTheme.colors.border,
   borderRadius: mobileTheme.radii.md,
   backgroundColor: mobileTheme.colors.panel,
+  paddingHorizontal: mobileTheme.spacing[3],
+})
+
+const SearchInput = styled.TextInput({
+  minWidth: 0,
+  minHeight: 44,
+  flex: 1,
   color: mobileTheme.colors.ink,
   fontFamily: "Pretendard",
   fontSize: 13,
-  paddingHorizontal: mobileTheme.spacing[4],
+  paddingVertical: 0,
 })
 
 const FilterButton = styled.Pressable<{ $active: boolean }>(({ $active }) => ({
   minWidth: 76,
   minHeight: 46,
+  flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
+  gap: mobileTheme.spacing[1],
   borderWidth: 1,
   borderColor: $active ? mobileTheme.colors.teal : mobileTheme.colors.border,
   borderRadius: mobileTheme.radii.md,
@@ -503,22 +537,29 @@ const FilterButtonLabel = styled(AppText)<{ $active: boolean }>(
 
 const TotalsCard = styled.View<{ $stacked: boolean }>(({ $stacked }) => ({
   flexDirection: $stacked ? "column" : "row",
-  gap: mobileTheme.spacing[2],
-  borderRadius: mobileTheme.radii.md,
-  borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderTopWidth: 1,
+  borderTopColor: mobileTheme.colors.border,
+  borderBottomWidth: 1,
+  borderBottomColor: mobileTheme.colors.border,
   backgroundColor: mobileTheme.colors.panel,
-  padding: mobileTheme.spacing[4],
 }))
 
-const TotalItem = styled.View<{ $stacked: boolean }>(({ $stacked }) => ({
-  minWidth: 0,
-  flex: $stacked ? undefined : 1,
-  flexDirection: $stacked ? "row" : "column",
-  alignItems: $stacked ? "baseline" : "stretch",
-  justifyContent: $stacked ? "space-between" : "flex-start",
-  gap: mobileTheme.spacing[1],
-}))
+const TotalItem = styled.View<{ $divided: boolean; $stacked: boolean }>(
+  ({ $divided, $stacked }) => ({
+    minWidth: 0,
+    flex: $stacked ? undefined : 1,
+    flexDirection: $stacked ? "row" : "column",
+    alignItems: $stacked ? "baseline" : "center",
+    justifyContent: $stacked ? "space-between" : "flex-start",
+    gap: mobileTheme.spacing[1],
+    borderTopWidth: $stacked && $divided ? 1 : 0,
+    borderTopColor: mobileTheme.colors.border,
+    borderLeftWidth: !$stacked && $divided ? 1 : 0,
+    borderLeftColor: mobileTheme.colors.border,
+    paddingVertical: mobileTheme.spacing[3],
+    paddingHorizontal: mobileTheme.spacing[2],
+  }),
+)
 
 const TotalLabel = styled(AppText)({
   color: mobileTheme.colors.muted,

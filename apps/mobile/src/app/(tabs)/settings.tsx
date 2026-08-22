@@ -419,7 +419,8 @@ const Content = styled.View({
   maxWidth: 720,
   alignSelf: "center",
   gap: mobileTheme.spacing[4],
-  padding: mobileTheme.spacing[5],
+  paddingVertical: mobileTheme.spacing[5],
+  paddingHorizontal: mobileTheme.spacing[4],
 })
 
 const ScreenHeader = styled.View({
@@ -438,9 +439,9 @@ const Eyebrow = styled(AppText)`
 
 const Title = styled(AppText)`
   color: ${mobileTheme.colors.ink};
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 31px;
+  font-size: ${mobileTheme.typography.title.fontSize}px;
+  font-weight: ${mobileTheme.typography.title.fontWeight};
+  line-height: ${mobileTheme.typography.title.lineHeight}px;
 `
 
 const BrandMark = styled.View({
@@ -514,17 +515,17 @@ const ConnectedBadge = styled(AppText)({
 
 const Section = styled.View({
   gap: mobileTheme.spacing[3],
-  borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
-  borderRadius: mobileTheme.radii.md,
+  borderBottomWidth: 1,
+  borderBottomColor: mobileTheme.colors.border,
   backgroundColor: mobileTheme.colors.panel,
-  padding: mobileTheme.spacing[4],
+  paddingVertical: mobileTheme.spacing[4],
 })
 
 const SectionTitle = styled(AppText)`
   color: ${mobileTheme.colors.ink};
-  font-size: 15px;
-  font-weight: 700;
+  font-size: ${mobileTheme.typography.section.fontSize}px;
+  font-weight: ${mobileTheme.typography.section.fontWeight};
+  line-height: ${mobileTheme.typography.section.lineHeight}px;
 `
 
 const SectionHeader = styled.View({
@@ -606,13 +607,13 @@ const LedgerOptions = styled.View({
 })
 const LedgerButton = styled.Pressable<{ $selected: boolean }>(
   ({ $selected }) => ({
-    minHeight: 40,
+    minHeight: mobileTheme.controls.touch,
     justifyContent: "center",
     borderWidth: 1,
     borderColor: $selected
       ? mobileTheme.colors.teal
       : mobileTheme.colors.border,
-    borderRadius: mobileTheme.radii.round,
+    borderRadius: mobileTheme.radii.sm,
     backgroundColor: $selected
       ? mobileTheme.colors.tealSoft
       : mobileTheme.colors.panel,
@@ -636,7 +637,7 @@ const PermissionRow = styled.View({
 })
 const PermissionCopy = styled.View({ minWidth: 0, flex: 1, gap: 2 })
 const InlineButton = styled.Pressable({
-  minHeight: 40,
+  minHeight: mobileTheme.controls.touch,
   justifyContent: "center",
   borderRadius: mobileTheme.radii.md,
   backgroundColor: mobileTheme.colors.tealSoft,
@@ -656,7 +657,7 @@ const ErrorText = styled(AppText)({
   padding: mobileTheme.spacing[3],
 })
 const TextAction = styled.Pressable({
-  minHeight: 40,
+  minHeight: mobileTheme.controls.touch,
   alignItems: "center",
   justifyContent: "center",
 })

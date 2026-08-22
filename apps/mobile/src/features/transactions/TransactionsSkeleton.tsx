@@ -64,10 +64,12 @@ export function TransactionsSkeleton() {
               <SkeletonLight $height={9} $width="46%" />
               <SkeletonLight $height={16} $width="78%" />
             </TotalSkeleton>
+            <TotalDivider />
             <TotalSkeleton>
               <SkeletonLight $height={9} $width="46%" />
               <SkeletonLight $height={16} $width="78%" />
             </TotalSkeleton>
+            <TotalDivider />
             <TotalSkeleton>
               <SkeletonLight $height={9} $width="46%" />
               <SkeletonLight $height={16} $width="78%" />
@@ -82,7 +84,6 @@ export function TransactionsSkeleton() {
 
         {rowWidths.map((width, index) => (
           <RowSkeleton key={`${width}-${index}`}>
-            <SkeletonBlock $height={36} $radius={18} $width={36} />
             <RowCopy>
               <SkeletonBlock $height={14} $width={width} />
               <SkeletonBlock $height={10} $width="88%" />
@@ -116,10 +117,10 @@ const MonthControl = styled.View({
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
-  borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
-  borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  borderTopWidth: 1,
+  borderTopColor: mobileTheme.colors.border,
+  borderBottomWidth: 1,
+  borderBottomColor: mobileTheme.colors.border,
   paddingHorizontal: mobileTheme.spacing[4],
 })
 
@@ -130,15 +131,24 @@ const SearchRow = styled.View({
 
 const TotalsCard = styled.View({
   flexDirection: "row",
-  gap: mobileTheme.spacing[3],
-  borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
-  borderRadius: mobileTheme.radii.md,
+  borderTopWidth: 1,
+  borderTopColor: mobileTheme.colors.border,
+  borderBottomWidth: 1,
+  borderBottomColor: mobileTheme.colors.border,
   backgroundColor: mobileTheme.colors.panel,
-  padding: mobileTheme.spacing[4],
 })
 
-const TotalSkeleton = styled.View({ flex: 1, gap: mobileTheme.spacing[2] })
+const TotalSkeleton = styled.View({
+  flex: 1,
+  alignItems: "center",
+  gap: mobileTheme.spacing[2],
+  padding: mobileTheme.spacing[3],
+})
+
+const TotalDivider = styled.View({
+  width: 1,
+  backgroundColor: mobileTheme.colors.border,
+})
 
 const DateHeaderSkeleton = styled.View({
   minHeight: 48,

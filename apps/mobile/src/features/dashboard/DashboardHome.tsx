@@ -144,7 +144,7 @@ const StateContent = styled.View({
   flex: 1,
   justifyContent: "center",
   gap: mobileTheme.spacing[3],
-  padding: mobileTheme.spacing[5],
+  padding: mobileTheme.spacing[4],
 })
 
 const StateText = styled(AppText)`

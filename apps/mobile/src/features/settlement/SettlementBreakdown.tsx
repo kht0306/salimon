@@ -153,9 +153,7 @@ export function SettlementBreakdown({
                 <BreakdownRow key={row.category.id}>
                   <BreakdownHeading>
                     <BreakdownNameRow>
-                      <CategoryMarker
-                        style={{ backgroundColor: row.category.color }}
-                      />
+                      <CategoryMarker />
                       <BreakdownName numberOfLines={2}>
                         {getCategoryLabel(categories, row.category.id)}
                       </BreakdownName>
@@ -170,7 +168,7 @@ export function SettlementBreakdown({
                       style={{
                         backgroundColor: overBudget
                           ? mobileTheme.colors.amber
-                          : row.category.color,
+                          : mobileTheme.colors.teal,
                         width: `${Math.min(
                           100,
                           (row.spent / comparisonBase) * 100,
@@ -319,11 +317,10 @@ function formatTransactionDay(value: string): string {
 
 const SectionCard = styled.View({
   gap: mobileTheme.spacing[4],
-  borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
-  borderRadius: mobileTheme.radii.md,
+  borderBottomWidth: 1,
+  borderBottomColor: mobileTheme.colors.border,
   backgroundColor: mobileTheme.colors.panel,
-  padding: mobileTheme.spacing[4],
+  paddingVertical: mobileTheme.spacing[4],
 })
 
 const SectionHeading = styled.View({
@@ -337,8 +334,7 @@ const SectionHeadingCopy = styled.View({ minWidth: 0, flex: 1, gap: 3 })
 
 const SectionTitle = styled(AppText)({
   color: mobileTheme.colors.ink,
-  fontSize: 14,
-  fontWeight: "600",
+  ...mobileTheme.typography.label,
 })
 
 const SectionDescription = styled(AppText)({
@@ -471,6 +467,7 @@ const CategoryMarker = styled.View({
   width: 8,
   height: 8,
   borderRadius: mobileTheme.radii.round,
+  backgroundColor: mobileTheme.colors.teal,
 })
 
 const BreakdownName = styled(AppText)({

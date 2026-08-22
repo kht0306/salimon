@@ -252,7 +252,7 @@ const PanelTitle = styled(AppText)({
 })
 
 const ResetButton = styled.Pressable({
-  minHeight: 36,
+  minHeight: mobileTheme.controls.touch,
   justifyContent: "center",
   paddingHorizontal: mobileTheme.spacing[2],
 })
@@ -317,7 +317,7 @@ const CategorySelectorAction = styled(AppText)({
 
 const FilterChip = styled.Pressable<{ $selected: boolean }>(
   ({ $selected }) => ({
-    minHeight: 36,
+    minHeight: mobileTheme.controls.touch,
     justifyContent: "center",
     borderWidth: 1,
     borderColor: $selected

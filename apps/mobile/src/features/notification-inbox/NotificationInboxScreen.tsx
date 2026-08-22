@@ -1,7 +1,7 @@
 import styled from "@emotion/native"
 import type { LocalSmsCandidate } from "@salimon/types"
 import { useFocusEffect, useRouter } from "expo-router"
-import { Check, Minus } from "lucide-react-native"
+import { Check, Minus, Settings2 } from "lucide-react-native"
 import { observer } from "mobx-react-lite"
 import { useCallback, useState } from "react"
 import { Alert, FlatList, RefreshControl } from "react-native"
@@ -19,6 +19,12 @@ import {
 } from "./notificationInbox"
 
 const safeAreaEdges = ["top"] as const
+const candidateListContentStyle = {
+  flexGrow: 1,
+  gap: mobileTheme.spacing[3],
+  paddingVertical: mobileTheme.spacing[5],
+  paddingHorizontal: mobileTheme.spacing[4],
+} as const
 
 export const NotificationInboxScreen = observer(
   function NotificationInboxScreen() {
@@ -129,11 +135,7 @@ export const NotificationInboxScreen = observer(
               onRefresh={() => void store.refreshNotificationInbox()}
             />
           }
-          contentContainerStyle={{
-            flexGrow: 1,
-            gap: mobileTheme.spacing[3],
-            padding: mobileTheme.spacing[5],
-          }}
+          contentContainerStyle={candidateListContentStyle}
           ListHeaderComponent={
             <Header>
               <HeaderTop>
@@ -141,6 +143,17 @@ export const NotificationInboxScreen = observer(
                   <Eyebrow>결제 알림</Eyebrow>
                   <Title accessibilityRole="header">후보함</Title>
                 </HeaderCopy>
+                <HeaderSettingsButton
+                  accessibilityLabel="후보함 설정 열기"
+                  accessibilityRole="button"
+                  onPress={() => router.push("/(tabs)/settings")}
+                >
+                  <Settings2
+                    color={mobileTheme.colors.muted}
+                    size={19}
+                    strokeWidth={1.8}
+                  />
+                </HeaderSettingsButton>
               </HeaderTop>
               {store.notificationCandidateCount > 0 ? (
                 <SelectionToolbar>
@@ -232,65 +245,80 @@ export const NotificationInboxScreen = observer(
             const statusTone = candidateStatusTone(item)
             const eventLabel = cardNotificationEventLabel(item)
             const selected = selectedCandidateIds.has(item.id)
+            const amountLabel = candidateAmountLabel(item)
+            const cancellation =
+              item.parsed.cardNotificationEvent === "approval_cancellation"
+            const candidateActionLabel = cancellation
+              ? "상세 확인"
+              : "내용 확인 후 등록"
             return (
               <CandidateRow>
                 <CandidateCheckbox
                   accessibilityLabel={`${item.parsed.merchantName ?? "가맹점 미확인"} 후보 선택`}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: selected }}
-                  $checked={selected}
                   onPress={() => toggleCandidateSelection(item.id)}
                 >
-                  {selected ? (
-                    <Check color={mobileTheme.colors.panel} size={17} />
-                  ) : null}
+                  <CandidateCheckboxVisual $checked={selected}>
+                    {selected ? (
+                      <Check
+                        color={mobileTheme.colors.panel}
+                        size={16}
+                        strokeWidth={2.2}
+                      />
+                    ) : null}
+                  </CandidateCheckboxVisual>
                 </CandidateCheckbox>
-                <CandidateCard
-                  accessibilityLabel={`${item.parsed.merchantName ?? "가맹점 미확인"}, ${candidateAmountLabel(item)}, ${eventLabel ?? "거래 알림"}, ${candidateStatusLabel(item)}`}
-                  accessibilityRole="button"
-                  onPress={() => setSelectedCandidate(item)}
-                >
-                  <CardTop>
-                    <SourceLabel>
-                      {notificationAppName(item.sourceApp)}
-                    </SourceLabel>
-                    <BadgeGroup>
-                      {eventLabel ? (
-                        <EventBadge
-                          $cancelled={
-                            item.parsed.cardNotificationEvent ===
-                            "approval_cancellation"
-                          }
-                        >
-                          <EventLabel
-                            $cancelled={
-                              item.parsed.cardNotificationEvent ===
-                              "approval_cancellation"
-                            }
-                          >
-                            {eventLabel}
-                          </EventLabel>
-                        </EventBadge>
-                      ) : null}
-                      <StatusBadge $tone={statusTone}>
-                        <StatusLabel $tone={statusTone}>
-                          {candidateStatusLabel(item)}
-                        </StatusLabel>
-                      </StatusBadge>
-                    </BadgeGroup>
-                  </CardTop>
-                  <Merchant numberOfLines={1}>
-                    {item.parsed.merchantName ?? "가맹점 확인 필요"}
-                  </Merchant>
-                  <Amount>{candidateAmountLabel(item)}</Amount>
-                  {item.parsed.originalCurrencyAmount ? (
-                    <ForeignAmountHint>
-                      원화 반영금액을 입력해 주세요.
-                    </ForeignAmountHint>
-                  ) : null}
-                  <ReceivedAt>
-                    {formatDateTime(item.parsed.transactionAt)}
-                  </ReceivedAt>
+                <CandidateCard>
+                  <CandidateOpenButton
+                    accessibilityLabel={`${item.parsed.merchantName ?? "가맹점 미확인"}, ${amountLabel}, ${eventLabel ?? "거래 알림"}, ${candidateStatusLabel(item)}`}
+                    accessibilityRole="button"
+                    onPress={() => setSelectedCandidate(item)}
+                  >
+                    <CardTop>
+                      <SourceLabel>
+                        {notificationAppName(item.sourceApp)}
+                      </SourceLabel>
+                      <BadgeGroup>
+                        {eventLabel ? (
+                          <EventBadge $cancelled={cancellation}>
+                            <EventLabel $cancelled={cancellation}>
+                              {eventLabel}
+                            </EventLabel>
+                          </EventBadge>
+                        ) : null}
+                        <StatusBadge $tone={statusTone}>
+                          <StatusLabel $tone={statusTone}>
+                            {candidateStatusLabel(item)}
+                          </StatusLabel>
+                        </StatusBadge>
+                      </BadgeGroup>
+                    </CardTop>
+                    <Merchant numberOfLines={1}>
+                      {item.parsed.merchantName ?? "가맹점 확인 필요"}
+                    </Merchant>
+                    <Amount>{amountLabel}</Amount>
+                    {item.parsed.originalCurrencyAmount ? (
+                      <ForeignAmountHint>
+                        원화 반영금액을 입력해 주세요.
+                      </ForeignAmountHint>
+                    ) : null}
+                    <ReceivedAt>
+                      {item.parsed.paymentMethodName
+                        ? `${item.parsed.paymentMethodName} · `
+                        : ""}
+                      {formatDateTime(item.parsed.transactionAt)}
+                    </ReceivedAt>
+                  </CandidateOpenButton>
+                  <CandidateAction
+                    $primary={!cancellation}
+                    accessibilityRole="button"
+                    onPress={() => setSelectedCandidate(item)}
+                  >
+                    <CandidateActionLabel $primary={!cancellation}>
+                      {candidateActionLabel}
+                    </CandidateActionLabel>
+                  </CandidateAction>
                 </CandidateCard>
               </CandidateRow>
             )
@@ -351,8 +379,17 @@ const Eyebrow = styled(AppText)({
 })
 const Title = styled(AppText)({
   color: mobileTheme.colors.ink,
-  fontSize: 26,
-  fontWeight: "700",
+  ...mobileTheme.typography.title,
+})
+const HeaderSettingsButton = styled.Pressable({
+  width: mobileTheme.controls.touch,
+  minHeight: mobileTheme.controls.touch,
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.borderStrong,
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: mobileTheme.colors.panel,
 })
 const SelectionToolbar = styled.View({
   minHeight: 48,
@@ -453,13 +490,19 @@ const CandidateRow = styled.View({
   alignItems: "flex-start",
   gap: mobileTheme.spacing[3],
 })
-const CandidateCheckbox = styled.Pressable<{ $checked: boolean }>(
+const CandidateCheckbox = styled.Pressable({
+  width: mobileTheme.controls.touch,
+  height: mobileTheme.controls.touch,
+  alignItems: "center",
+  justifyContent: "center",
+  marginTop: mobileTheme.spacing[2],
+})
+const CandidateCheckboxVisual = styled.View<{ $checked: boolean }>(
   ({ $checked }) => ({
-    width: 28,
-    height: 28,
+    width: 24,
+    height: 24,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: mobileTheme.spacing[4],
     borderWidth: 2,
     borderColor: $checked
       ? mobileTheme.colors.teal
@@ -470,7 +513,7 @@ const CandidateCheckbox = styled.Pressable<{ $checked: boolean }>(
       : mobileTheme.colors.panel,
   }),
 )
-const CandidateCard = styled.Pressable({
+const CandidateCard = styled.View({
   minWidth: 0,
   flex: 1,
   gap: mobileTheme.spacing[2],
@@ -479,6 +522,9 @@ const CandidateCard = styled.Pressable({
   borderRadius: mobileTheme.radii.md,
   backgroundColor: mobileTheme.colors.panel,
   padding: mobileTheme.spacing[4],
+})
+const CandidateOpenButton = styled.Pressable({
+  gap: mobileTheme.spacing[2],
 })
 const CardTop = styled.View({
   flexDirection: "row",
@@ -543,7 +589,7 @@ const Amount = styled(AppText)({
   fontWeight: "700",
 })
 const ForeignAmountHint = styled(AppText)({
-  color: mobileTheme.colors.blue,
+  color: mobileTheme.colors.teal,
   fontSize: 11,
   fontWeight: "600",
 })
@@ -551,3 +597,26 @@ const ReceivedAt = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 11,
 })
+const CandidateAction = styled.Pressable<{ $primary: boolean }>(
+  ({ $primary }) => ({
+    minHeight: mobileTheme.controls.touch,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: mobileTheme.spacing[1],
+    borderWidth: 1,
+    borderColor: $primary
+      ? mobileTheme.colors.teal
+      : mobileTheme.colors.borderStrong,
+    borderRadius: mobileTheme.radii.sm,
+    backgroundColor: $primary
+      ? mobileTheme.colors.tealSoft
+      : mobileTheme.colors.panelSubtle,
+    paddingHorizontal: mobileTheme.spacing[3],
+  }),
+)
+const CandidateActionLabel = styled(AppText)<{ $primary: boolean }>(
+  ({ $primary }) => ({
+    color: $primary ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+    ...mobileTheme.typography.label,
+  }),
+)
