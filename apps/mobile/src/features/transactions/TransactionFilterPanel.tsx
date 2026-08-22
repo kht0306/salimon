@@ -1,6 +1,6 @@
 import styled from "@emotion/native"
 import { getCategoryLabel } from "@salimon/domain"
-import type { Category, LedgerMember } from "@salimon/types"
+import type { Category, LedgerMember, PaymentMethod } from "@salimon/types"
 import { useMemo, useState } from "react"
 import { ScrollView } from "react-native"
 import { AppText } from "../../components/AppText"
@@ -16,6 +16,7 @@ interface TransactionFilterPanelProps {
   categories: Category[]
   filters: MobileTransactionFilters
   members: LedgerMember[]
+  paymentMethods: PaymentMethod[]
   onChange: (filters: MobileTransactionFilters) => void
   onReset: () => void
 }
@@ -27,9 +28,12 @@ interface FilterOption<T extends string> {
 
 const periodOptions: FilterOption<TransactionPeriod>[] = [
   { label: "이번 달", value: "all" },
+  { label: "최근 3일", value: "3" },
   { label: "최근 7일", value: "7" },
   { label: "최근 14일", value: "14" },
+  { label: "최근 21일", value: "21" },
   { label: "최근 28일", value: "28" },
+  { label: "직접 선택", value: "custom" },
 ]
 
 const typeOptions: FilterOption<MobileTransactionFilters["type"]>[] = [
@@ -58,6 +62,7 @@ export function TransactionFilterPanel({
   categories,
   filters,
   members,
+  paymentMethods,
   onChange,
   onReset,
 }: TransactionFilterPanelProps) {
@@ -99,6 +104,39 @@ export function TransactionFilterPanel({
           selectedValue={filters.period}
           onSelect={(period) => onChange({ ...filters, period })}
         />
+        {filters.period === "custom" ? (
+          <Group>
+            <GroupLabel>직접 선택 기간</GroupLabel>
+            <DateRangeRow>
+              <DateInput
+                accessibilityLabel="검색 시작일"
+                autoCapitalize="none"
+                keyboardType="numbers-and-punctuation"
+                maxLength={10}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={mobileTheme.colors.subtle}
+                value={filters.startDate}
+                onChangeText={(startDate) =>
+                  onChange({ ...filters, startDate })
+                }
+              />
+              <DateRangeSeparator>~</DateRangeSeparator>
+              <DateInput
+                accessibilityLabel="검색 종료일"
+                autoCapitalize="none"
+                keyboardType="numbers-and-punctuation"
+                maxLength={10}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={mobileTheme.colors.subtle}
+                value={filters.endDate}
+                onChangeText={(endDate) => onChange({ ...filters, endDate })}
+              />
+            </DateRangeRow>
+            <CategorySelectorHint>
+              월 경계를 넘어 원하는 기간의 거래를 서버에서 불러옵니다.
+            </CategorySelectorHint>
+          </Group>
+        ) : null}
         <FilterGroup
           defaultValue=""
           label="유형"
@@ -106,6 +144,47 @@ export function TransactionFilterPanel({
           selectedValue={filters.type}
           onSelect={(type) => onChange({ ...filters, type })}
         />
+
+        <Group>
+          <GroupLabel>결제수단</GroupLabel>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={chipContentStyle}
+          >
+            {[
+              { id: "cash", name: "현금" },
+              ...paymentMethods.map((method) => ({
+                id: method.id,
+                name: method.name,
+              })),
+            ].map((method) => {
+              const selected = filters.paymentMethodIds.includes(method.id)
+              return (
+                <FilterChip
+                  key={`payment-${method.id}`}
+                  $selected={selected}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  onPress={() =>
+                    onChange({
+                      ...filters,
+                      paymentMethodIds: selected
+                        ? filters.paymentMethodIds.filter(
+                            (methodId) => methodId !== method.id,
+                          )
+                        : [...filters.paymentMethodIds, method.id],
+                    })
+                  }
+                >
+                  <FilterChipLabel $selected={selected} numberOfLines={1}>
+                    {method.name}
+                  </FilterChipLabel>
+                </FilterChip>
+              )
+            })}
+          </ScrollView>
+        </Group>
         <FilterGroup
           defaultValue=""
           label="상태"
@@ -269,6 +348,31 @@ const GroupLabel = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 10,
   fontWeight: "700",
+})
+
+const DateRangeRow = styled.View({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: mobileTheme.spacing[2],
+})
+
+const DateInput = styled.TextInput({
+  minHeight: 46,
+  minWidth: 0,
+  flex: 1,
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.borderStrong,
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: mobileTheme.colors.panel,
+  color: mobileTheme.colors.ink,
+  fontFamily: "Pretendard",
+  fontSize: 12,
+  paddingHorizontal: mobileTheme.spacing[3],
+})
+
+const DateRangeSeparator = styled(AppText)({
+  color: mobileTheme.colors.muted,
+  fontSize: 11,
 })
 
 const CategorySelector = styled.Pressable<{ $selected: boolean }>(

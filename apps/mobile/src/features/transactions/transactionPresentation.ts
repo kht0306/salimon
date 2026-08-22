@@ -14,7 +14,14 @@ import type {
   TransactionType,
 } from "@salimon/types"
 
-export type TransactionPeriod = "all" | "7" | "14" | "28"
+export type TransactionPeriod =
+  | "all"
+  | "3"
+  | "7"
+  | "14"
+  | "21"
+  | "28"
+  | "custom"
 export type TransactionStructure =
   | ""
   | "regular"
@@ -26,7 +33,10 @@ export interface MobileTransactionFilters {
   actorUserId: string
   categoryIds: string[]
   keyword: string
+  paymentMethodIds: string[]
   period: TransactionPeriod
+  startDate: string
+  endDate: string
   status: "" | TransactionStatus
   structure: TransactionStructure
   type: "" | TransactionType
@@ -58,7 +68,10 @@ export const defaultTransactionFilters: MobileTransactionFilters = {
   actorUserId: "",
   categoryIds: [],
   keyword: "",
+  paymentMethodIds: [],
   period: "all",
+  startDate: "",
+  endDate: "",
   status: "",
   structure: "",
   type: "",
@@ -69,11 +82,11 @@ export function filterTransactions(
   filters: MobileTransactionFilters,
   context: TransactionFilterContext,
 ): Transaction[] {
-  const startDate = resolvePeriodStart(
-    context.selectedMonth,
-    filters.period,
-    context.now,
-  )
+  const startDate =
+    filters.period === "custom"
+      ? filters.startDate
+      : resolvePeriodStart(context.selectedMonth, filters.period, context.now)
+  const endDate = filters.period === "custom" ? filters.endDate : undefined
   const query = filters.keyword.trim().toLocaleLowerCase("ko-KR")
   const selectedCategoryIds = new Set<string>()
   for (const categoryId of filters.categoryIds) {
@@ -99,8 +112,15 @@ export function filterTransactions(
       ) {
         return false
       }
+      if (endDate && toDateKey(new Date(transaction.transactionAt)) > endDate) {
+        return false
+      }
       if (filters.type && transaction.type !== filters.type) return false
       if (filters.status && transaction.status !== filters.status) return false
+      if (filters.paymentMethodIds.length > 0) {
+        const paymentMethodKey = transaction.paymentMethodId ?? "cash"
+        if (!filters.paymentMethodIds.includes(paymentMethodKey)) return false
+      }
       const transactionSplits = splitsByTransaction.get(transaction.id) ?? []
       if (
         filters.structure &&
@@ -277,6 +297,7 @@ function resolvePeriodStart(
   now = new Date(),
 ): string | undefined {
   if (period === "all") return undefined
+  if (period === "custom") return undefined
   const [year, month] = selectedMonth.split("-").map(Number)
   const currentMonth = toMonthKey(now)
   const anchor =

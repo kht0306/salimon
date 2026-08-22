@@ -5,6 +5,8 @@ import {
   type AuthSessionEvent,
   type AuthSessionInfo,
   type AuthUserInfo,
+  type AcceptLedgerInviteResult,
+  type CreatedLedgerInvitation,
   type FinanceData,
   type FinanceLoadOptions,
   type RemoteTransactionInput,
@@ -12,6 +14,9 @@ import {
 } from "@salimon/api-client"
 import {
   getDescendantCategoryIds,
+  getCategoryDepth,
+  isSplitCategory,
+  MAX_CATEGORY_DEPTH,
   moveMonth,
   toDateKey,
   toMonthKey,
@@ -21,8 +26,13 @@ import {
   CURRENT_PRIVACY_VERSION,
   CURRENT_TERMS_VERSION,
   type Category,
+  type CategoryUsageType,
+  type InstallmentDeleteScope,
   type Ledger,
+  type LedgerRole,
+  type LedgerType,
   type LocalSmsCandidate,
+  type PaymentInstrument,
   type Transaction,
 } from "@salimon/types"
 import { makeAutoObservable, runInAction } from "mobx"
@@ -38,7 +48,6 @@ import {
   type MonthDaySummary,
   type TransactionTotals,
 } from "../features/dashboard/dashboardPresentation"
-import { isGeneralMobileTransaction } from "../features/transactions/transactionDraft"
 import { createCandidateFromNotificationRecord } from "../features/notification-inbox/notificationInbox"
 import {
   isRetryableCandidateRegistrationError,
@@ -66,11 +75,39 @@ import {
 type MobileFinanceRepository = Pick<
   SupabaseFinanceRepository,
   | "acceptLegalTerms"
+  | "acceptInvite"
+  | "archiveCategory"
+  | "archiveLedger"
+  | "convertPersonalLedgerToShared"
+  | "createAccount"
+  | "createCard"
+  | "createCategory"
+  | "createInvite"
   | "createLedger"
+  | "deactivateFixedRule"
+  | "deleteAccount"
+  | "deleteCard"
+  | "deleteInstallmentOccurrences"
+  | "leaveSharedLedger"
   | "load"
   | "materializeMonth"
+  | "removeLedgerMember"
+  | "renameLedger"
+  | "restoreLedger"
+  | "revokeInvite"
   | "saveTransaction"
+  | "setAccountActive"
+  | "setCardActive"
+  | "setCategoryBudget"
+  | "setDefaultLedger"
   | "softDeleteTransaction"
+  | "syncMyLedgerPaymentMethods"
+  | "transferLedgerOwnership"
+  | "updateAccount"
+  | "updateCard"
+  | "updateCategory"
+  | "updateCategoryOrder"
+  | "updateLedgerMemberRole"
 >
 
 export type MobileAuthState =
@@ -89,11 +126,17 @@ export type MobileDataStatus =
   | "error"
 export type MobileConsentStatus = "idle" | "saving" | "error"
 export type MobileTransactionMutationState = "idle" | "saving" | "deleting"
+export type MobileManagementMutationState = "idle" | "saving"
+export type MobileTransactionSearchStatus =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "error"
 export type NotificationInboxStatus = "idle" | "loading" | "ready" | "error"
 export type NotificationRegistrationState = "idle" | "saving"
 
 export type MobileTransactionSaveResult =
-  | { status: "saved"; transactionId: string }
+  | { status: "saved"; transactionId?: string }
   | { status: "error" }
 
 export type NotificationCandidateRegistrationResult =
@@ -119,6 +162,38 @@ export interface MobileCategoryBudgetProgress {
   spent: number
 }
 
+export interface MobileCategoryInput {
+  color: string
+  icon: string
+  name: string
+  parentCategoryId?: string
+  usageTypes: CategoryUsageType[]
+}
+
+export interface MobileCardInput {
+  billingPeriodEndDay: number
+  billingPeriodEndMonthOffset: -1 | 0
+  isDebit: boolean
+  issuer: string
+  last4?: string
+  name: string
+  paymentDay: number
+}
+
+export interface MobileAccountInput {
+  bank: string
+  last4?: string
+  name: string
+}
+
+export interface MobileLedgerCreationInput {
+  ledgerVisibleInstrumentIds: string[]
+  name: string
+  paymentInstrumentIds: string[]
+  setDefault: boolean
+  type: LedgerType
+}
+
 export class MobileAppStore {
   selectedDate: string
   selectedLedgerId = ""
@@ -132,6 +207,11 @@ export class MobileAppStore {
   dataStatus: MobileDataStatus = "idle"
   consentStatus: MobileConsentStatus = "idle"
   transactionMutationState: MobileTransactionMutationState = "idle"
+  managementMutationState: MobileManagementMutationState = "idle"
+  transactionSearchStatus: MobileTransactionSearchStatus = "idle"
+  transactionSearchTransactions?: Transaction[]
+  transactionSearchSplits?: FinanceData["transactionSplits"]
+  transactionSearchRangeKey?: string
   notificationCaptureStatus: NotificationCaptureStatus =
     createEmptyNotificationCaptureStatus()
   notificationCandidates: LocalSmsCandidate[] = []
@@ -141,12 +221,16 @@ export class MobileAppStore {
   dataErrorMessage?: string
   consentErrorMessage?: string
   transactionMutationErrorMessage?: string
+  managementErrorMessage?: string
+  managementNoticeMessage?: string
+  transactionSearchErrorMessage?: string
   notificationInboxErrorMessage?: string
   notificationInboxNoticeMessage?: string
   notificationRegistrationErrorMessage?: string
 
   private activeSessionUserId?: string
   private dataRequestSequence = 0
+  private transactionSearchSequence = 0
   private readonly financeQueryCache: QueryCache<FinanceData>
   private sessionSequence = 0
   private activationPromise?: Promise<void>
@@ -198,6 +282,53 @@ export class MobileAppStore {
   get currentLedger(): Ledger | undefined {
     return this.selectableLedgers.find(
       (ledger) => ledger.id === this.selectedLedgerId,
+    )
+  }
+
+  get currentMembership() {
+    return this.financeData.members.find(
+      (member) =>
+        member.ledgerId === this.selectedLedgerId &&
+        member.userId === this.authUser?.id &&
+        member.status === "active",
+    )
+  }
+
+  get currentMembers() {
+    return this.financeData.members.filter(
+      (member) =>
+        member.ledgerId === this.selectedLedgerId && member.status === "active",
+    )
+  }
+
+  get currentCategories(): Category[] {
+    return this.financeData.categories
+      .filter((category) => category.ledgerId === this.selectedLedgerId)
+      .sort(
+        (first, second) =>
+          first.sortOrder - second.sortOrder ||
+          first.name.localeCompare(second.name, "ko-KR"),
+      )
+  }
+
+  get myPaymentInstruments(): PaymentInstrument[] {
+    return this.financeData.paymentInstruments
+      .filter(
+        (instrument) =>
+          instrument.ownerUserId === this.authUser?.id && !instrument.isDeleted,
+      )
+      .sort((first, second) => first.name.localeCompare(second.name, "ko-KR"))
+  }
+
+  get currentPaymentMethods() {
+    return this.financeData.paymentMethods.filter(
+      (method) => method.ledgerId === this.selectedLedgerId,
+    )
+  }
+
+  get archivedOwnedLedgers(): Ledger[] {
+    return this.financeData.ledgers.filter(
+      (ledger) => ledger.ownerId === this.authUser?.id && ledger.archivedAt,
     )
   }
 
@@ -528,6 +659,57 @@ export class MobileAppStore {
     await this.loadSelectedMonth(this.selectedMonth, true)
   }
 
+  async loadTransactionSearchRange(
+    startDate: string,
+    endDate: string,
+  ): Promise<void> {
+    const userId = this.authUser?.id
+    if (!userId || !isDateKey(startDate) || !isDateKey(endDate)) return
+    if (endDate < startDate) {
+      this.transactionSearchStatus = "error"
+      this.transactionSearchErrorMessage =
+        "검색 종료일은 시작일보다 빠를 수 없습니다."
+      return
+    }
+
+    const sequence = ++this.transactionSearchSequence
+    this.transactionSearchStatus = "loading"
+    this.transactionSearchRangeKey = `${startDate}:${endDate}`
+    this.transactionSearchErrorMessage = undefined
+    try {
+      const financeData = await this.repository.load(userId, {
+        transactionDateRange: createKoreaTransactionDateRange(
+          startDate,
+          endDate,
+        ),
+      })
+      if (sequence !== this.transactionSearchSequence) return
+      runInAction(() => {
+        this.transactionSearchTransactions = financeData.transactions
+        this.transactionSearchSplits = financeData.transactionSplits
+        this.transactionSearchStatus = "ready"
+      })
+    } catch (error) {
+      if (sequence !== this.transactionSearchSequence) return
+      runInAction(() => {
+        this.transactionSearchStatus = "error"
+        this.transactionSearchErrorMessage = dataLoadErrorMessage(
+          error,
+          "선택한 기간의 거래를 불러오지 못했습니다.",
+        )
+      })
+    }
+  }
+
+  clearTransactionSearchRange(): void {
+    this.transactionSearchSequence += 1
+    this.transactionSearchStatus = "idle"
+    this.transactionSearchTransactions = undefined
+    this.transactionSearchSplits = undefined
+    this.transactionSearchRangeKey = undefined
+    this.transactionSearchErrorMessage = undefined
+  }
+
   clearTransactionMutationError(): void {
     this.transactionMutationErrorMessage = undefined
   }
@@ -541,13 +723,10 @@ export class MobileAppStore {
     if (
       !this.authUser ||
       !this.canMutateCurrentLedger ||
-      input.ledgerId !== this.selectedLedgerId ||
-      input.recurringType ||
-      input.recurringRuleId ||
-      (input.splits?.length ?? 0) > 0
+      input.ledgerId !== this.selectedLedgerId
     ) {
       this.transactionMutationErrorMessage =
-        "현재 가계부에서 일반 거래를 저장할 권한이 없습니다."
+        "현재 가계부에서 거래를 저장할 권한이 없습니다."
       return { status: "error" }
     }
 
@@ -574,11 +753,9 @@ export class MobileAppStore {
         timeoutId = undefined
       }
       const savedTransactionId = transactionId ?? input.id
-      if (!savedTransactionId) {
-        throw new Error("저장된 거래를 확인하지 못했습니다.")
-      }
 
       this.selectedDate = toDateKey(new Date(input.transactionAt))
+      this.clearTransactionSearchRange()
       await this.loadSelectedMonth(
         toMonthKey(new Date(input.transactionAt)),
         true,
@@ -586,7 +763,9 @@ export class MobileAppStore {
       runInAction(() => {
         this.transactionMutationState = "idle"
       })
-      return { status: "saved", transactionId: savedTransactionId }
+      return savedTransactionId
+        ? { status: "saved", transactionId: savedTransactionId }
+        : { status: "saved" }
     } catch (error) {
       runInAction(() => {
         this.transactionMutationState = "idle"
@@ -609,21 +788,20 @@ export class MobileAppStore {
   async deleteGeneralTransaction(transactionId: string): Promise<boolean> {
     if (this.transactionMutationState !== "idle") return false
 
-    const transaction = this.financeData.transactions.find(
-      (item) => item.id === transactionId && !item.deletedAt,
-    )
-    const splitCount = this.financeData.transactionSplits.filter(
-      (split) => split.transactionId === transactionId,
-    ).length
+    const transaction = [
+      ...this.financeData.transactions,
+      ...(this.transactionSearchTransactions ?? []),
+    ].find((item) => item.id === transactionId && !item.deletedAt)
     if (
       !this.authUser ||
       !this.canMutateCurrentLedger ||
       !transaction ||
       transaction.ledgerId !== this.selectedLedgerId ||
-      !isGeneralMobileTransaction(transaction, splitCount)
+      transaction.recurringType ||
+      transaction.recurringRuleId
     ) {
       this.transactionMutationErrorMessage =
-        "일반 거래만 모바일에서 삭제할 수 있습니다."
+        "이 거래는 일반 삭제 방식으로 처리할 수 없습니다."
       return false
     }
 
@@ -635,7 +813,11 @@ export class MobileAppStore {
         transactionId,
         this.authUser.id,
       )
-      await this.loadSelectedMonth(this.selectedMonth, true)
+      this.clearTransactionSearchRange()
+      await this.loadSelectedMonth(
+        toMonthKey(new Date(transaction.transactionAt)),
+        true,
+      )
       runInAction(() => {
         this.transactionMutationState = "idle"
       })
@@ -646,6 +828,80 @@ export class MobileAppStore {
         this.transactionMutationErrorMessage = errorMessage(
           error,
           "거래를 삭제하지 못했습니다.",
+        )
+      })
+      return false
+    }
+  }
+
+  async endFixedRule(
+    ruleId: string,
+    timing: "current" | "next" = "current",
+    month = this.selectedMonth,
+  ): Promise<boolean> {
+    if (
+      !this.canMutateCurrentLedger ||
+      this.transactionMutationState !== "idle"
+    ) {
+      return false
+    }
+    this.transactionMutationState = "deleting"
+    this.transactionMutationErrorMessage = undefined
+    try {
+      await this.repository.deactivateFixedRule(
+        ruleId,
+        timing === "current" ? month : moveMonth(month, 1),
+      )
+      this.clearTransactionSearchRange()
+      await this.loadSelectedMonth(month, true)
+      runInAction(() => {
+        this.transactionMutationState = "idle"
+      })
+      return true
+    } catch (error) {
+      runInAction(() => {
+        this.transactionMutationState = "idle"
+        this.transactionMutationErrorMessage = errorMessage(
+          error,
+          "고정 거래를 종료하지 못했습니다.",
+        )
+      })
+      return false
+    }
+  }
+
+  async deleteInstallmentOccurrences(
+    ruleId: string,
+    installmentNumber: number,
+    scope: InstallmentDeleteScope,
+    month = this.selectedMonth,
+  ): Promise<boolean> {
+    if (
+      !this.canMutateCurrentLedger ||
+      this.transactionMutationState !== "idle"
+    ) {
+      return false
+    }
+    this.transactionMutationState = "deleting"
+    this.transactionMutationErrorMessage = undefined
+    try {
+      await this.repository.deleteInstallmentOccurrences(
+        ruleId,
+        installmentNumber,
+        scope,
+      )
+      this.clearTransactionSearchRange()
+      await this.loadSelectedMonth(month, true)
+      runInAction(() => {
+        this.transactionMutationState = "idle"
+      })
+      return true
+    } catch (error) {
+      runInAction(() => {
+        this.transactionMutationState = "idle"
+        this.transactionMutationErrorMessage = errorMessage(
+          error,
+          "할부 거래를 삭제하지 못했습니다.",
         )
       })
       return false
@@ -663,6 +919,7 @@ export class MobileAppStore {
       return
     }
     this.selectedLedgerId = ledgerId
+    this.clearTransactionSearchRange()
   }
 
   selectDate(date: string): void {
@@ -685,6 +942,596 @@ export class MobileAppStore {
       return
     }
     this.collapsedDashboardTransactionGroupKeys.add(groupKey)
+  }
+
+  clearManagementFeedback(): void {
+    this.managementErrorMessage = undefined
+    this.managementNoticeMessage = undefined
+  }
+
+  categoryBudgetAmount(categoryId: string): number {
+    return (
+      this.financeData.categoryBudgets
+        .filter(
+          (budget) =>
+            budget.categoryId === categoryId &&
+            budget.effectiveMonth <= this.selectedMonth,
+        )
+        .sort((first, second) =>
+          second.effectiveMonth.localeCompare(first.effectiveMonth),
+        )[0]?.amount ?? 0
+    )
+  }
+
+  async createCategory(
+    input: MobileCategoryInput,
+    budgetAmount = 0,
+  ): Promise<boolean> {
+    const validated = this.validateCategoryInput(input)
+    if (!validated || !this.canManageCurrentLedger()) return false
+
+    return this.runManagementMutation(async () => {
+      const categoryId = await this.repository.createCategory({
+        ledgerId: this.selectedLedgerId,
+        ...validated,
+      })
+      if (validated.usageTypes.includes("expense") && budgetAmount > 0) {
+        await this.repository.setCategoryBudget({
+          ledgerId: this.selectedLedgerId,
+          categoryId,
+          month: this.selectedMonth,
+          amount: budgetAmount,
+          userId: this.authUser!.id,
+        })
+      }
+    }, "카테고리를 추가했습니다.")
+  }
+
+  async updateCategory(
+    categoryId: string,
+    input: MobileCategoryInput,
+  ): Promise<boolean> {
+    const category = this.currentCategories.find(
+      (item) => item.id === categoryId,
+    )
+    const validated = this.validateCategoryInput(input, categoryId)
+    if (!category || !validated || !this.canManageCurrentLedger()) return false
+
+    return this.runManagementMutation(
+      () => this.repository.updateCategory(categoryId, validated),
+      "카테고리를 수정했습니다.",
+    )
+  }
+
+  async archiveCategory(categoryId: string): Promise<boolean> {
+    const category = this.currentCategories.find(
+      (item) => item.id === categoryId,
+    )
+    if (
+      !category ||
+      category.isDefault ||
+      isSplitCategory(category) ||
+      this.currentCategories.some(
+        (item) => item.parentCategoryId === categoryId && !item.isArchived,
+      ) ||
+      !this.canManageCurrentLedger()
+    ) {
+      this.managementErrorMessage = category?.isDefault
+        ? "기본 카테고리는 보관할 수 없습니다."
+        : "하위 카테고리를 먼저 이동하거나 보관해 주세요."
+      return false
+    }
+    return this.runManagementMutation(
+      () => this.repository.archiveCategory(categoryId),
+      "카테고리를 보관했습니다.",
+    )
+  }
+
+  async moveCategory(
+    categoryId: string,
+    direction: "up" | "down",
+  ): Promise<boolean> {
+    const category = this.currentCategories.find(
+      (item) => item.id === categoryId,
+    )
+    if (!category || !this.canManageCurrentLedger()) return false
+    const siblings = this.currentCategories.filter(
+      (item) => item.parentCategoryId === category.parentCategoryId,
+    )
+    const index = siblings.findIndex((item) => item.id === categoryId)
+    const targetIndex = direction === "up" ? index - 1 : index + 1
+    if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length)
+      return false
+    const reordered = [...siblings]
+    const [moved] = reordered.splice(index, 1)
+    if (!moved) return false
+    reordered.splice(targetIndex, 0, moved)
+    return this.runManagementMutation(
+      () =>
+        this.repository.updateCategoryOrder(
+          category.parentCategoryId,
+          reordered.map((item) => item.id),
+        ),
+      "카테고리 순서를 변경했습니다.",
+    )
+  }
+
+  async setCategoryBudget(
+    categoryId: string,
+    amount: number,
+  ): Promise<boolean> {
+    const category = this.currentCategories.find(
+      (item) => item.id === categoryId,
+    )
+    if (
+      !category ||
+      !category.usageTypes.includes("expense") ||
+      !Number.isSafeInteger(amount) ||
+      amount < 0 ||
+      !this.canManageCurrentLedger()
+    ) {
+      this.managementErrorMessage = "올바른 예산 금액을 입력해 주세요."
+      return false
+    }
+    return this.runManagementMutation(
+      () =>
+        this.repository.setCategoryBudget({
+          ledgerId: this.selectedLedgerId,
+          categoryId,
+          month: this.selectedMonth,
+          amount,
+          userId: this.authUser!.id,
+        }),
+      "카테고리 예산을 저장했습니다.",
+    )
+  }
+
+  async createCard(input: MobileCardInput): Promise<boolean> {
+    const validated = validateCardInput(input)
+    if (!validated || !this.authUser) {
+      this.managementErrorMessage = "카드 정보를 확인해 주세요."
+      return false
+    }
+    return this.runManagementMutation(
+      () => this.repository.createCard(validated),
+      "카드를 등록했습니다. 사용할 가계부에 연결해 주세요.",
+    )
+  }
+
+  async updateCard(
+    instrumentId: string,
+    input: MobileCardInput,
+  ): Promise<boolean> {
+    const validated = validateCardInput(input)
+    const instrument = this.myPaymentInstruments.find(
+      (item) => item.id === instrumentId && item.type === "card",
+    )
+    if (!validated || !instrument) {
+      this.managementErrorMessage = "카드 정보를 확인해 주세요."
+      return false
+    }
+    return this.runManagementMutation(
+      () => this.repository.updateCard(instrumentId, validated),
+      "카드를 수정했습니다.",
+    )
+  }
+
+  async setCardActive(
+    instrumentId: string,
+    isActive: boolean,
+  ): Promise<boolean> {
+    return this.runManagementMutation(
+      () => this.repository.setCardActive(instrumentId, isActive),
+      isActive ? "카드를 활성화했습니다." : "카드를 비활성화했습니다.",
+    )
+  }
+
+  async deleteCard(instrumentId: string): Promise<boolean> {
+    return this.runManagementMutation(
+      () => this.repository.deleteCard(instrumentId),
+      "카드를 삭제하고 가계부 연결을 해제했습니다.",
+    )
+  }
+
+  async createAccount(input: MobileAccountInput): Promise<boolean> {
+    const validated = validateAccountInput(input)
+    if (!validated || !this.authUser) {
+      this.managementErrorMessage = "계좌 정보를 확인해 주세요."
+      return false
+    }
+    return this.runManagementMutation(
+      () => this.repository.createAccount(validated),
+      "계좌를 등록했습니다. 사용할 가계부에 연결해 주세요.",
+    )
+  }
+
+  async updateAccount(
+    instrumentId: string,
+    input: MobileAccountInput,
+  ): Promise<boolean> {
+    const validated = validateAccountInput(input)
+    const instrument = this.myPaymentInstruments.find(
+      (item) => item.id === instrumentId && item.type === "bank",
+    )
+    if (!validated || !instrument) {
+      this.managementErrorMessage = "계좌 정보를 확인해 주세요."
+      return false
+    }
+    return this.runManagementMutation(
+      () => this.repository.updateAccount(instrumentId, validated),
+      "계좌를 수정했습니다.",
+    )
+  }
+
+  async setAccountActive(
+    instrumentId: string,
+    isActive: boolean,
+  ): Promise<boolean> {
+    return this.runManagementMutation(
+      () => this.repository.setAccountActive(instrumentId, isActive),
+      isActive ? "계좌를 활성화했습니다." : "계좌를 비활성화했습니다.",
+    )
+  }
+
+  async deleteAccount(instrumentId: string): Promise<boolean> {
+    return this.runManagementMutation(
+      () => this.repository.deleteAccount(instrumentId),
+      "계좌를 삭제하고 가계부 연결을 해제했습니다.",
+    )
+  }
+
+  async syncCurrentLedgerPaymentMethods(
+    instrumentIds: string[],
+    visibleInstrumentIds: string[],
+    primaryInstrumentId?: string,
+  ): Promise<boolean> {
+    if (!this.currentLedger || this.currentLedger.role === "viewer")
+      return false
+    return this.runManagementMutation(
+      () =>
+        this.repository.syncMyLedgerPaymentMethods(
+          this.currentLedger!.id,
+          instrumentIds,
+          this.currentLedger!.type === "shared" ? visibleInstrumentIds : [],
+          primaryInstrumentId,
+        ),
+      "이 가계부의 카드·계좌 연결을 저장했습니다.",
+    )
+  }
+
+  async createLedger(input: MobileLedgerCreationInput): Promise<boolean> {
+    const name = input.name.trim()
+    if (!this.authUser || !name || name.length > 30) {
+      this.managementErrorMessage = "가계부 이름은 1~30자로 입력해 주세요."
+      return false
+    }
+    let ledgerId: string | undefined
+    const succeeded = await this.runManagementMutation(
+      async () => {
+        ledgerId = await this.repository.createLedger({ ...input, name })
+      },
+      `${input.type === "shared" ? "공동" : "개인"} 가계부를 만들었습니다.`,
+    )
+    if (succeeded && ledgerId) this.selectedLedgerId = ledgerId
+    return succeeded
+  }
+
+  async renameCurrentLedger(name: string): Promise<boolean> {
+    const ledger = this.currentLedger
+    const trimmed = name.trim()
+    const canRename =
+      ledger?.type === "personal"
+        ? ledger.ownerId === this.authUser?.id
+        : ledger?.role === "owner" || ledger?.role === "admin"
+    if (!ledger || !canRename || !trimmed || trimmed.length > 30) {
+      this.managementErrorMessage =
+        "가계부 이름을 변경할 권한이나 올바른 이름이 필요합니다."
+      return false
+    }
+    return this.runManagementMutation(
+      () => this.repository.renameLedger(ledger.id, trimmed),
+      "가계부 이름을 변경했습니다.",
+    )
+  }
+
+  async setDefaultLedger(ledgerId: string): Promise<boolean> {
+    if (!this.selectableLedgers.some((ledger) => ledger.id === ledgerId))
+      return false
+    return this.runManagementMutation(
+      () => this.repository.setDefaultLedger(ledgerId),
+      "기본 가계부를 변경했습니다.",
+    )
+  }
+
+  async convertCurrentLedgerToShared(): Promise<boolean> {
+    const ledger = this.currentLedger
+    if (
+      !ledger ||
+      ledger.type !== "personal" ||
+      ledger.ownerId !== this.authUser?.id
+    ) {
+      return false
+    }
+    return this.runManagementMutation(
+      () => this.repository.convertPersonalLedgerToShared(ledger.id),
+      "개인 가계부를 공동 가계부로 전환했습니다.",
+    )
+  }
+
+  async archiveCurrentLedger(): Promise<boolean> {
+    const ledger = this.currentLedger
+    if (!ledger || ledger.ownerId !== this.authUser?.id) return false
+    if (this.currentMembership?.isDefault) {
+      this.managementErrorMessage =
+        "다른 가계부를 기본 가계부로 설정한 후 보관해 주세요."
+      return false
+    }
+    return this.runManagementMutation(
+      () => this.repository.archiveLedger(ledger.id),
+      "가계부를 보관했습니다. 30일 동안 복원할 수 있습니다.",
+    )
+  }
+
+  async restoreLedger(ledgerId: string): Promise<boolean> {
+    if (!this.archivedOwnedLedgers.some((ledger) => ledger.id === ledgerId)) {
+      return false
+    }
+    const succeeded = await this.runManagementMutation(
+      () => this.repository.restoreLedger(ledgerId),
+      "가계부를 복원했습니다.",
+    )
+    if (succeeded) this.selectedLedgerId = ledgerId
+    return succeeded
+  }
+
+  async leaveCurrentSharedLedger(): Promise<boolean> {
+    const ledger = this.currentLedger
+    if (!ledger || ledger.type !== "shared" || ledger.role === "owner")
+      return false
+    return this.runManagementMutation(
+      () => this.repository.leaveSharedLedger(ledger.id),
+      "공동 가계부에서 나왔습니다.",
+    )
+  }
+
+  async createInvite(
+    role: Exclude<LedgerRole, "owner">,
+  ): Promise<CreatedLedgerInvitation | undefined> {
+    const ledger = this.currentLedger
+    if (
+      !ledger ||
+      ledger.type !== "shared" ||
+      (ledger.role !== "owner" && ledger.role !== "admin") ||
+      !this.hasLoadedFinanceData ||
+      this.dataStatus === "stale" ||
+      this.managementMutationState !== "idle"
+    ) {
+      return undefined
+    }
+    this.clearManagementFeedback()
+    this.managementMutationState = "saving"
+    try {
+      const invitation = await this.repository.createInvite(ledger.id, role)
+      await this.refreshSelectedMonth()
+      runInAction(() => {
+        this.managementMutationState = "idle"
+        this.managementNoticeMessage = "초대 코드를 만들었습니다."
+      })
+      return invitation
+    } catch (error) {
+      runInAction(() => {
+        this.managementMutationState = "idle"
+        this.managementErrorMessage = errorMessage(
+          error,
+          "초대 코드를 만들지 못했습니다.",
+        )
+      })
+      return undefined
+    }
+  }
+
+  async revokeInvite(invitationId: string): Promise<boolean> {
+    return this.runManagementMutation(
+      () => this.repository.revokeInvite(invitationId),
+      "초대를 취소했습니다.",
+    )
+  }
+
+  async acceptInvite(
+    inviteCode: string,
+  ): Promise<AcceptLedgerInviteResult | undefined> {
+    const code = inviteCode.trim().toUpperCase()
+    if (
+      !code ||
+      !this.hasLoadedFinanceData ||
+      this.dataStatus === "stale" ||
+      this.managementMutationState !== "idle"
+    ) {
+      return undefined
+    }
+    this.clearManagementFeedback()
+    this.managementMutationState = "saving"
+    try {
+      const result = await this.repository.acceptInvite(code)
+      if (result.status === "invalid_or_expired") {
+        runInAction(() => {
+          this.managementMutationState = "idle"
+          this.managementErrorMessage =
+            "유효하지 않거나 만료된 초대 코드입니다."
+        })
+        return result
+      }
+      await this.refreshSelectedMonth()
+      runInAction(() => {
+        this.selectedLedgerId = result.ledgerId
+        this.managementMutationState = "idle"
+        this.managementNoticeMessage =
+          result.status === "already_member"
+            ? "이미 참여 중인 가계부로 이동했습니다."
+            : "공동 가계부에 참여했습니다."
+      })
+      return result
+    } catch (error) {
+      runInAction(() => {
+        this.managementMutationState = "idle"
+        this.managementErrorMessage = errorMessage(
+          error,
+          "공동 가계부 초대를 확인하지 못했습니다.",
+        )
+      })
+      return undefined
+    }
+  }
+
+  async updateMemberRole(
+    targetUserId: string,
+    role: Exclude<LedgerRole, "owner">,
+  ): Promise<boolean> {
+    if (this.currentLedger?.role !== "owner") return false
+    return this.runManagementMutation(
+      () =>
+        this.repository.updateLedgerMemberRole(
+          this.selectedLedgerId,
+          targetUserId,
+          role,
+        ),
+      "멤버 역할을 변경했습니다.",
+    )
+  }
+
+  async removeMember(targetUserId: string): Promise<boolean> {
+    if (this.currentLedger?.role !== "owner") return false
+    return this.runManagementMutation(
+      () =>
+        this.repository.removeLedgerMember(this.selectedLedgerId, targetUserId),
+      "멤버를 공동 가계부에서 내보냈습니다.",
+    )
+  }
+
+  async transferLedgerOwnership(targetUserId: string): Promise<boolean> {
+    if (this.currentLedger?.role !== "owner") return false
+    return this.runManagementMutation(
+      () =>
+        this.repository.transferLedgerOwnership(
+          this.selectedLedgerId,
+          targetUserId,
+        ),
+      "가계부 소유권을 이전했습니다.",
+    )
+  }
+
+  private validateCategoryInput(
+    input: MobileCategoryInput,
+    editingCategoryId?: string,
+  ): MobileCategoryInput | undefined {
+    const name = input.name.trim()
+    const usageTypes = [...new Set(input.usageTypes)]
+    const parent = input.parentCategoryId
+      ? this.currentCategories.find(
+          (category) => category.id === input.parentCategoryId,
+        )
+      : undefined
+    const descendantIds = editingCategoryId
+      ? getDescendantCategoryIds(
+          this.currentCategories,
+          editingCategoryId,
+          false,
+        )
+      : new Set<string>()
+    const editingDepth = editingCategoryId
+      ? getCategoryDepth(this.currentCategories, editingCategoryId)
+      : 1
+    const subtreeHeight = editingCategoryId
+      ? Math.max(
+          1,
+          ...[...descendantIds].map(
+            (categoryId) =>
+              getCategoryDepth(this.currentCategories, categoryId) -
+              editingDepth +
+              1,
+          ),
+        )
+      : 1
+    const nextParentDepth = parent
+      ? getCategoryDepth(this.currentCategories, parent.id)
+      : 0
+    const invalidParent = Boolean(
+      input.parentCategoryId &&
+      (!parent ||
+        parent.id === editingCategoryId ||
+        descendantIds.has(parent.id) ||
+        isSplitCategory(parent) ||
+        usageTypes.some((usageType) => !parent.usageTypes.includes(usageType))),
+    )
+    if (
+      !name ||
+      name.length > 30 ||
+      !/^#[0-9a-f]{6}$/i.test(input.color) ||
+      !input.icon.trim() ||
+      usageTypes.length === 0 ||
+      nextParentDepth + subtreeHeight > MAX_CATEGORY_DEPTH ||
+      invalidParent
+    ) {
+      this.managementErrorMessage =
+        "카테고리 이름·용도·색상·상위 단계를 확인해 주세요."
+      return undefined
+    }
+    return {
+      ...input,
+      name,
+      icon: input.icon.trim(),
+      usageTypes,
+      parentCategoryId: parent?.id,
+    }
+  }
+
+  private canManageCurrentLedger(): boolean {
+    const ledger = this.currentLedger
+    return Boolean(
+      this.authUser &&
+      ledger &&
+      !ledger.archivedAt &&
+      ledger.role !== "viewer" &&
+      this.dataStatus !== "stale" &&
+      this.dataStatus !== "error",
+    )
+  }
+
+  private async runManagementMutation(
+    mutation: () => Promise<unknown>,
+    successMessage: string,
+  ): Promise<boolean> {
+    if (
+      this.managementMutationState !== "idle" ||
+      !this.authUser ||
+      !this.hasLoadedFinanceData ||
+      this.dataStatus === "stale"
+    ) {
+      this.managementErrorMessage =
+        "최신 관리 정보를 불러온 뒤 다시 시도해 주세요."
+      return false
+    }
+    this.clearManagementFeedback()
+    this.managementMutationState = "saving"
+    try {
+      await mutation()
+      this.financeQueryCache.clear()
+      await this.loadSelectedMonth(this.selectedMonth, true)
+      runInAction(() => {
+        this.managementMutationState = "idle"
+        this.managementNoticeMessage = successMessage
+      })
+      return true
+    } catch (error) {
+      runInAction(() => {
+        this.managementMutationState = "idle"
+        this.managementErrorMessage = mutationErrorMessage(
+          error,
+          "변경 내용을 저장하지 못했습니다.",
+        )
+      })
+      return false
+    }
   }
 
   async acceptLegalTerms(): Promise<void> {
@@ -1279,6 +2126,10 @@ export class MobileAppStore {
     this.consentErrorMessage = undefined
     this.transactionMutationState = "idle"
     this.transactionMutationErrorMessage = undefined
+    this.managementMutationState = "idle"
+    this.managementErrorMessage = undefined
+    this.managementNoticeMessage = undefined
+    this.clearTransactionSearchRange()
     this.notificationCaptureStatus = createEmptyNotificationCaptureStatus()
     this.notificationCandidates = []
     this.notificationInboxStatus = "idle"
@@ -1349,6 +2200,69 @@ export function createKoreaMonthTransactionRange(
     start: `${monthKey}-01T00:00:00+09:00`,
     endExclusive: `${nextMonthKey}-01T00:00:00+09:00`,
   }
+}
+
+export function createKoreaTransactionDateRange(
+  startDate: string,
+  endDate: string,
+): TransactionDateRange {
+  if (!isDateKey(startDate) || !isDateKey(endDate) || endDate < startDate) {
+    throw new Error("조회 기간을 올바르게 입력해 주세요.")
+  }
+  const [year, month, day] = endDate.split("-").map(Number)
+  const nextDate = new Date(Date.UTC(year, month - 1, day + 1))
+    .toISOString()
+    .slice(0, 10)
+  return {
+    start: `${startDate}T00:00:00+09:00`,
+    endExclusive: `${nextDate}T00:00:00+09:00`,
+  }
+}
+
+function isDateKey(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
+function validateCardInput(
+  input: MobileCardInput,
+): MobileCardInput | undefined {
+  const name = input.name.trim()
+  const issuer = input.issuer.trim()
+  const last4 = input.last4?.trim() || undefined
+  if (
+    !name ||
+    !issuer ||
+    (last4 && !/^\d{4}$/.test(last4)) ||
+    !Number.isSafeInteger(input.paymentDay) ||
+    input.paymentDay < 1 ||
+    input.paymentDay > 31 ||
+    !Number.isSafeInteger(input.billingPeriodEndDay) ||
+    input.billingPeriodEndDay < 1 ||
+    input.billingPeriodEndDay > 31
+  ) {
+    return undefined
+  }
+  return { ...input, issuer, last4, name }
+}
+
+function validateAccountInput(
+  input: MobileAccountInput,
+): MobileAccountInput | undefined {
+  const name = input.name.trim()
+  const bank = input.bank.trim()
+  const last4 = input.last4?.trim() || undefined
+  if (!name || !bank || (last4 && !/^\d{4}$/.test(last4))) return undefined
+  return { bank, last4, name }
 }
 
 function errorMessage(error: unknown, fallback: string): string {

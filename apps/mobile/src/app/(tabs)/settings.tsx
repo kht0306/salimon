@@ -1,5 +1,5 @@
 import styled from "@emotion/native"
-import { useFocusEffect } from "expo-router"
+import { router, useFocusEffect } from "expo-router"
 import { Check } from "lucide-react-native"
 import { observer } from "mobx-react-lite"
 import { useCallback, useEffect, useState } from "react"
@@ -192,6 +192,27 @@ export default observer(function SettingsScreen() {
               <SettingLabel>현재 선택</SettingLabel>
               <SettingValue>{store.currentLedgerName}</SettingValue>
             </SettingRow>
+          </Section>
+
+          <Section>
+            <SectionTitle>재무 관리</SectionTitle>
+            <Description>
+              웹과 같은 기준정보와 공동 가계부 설정을 모바일에서 관리합니다.
+            </Description>
+            <SettingGroup>
+              <AppButton
+                label="카테고리·예산 관리"
+                onPress={() => router.push("../manage/categories")}
+              />
+              <AppButton
+                label="카드·계좌 관리"
+                onPress={() => router.push("../manage/payment-methods")}
+              />
+              <AppButton
+                label="가계부·공동 멤버 관리"
+                onPress={() => router.push("../manage/ledgers")}
+              />
+            </SettingGroup>
           </Section>
 
           <Section>

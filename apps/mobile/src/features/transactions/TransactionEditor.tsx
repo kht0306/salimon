@@ -1,10 +1,18 @@
 import styled from "@emotion/native"
-import { formatKrw, getCategoryLabel, toDateKey } from "@salimon/domain"
+import {
+  formatKrw,
+  getCategoryLabel,
+  isSplitCategory,
+  splitInstallmentPrincipal,
+  toDateKey,
+} from "@salimon/domain"
 import type {
   Category,
   LedgerMember,
   PaymentMethod,
+  RecurringRule,
   Transaction,
+  TransactionSplit,
   TransactionType,
 } from "@salimon/types"
 import { Redirect, router } from "expo-router"
@@ -16,6 +24,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppButton } from "../../components/AppButton"
@@ -24,9 +33,9 @@ import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
 import {
   changeMobileTransactionType,
+  createCopiedMobileTransactionDraft,
   createEditingMobileTransactionDraft,
   createNewMobileTransactionDraft,
-  isGeneralMobileTransaction,
   normalizeAmountInput,
   validateMobileTransactionDraft,
   type MobileGeneralTransactionInput,
@@ -38,6 +47,7 @@ import {
 } from "./TransactionOptionPickerModal"
 
 interface TransactionEditorScreenProps {
+  copyTransactionId?: string
   transactionId?: string
 }
 
@@ -47,6 +57,7 @@ const keyboardBehavior = Platform.OS === "ios" ? "padding" : undefined
 export const TransactionEditorScreen = observer(
   function TransactionEditorScreen({
     transactionId,
+    copyTransactionId,
   }: TransactionEditorScreenProps) {
     const store = useMobileAppStore()
 
@@ -85,9 +96,16 @@ export const TransactionEditorScreen = observer(
     }
 
     const transaction = transactionId
-      ? store.financeData.transactions.find(
-          (item) => item.id === transactionId && !item.deletedAt,
-        )
+      ? [
+          ...store.financeData.transactions,
+          ...(store.transactionSearchTransactions ?? []),
+        ].find((item) => item.id === transactionId && !item.deletedAt)
+      : undefined
+    const copySource = copyTransactionId
+      ? [
+          ...store.financeData.transactions,
+          ...(store.transactionSearchTransactions ?? []),
+        ].find((item) => item.id === copyTransactionId && !item.deletedAt)
       : undefined
     if (transactionId && !transaction) {
       return (
@@ -98,18 +116,12 @@ export const TransactionEditorScreen = observer(
         />
       )
     }
-
-    const splitCount = transaction
-      ? store.financeData.transactionSplits.filter(
-          (split) => split.transactionId === transaction.id,
-        ).length
-      : 0
-    if (transaction && !isGeneralMobileTransaction(transaction, splitCount)) {
+    if (copyTransactionId && !copySource) {
       return (
         <EditorState
-          actionLabel="거래 상세로 돌아가기"
-          message="고정·할부·분할 거래는 모바일에서 조회만 할 수 있습니다."
-          onAction={() => router.back()}
+          actionLabel="거래 목록으로 돌아가기"
+          message="현재 불러온 월에서 복사할 거래를 찾지 못했습니다."
+          onAction={() => router.replace("/transactions")}
         />
       )
     }
@@ -125,14 +137,39 @@ export const TransactionEditorScreen = observer(
     const paymentMethods = store.financeData.paymentMethods.filter(
       (method) => method.ledgerId === store.selectedLedgerId,
     )
+    const sourceTransaction = transaction ?? copySource
+    const sourceSplits = sourceTransaction
+      ? [
+          ...store.financeData.transactionSplits,
+          ...(store.transactionSearchSplits ?? []),
+        ]
+          .filter((split) => split.transactionId === sourceTransaction.id)
+          .filter(
+            (split, index, splits) =>
+              splits.findIndex((item) => item.id === split.id) === index,
+          )
+      : []
+    const recurringRule = sourceTransaction?.recurringRuleId
+      ? store.financeData.recurringRules.find(
+          (rule) => rule.id === sourceTransaction.recurringRuleId,
+        )
+      : undefined
 
     return (
       <TransactionEditorForm
-        key={transaction?.id ?? `new-${store.selectedLedgerId}`}
+        key={
+          transaction?.id ??
+          (copySource
+            ? `copy-${copySource.id}`
+            : `new-${store.selectedLedgerId}`)
+        }
         categories={categories}
+        copySource={copySource}
         members={members}
         paymentMethods={paymentMethods}
+        recurringRule={recurringRule}
         selectedDate={store.selectedDate}
+        sourceSplits={sourceSplits}
         transaction={transaction}
       />
     )
@@ -141,9 +178,12 @@ export const TransactionEditorScreen = observer(
 
 interface TransactionEditorFormProps {
   categories: Category[]
+  copySource?: Transaction
   members: LedgerMember[]
   paymentMethods: PaymentMethod[]
+  recurringRule?: RecurringRule
   selectedDate: string
+  sourceSplits: TransactionSplit[]
   transaction?: Transaction
 }
 
@@ -151,24 +191,34 @@ type PickerKind = "actor" | "category" | "payment"
 
 const TransactionEditorForm = observer(function TransactionEditorForm({
   categories,
+  copySource,
   members,
   paymentMethods,
+  recurringRule,
   selectedDate,
+  sourceSplits,
   transaction,
 }: TransactionEditorFormProps) {
   const store = useMobileAppStore()
   const [draft, setDraft] = useState<MobileTransactionDraft>(() =>
     transaction
-      ? createEditingMobileTransactionDraft(transaction)
-      : createNewMobileTransactionDraft({
-          actorUserId: store.authUser?.id,
-          categories,
-          paymentMethods,
-          selectedDate,
-        }),
+      ? createEditingMobileTransactionDraft(
+          transaction,
+          sourceSplits,
+          recurringRule,
+        )
+      : copySource
+        ? createCopiedMobileTransactionDraft(copySource, sourceSplits)
+        : createNewMobileTransactionDraft({
+            actorUserId: store.authUser?.id,
+            categories,
+            paymentMethods,
+            selectedDate,
+          }),
   )
   const [formError, setFormError] = useState<string>()
   const [picker, setPicker] = useState<PickerKind>()
+  const [splitPickerIndex, setSplitPickerIndex] = useState<number>()
   const savingRef = useRef(false)
   const isSaving = store.transactionMutationState === "saving"
 
@@ -190,6 +240,10 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
         method.id === transaction?.paymentMethodId,
     )
     .filter((method) => draft.type !== "saving" || method.type === "bank")
+    .filter(
+      (method) =>
+        draft.recurringType !== "installment" || method.type === "card",
+    )
     .sort(
       (first, second) =>
         Number(second.isPrimary) - Number(first.isPrimary) ||
@@ -200,11 +254,29 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
     (item) => item.id === draft.paymentMethodId,
   )
   const actor = members.find((member) => member.userId === draft.actorUserId)
+  const splitCategorySelected = isSplitCategory(category)
+  const availableSplitCategories = availableCategories.filter(
+    (category) => !isSplitCategory(category),
+  )
   const amount = Number(draft.amount)
   const amountPreview =
     Number.isSafeInteger(amount) && amount > 0
       ? formatKrw(amount)
       : "금액 미입력"
+  const splitTotal = draft.splits.reduce(
+    (sum, split) => sum + Number(split.amount || 0),
+    0,
+  )
+  const installmentMonths = Number(draft.installmentMonths)
+  const installmentAmounts =
+    draft.recurringType === "installment" &&
+    draft.installmentAmountType === "principal" &&
+    Number.isSafeInteger(amount) &&
+    Number.isSafeInteger(installmentMonths) &&
+    amount > 0 &&
+    installmentMonths > 0
+      ? splitInstallmentPrincipal(amount, installmentMonths)
+      : []
 
   function updateDraft(nextDraft: MobileTransactionDraft): void {
     setDraft(nextDraft)
@@ -216,6 +288,60 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
     updateDraft(
       changeMobileTransactionType(draft, type, categories, paymentMethods),
     )
+  }
+
+  function selectIncomeKind(
+    incomeKind: MobileTransactionDraft["incomeKind"],
+  ): void {
+    updateDraft({
+      ...draft,
+      incomeKind,
+      recurringType: incomeKind === "salary" ? "fixed" : draft.recurringType,
+    })
+  }
+
+  function selectRecurringType(
+    recurringType: MobileTransactionDraft["recurringType"],
+  ): void {
+    updateDraft({
+      ...draft,
+      recurringType,
+      splits: recurringType ? [] : draft.splits,
+      paymentMethodId:
+        recurringType === "installment" && paymentMethod?.type !== "card"
+          ? (availablePaymentMethods.find((method) => method.type === "card")
+              ?.id ?? "")
+          : draft.paymentMethodId,
+    })
+  }
+
+  function selectCategory(categoryId: string): void {
+    const nextCategory = categories.find((item) => item.id === categoryId)
+    updateDraft({
+      ...draft,
+      categoryId,
+      recurringType: isSplitCategory(nextCategory) ? "" : draft.recurringType,
+      splits: isSplitCategory(nextCategory)
+        ? draft.splits.length >= 2
+          ? draft.splits
+          : [
+              { amount: "", categoryId: "" },
+              { amount: "", categoryId: "" },
+            ]
+        : [],
+    })
+  }
+
+  function updateSplit(
+    index: number,
+    value: MobileTransactionDraft["splits"][number],
+  ): void {
+    updateDraft({
+      ...draft,
+      splits: draft.splits.map((split, splitIndex) =>
+        splitIndex === index ? value : split,
+      ),
+    })
   }
 
   function setCurrentDateTime(): void {
@@ -236,6 +362,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
       ledgerId: store.selectedLedgerId,
       members,
       paymentMethods,
+      transactionSplits: sourceSplits,
     })
     if (!validation.valid) {
       setFormError(validation.message)
@@ -265,10 +392,14 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
     try {
       const result = await store.saveGeneralTransaction(input)
       if (result.status === "saved") {
-        router.replace({
-          pathname: "/transactions/[id]",
-          params: { id: result.transactionId },
-        })
+        if (result.transactionId) {
+          router.replace({
+            pathname: "/transactions/[id]",
+            params: { id: result.transactionId },
+          })
+        } else {
+          router.replace("/transactions")
+        }
       }
     } finally {
       savingRef.current = false
@@ -276,6 +407,38 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
   }
 
   function renderPicker(): React.ReactNode {
+    if (splitPickerIndex !== undefined) {
+      const split = draft.splits[splitPickerIndex]
+      const usedCategoryIds = new Set(
+        draft.splits
+          .filter((_, index) => index !== splitPickerIndex)
+          .map((item) => item.categoryId),
+      )
+      const options: TransactionOption[] = availableSplitCategories
+        .filter(
+          (item) =>
+            !usedCategoryIds.has(item.id) || item.id === split?.categoryId,
+        )
+        .map((item) => ({
+          id: item.id,
+          label: getCategoryLabel(categories, item.id),
+          description: item.isArchived ? "보관된 카테고리" : undefined,
+          color: item.color,
+        }))
+      return (
+        <TransactionOptionPickerModal
+          emptyMessage="분할에 사용할 다른 카테고리가 없습니다."
+          options={options}
+          selectedId={split?.categoryId}
+          title={`분할 항목 ${splitPickerIndex + 1} 카테고리`}
+          onClose={() => setSplitPickerIndex(undefined)}
+          onSelect={(categoryId) => {
+            if (split) updateSplit(splitPickerIndex, { ...split, categoryId })
+            setSplitPickerIndex(undefined)
+          }}
+        />
+      )
+    }
     if (picker === "category") {
       const options: TransactionOption[] = availableCategories.map((item) => ({
         id: item.id,
@@ -290,7 +453,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
           selectedId={draft.categoryId}
           title="카테고리 선택"
           onClose={() => setPicker(undefined)}
-          onSelect={(categoryId) => updateDraft({ ...draft, categoryId })}
+          onSelect={selectCategory}
         />
       )
     }
@@ -363,7 +526,11 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                 <BackLabel>취소</BackLabel>
               </BackButton>
               <ScreenLabel>
-                {transaction ? "거래 수정" : "거래 추가"}
+                {transaction
+                  ? "거래 수정"
+                  : copySource
+                    ? "거래 복사"
+                    : "거래 추가"}
               </ScreenLabel>
               <TopBarSpacer />
             </TopBar>
@@ -373,10 +540,13 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
               <IntroTitle>
                 {transaction
                   ? "거래 내용을 수정합니다."
-                  : "새 거래를 기록합니다."}
+                  : copySource
+                    ? "기존 내용을 복사해 새 거래를 만듭니다."
+                    : "새 거래를 기록합니다."}
               </IntroTitle>
               <IntroDescription>
-                일반 거래만 저장되며 서버 확인 후 목록에 반영됩니다.
+                일반·고정·할부·분할 거래를 저장하고 서버 확인 후 목록에
+                반영합니다.
               </IntroDescription>
             </Intro>
 
@@ -395,6 +565,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                     $selected={draft.type === type}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: draft.type === type }}
+                    disabled={Boolean(transaction?.recurringType)}
                     onPress={() => selectType(type)}
                   >
                     <SegmentLabel $selected={draft.type === type}>
@@ -404,17 +575,183 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                 ))}
               </SegmentedRow>
               {draft.type === "income" ? (
+                <>
+                  <FieldLabel>수입 종류</FieldLabel>
+                  <SegmentedRow>
+                    {(
+                      [
+                        { label: "부수입", value: "side_income" },
+                        { label: "급여", value: "salary" },
+                      ] as const
+                    ).map((option) => (
+                      <SegmentButton
+                        key={option.value}
+                        $selected={draft.incomeKind === option.value}
+                        accessibilityRole="radio"
+                        accessibilityState={{
+                          selected: draft.incomeKind === option.value,
+                        }}
+                        disabled={Boolean(transaction?.recurringType)}
+                        onPress={() => selectIncomeKind(option.value)}
+                      >
+                        <SegmentLabel
+                          $selected={draft.incomeKind === option.value}
+                        >
+                          {option.label}
+                        </SegmentLabel>
+                      </SegmentButton>
+                    ))}
+                  </SegmentedRow>
+                  {draft.incomeKind === "salary" ? (
+                    <InlineNotice>
+                      급여는 매월 반복되는 고정 수입으로 등록됩니다.
+                    </InlineNotice>
+                  ) : null}
+                </>
+              ) : null}
+            </Section>
+
+            <Section>
+              <SectionTitle>거래 방식</SectionTitle>
+              <SegmentedRow>
+                {(
+                  [
+                    { label: "일반", value: "" },
+                    { label: "고정", value: "fixed" },
+                    ...(draft.type === "expense"
+                      ? [{ label: "할부", value: "installment" } as const]
+                      : []),
+                  ] as const
+                ).map((option) => (
+                  <SegmentButton
+                    key={option.value || "general"}
+                    $selected={draft.recurringType === option.value}
+                    accessibilityRole="radio"
+                    accessibilityState={{
+                      selected: draft.recurringType === option.value,
+                    }}
+                    disabled={
+                      Boolean(transaction?.recurringType) ||
+                      (draft.type === "income" &&
+                        draft.incomeKind === "salary" &&
+                        option.value !== "fixed") ||
+                      splitCategorySelected
+                    }
+                    onPress={() => selectRecurringType(option.value)}
+                  >
+                    <SegmentLabel
+                      $selected={draft.recurringType === option.value}
+                    >
+                      {option.label}
+                    </SegmentLabel>
+                  </SegmentButton>
+                ))}
+              </SegmentedRow>
+              {splitCategorySelected ? (
                 <InlineNotice>
-                  단건 수입은 부수입으로 등록됩니다. 급여는 고정 거래이므로
-                  웹에서 등록해 주세요.
+                  분할 거래는 일반 거래로 저장되며 반복 설정과 함께 사용할 수
+                  없습니다.
                 </InlineNotice>
+              ) : null}
+              {draft.recurringType === "installment" ? (
+                <>
+                  <Field>
+                    <FieldLabel>할부 개월 *</FieldLabel>
+                    <Input
+                      accessibilityLabel="할부 개월"
+                      editable={!transaction}
+                      keyboardType="number-pad"
+                      maxLength={3}
+                      placeholder="2"
+                      placeholderTextColor={mobileTheme.colors.subtle}
+                      value={draft.installmentMonths}
+                      onChangeText={(installmentMonths) =>
+                        updateDraft({
+                          ...draft,
+                          installmentMonths:
+                            normalizeAmountInput(installmentMonths),
+                        })
+                      }
+                    />
+                  </Field>
+                  {!transaction ? (
+                    <SegmentedRow>
+                      {(
+                        [
+                          { label: "월 납입액", value: "monthly" },
+                          { label: "총 원금", value: "principal" },
+                        ] as const
+                      ).map((option) => (
+                        <SegmentButton
+                          key={option.value}
+                          $selected={
+                            draft.installmentAmountType === option.value
+                          }
+                          accessibilityRole="radio"
+                          accessibilityState={{
+                            selected:
+                              draft.installmentAmountType === option.value,
+                          }}
+                          onPress={() =>
+                            updateDraft({
+                              ...draft,
+                              installmentAmountType: option.value,
+                            })
+                          }
+                        >
+                          <SegmentLabel
+                            $selected={
+                              draft.installmentAmountType === option.value
+                            }
+                          >
+                            {option.label}
+                          </SegmentLabel>
+                        </SegmentButton>
+                      ))}
+                    </SegmentedRow>
+                  ) : null}
+                  {installmentAmounts[0] ? (
+                    <InlineNotice>
+                      첫 달 {formatKrw(installmentAmounts[0])} · 마지막 달에
+                      나머지 금액을 반영합니다.
+                    </InlineNotice>
+                  ) : (
+                    <FieldHint>
+                      구매일을 기준으로 선택한 카드 결제일에 회차가 생성됩니다.
+                    </FieldHint>
+                  )}
+                </>
+              ) : null}
+              {transaction?.recurringType ? (
+                <ScopeRow>
+                  <ScopeText>
+                    <ScopeTitle>이 달 이후 거래에도 변경 적용</ScopeTitle>
+                    <FieldHint>
+                      끄면 선택한 회차만 변경하고, 켜면 이후 회차에도
+                      반영합니다.
+                    </FieldHint>
+                  </ScopeText>
+                  <Switch
+                    accessibilityLabel="이 달 이후 거래에도 변경 적용"
+                    value={draft.applyChangesToFuture}
+                    onValueChange={(applyChangesToFuture) =>
+                      updateDraft({ ...draft, applyChangesToFuture })
+                    }
+                  />
+                </ScopeRow>
               ) : null}
             </Section>
 
             <Section>
               <SectionTitle>금액과 일시</SectionTitle>
               <Field>
-                <FieldLabel>금액 *</FieldLabel>
+                <FieldLabel>
+                  {draft.recurringType === "installment" &&
+                  draft.installmentAmountType === "principal" &&
+                  !transaction
+                    ? "할부 총 원금 *"
+                    : "금액 *"}
+                </FieldLabel>
                 <AmountInput
                   accessibilityLabel="거래 금액"
                   keyboardType="number-pad"
@@ -438,6 +775,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                     autoCapitalize="none"
                     keyboardType="numbers-and-punctuation"
                     maxLength={10}
+                    editable={!transaction?.recurringType}
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor={mobileTheme.colors.subtle}
                     value={draft.date}
@@ -451,6 +789,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                     autoCapitalize="none"
                     keyboardType="numbers-and-punctuation"
                     maxLength={5}
+                    editable={!transaction?.recurringType}
                     placeholder="HH:mm"
                     placeholderTextColor={mobileTheme.colors.subtle}
                     value={draft.time}
@@ -460,6 +799,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
               </DateTimeRow>
               <QuickDateButton
                 accessibilityRole="button"
+                disabled={Boolean(transaction?.recurringType)}
                 onPress={setCurrentDateTime}
               >
                 <QuickDateLabel>오늘 · 현재 시각으로 설정</QuickDateLabel>
@@ -480,6 +820,84 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                 }
                 onPress={() => setPicker("category")}
               />
+              {splitCategorySelected ? (
+                <SplitList>
+                  {draft.splits.map((split, index) => {
+                    const splitCategory = categories.find(
+                      (item) => item.id === split.categoryId,
+                    )
+                    return (
+                      <SplitItem key={`split-${index}`}>
+                        <SplitItemHeader>
+                          <FieldLabel>분할 항목 {index + 1}</FieldLabel>
+                          {draft.splits.length > 2 ? (
+                            <RemoveSplitButton
+                              accessibilityLabel={`분할 항목 ${index + 1} 삭제`}
+                              accessibilityRole="button"
+                              onPress={() =>
+                                updateDraft({
+                                  ...draft,
+                                  splits: draft.splits.filter(
+                                    (_, splitIndex) => splitIndex !== index,
+                                  ),
+                                })
+                              }
+                            >
+                              <RemoveSplitLabel>삭제</RemoveSplitLabel>
+                            </RemoveSplitButton>
+                          ) : null}
+                        </SplitItemHeader>
+                        <SelectionField
+                          label="카테고리 *"
+                          placeholder="분할 카테고리 선택"
+                          value={
+                            splitCategory
+                              ? getCategoryLabel(categories, splitCategory.id)
+                              : undefined
+                          }
+                          onPress={() => setSplitPickerIndex(index)}
+                        />
+                        <Field>
+                          <FieldLabel>금액 *</FieldLabel>
+                          <Input
+                            accessibilityLabel={`분할 항목 ${index + 1} 금액`}
+                            keyboardType="number-pad"
+                            placeholder="0"
+                            placeholderTextColor={mobileTheme.colors.subtle}
+                            value={split.amount}
+                            onChangeText={(value) =>
+                              updateSplit(index, {
+                                ...split,
+                                amount: normalizeAmountInput(value),
+                              })
+                            }
+                          />
+                        </Field>
+                      </SplitItem>
+                    )
+                  })}
+                  <SplitSummary $valid={splitTotal === amount && amount > 0}>
+                    분할 합계 {formatKrw(splitTotal)} / 거래 금액{" "}
+                    {amountPreview}
+                  </SplitSummary>
+                  {draft.splits.length < 10 ? (
+                    <QuickDateButton
+                      accessibilityRole="button"
+                      onPress={() =>
+                        updateDraft({
+                          ...draft,
+                          splits: [
+                            ...draft.splits,
+                            { amount: "", categoryId: "" },
+                          ],
+                        })
+                      }
+                    >
+                      <QuickDateLabel>분할 항목 추가</QuickDateLabel>
+                    </QuickDateButton>
+                  ) : null}
+                </SplitList>
+              ) : null}
               {draft.type !== "income" ? (
                 <SelectionField
                   label={draft.type === "saving" ? "저축 계좌 *" : "결제수단"}
@@ -493,7 +911,11 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                       ? paymentMethodLabel(paymentMethod)
                       : undefined
                   }
-                  onPress={() => setPicker("payment")}
+                  onPress={() => {
+                    if (transaction?.recurringType !== "installment") {
+                      setPicker("payment")
+                    }
+                  }}
                 />
               ) : null}
               <SelectionField
@@ -830,6 +1252,25 @@ const InlineNotice = styled(AppText)({
   paddingHorizontal: mobileTheme.spacing[3],
 })
 
+const ScopeRow = styled.View({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: mobileTheme.spacing[3],
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.border,
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: mobileTheme.colors.panelSubtle,
+  padding: mobileTheme.spacing[3],
+})
+
+const ScopeText = styled.View({ minWidth: 0, flex: 1, gap: 4 })
+
+const ScopeTitle = styled(AppText)({
+  color: mobileTheme.colors.ink,
+  fontSize: 11,
+  fontWeight: "600",
+})
+
 const Field = styled.View({ gap: mobileTheme.spacing[2] })
 
 const FieldLabel = styled(AppText)({
@@ -918,6 +1359,42 @@ const SelectionAction = styled(AppText)({
   fontSize: 11,
   fontWeight: "600",
 })
+
+const SplitList = styled.View({ gap: mobileTheme.spacing[3] })
+
+const SplitItem = styled.View({
+  gap: mobileTheme.spacing[3],
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.border,
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: mobileTheme.colors.panelSubtle,
+  padding: mobileTheme.spacing[3],
+})
+
+const SplitItemHeader = styled.View({
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+})
+
+const RemoveSplitButton = styled.Pressable({
+  minHeight: 32,
+  justifyContent: "center",
+  paddingHorizontal: mobileTheme.spacing[2],
+})
+
+const RemoveSplitLabel = styled(AppText)({
+  color: mobileTheme.colors.coral,
+  fontSize: 10,
+  fontWeight: "600",
+})
+
+const SplitSummary = styled(AppText)<{ $valid: boolean }>(({ $valid }) => ({
+  color: $valid ? mobileTheme.colors.teal : mobileTheme.colors.coral,
+  fontSize: 11,
+  fontWeight: "600",
+  textAlign: "right",
+}))
 
 const MemoInput = styled(Input)({ minHeight: 96 })
 

@@ -27,6 +27,30 @@ const categories: Category[] = [
     isArchived: false,
   },
   {
+    id: "transport-category",
+    ledgerId: "ledger-1",
+    type: "expense",
+    usageTypes: ["expense"],
+    name: "교통비",
+    icon: "bus",
+    color: "#0f766e",
+    sortOrder: 4,
+    isDefault: false,
+    isArchived: false,
+  },
+  {
+    id: "split-category",
+    ledgerId: "ledger-1",
+    type: "expense",
+    usageTypes: ["expense"],
+    name: "분할",
+    icon: "split",
+    color: "#64748b",
+    sortOrder: 5,
+    isDefault: true,
+    isArchived: false,
+  },
+  {
     id: "income-category",
     ledgerId: "ledger-1",
     type: "income",
@@ -76,6 +100,7 @@ const paymentMethods: PaymentMethod[] = [
     visibility: "ledger",
     isActive: true,
     isPrimary: true,
+    paymentDay: 15,
   },
   {
     id: "bank-1",
@@ -194,9 +219,15 @@ describe("mobile transaction draft", () => {
         amount: "120000",
         categoryId: "income-category",
         date: "2026-08-12",
+        incomeKind: "side_income",
+        installmentAmountType: "monthly",
+        installmentMonths: "2",
         merchantName: "  중고 거래  ",
         memo: "  판매 대금  ",
         paymentMethodId: "card-1",
+        recurringType: "",
+        applyChangesToFuture: true,
+        splits: [],
         status: "confirmed",
         tagsInput: "중고, 판매, 중고",
         time: "20:30",
@@ -239,6 +270,85 @@ describe("mobile transaction draft", () => {
     })
 
     expect(result.valid).toBe(true)
+  })
+
+  it("normalizes salary and installment recurrence settings", () => {
+    const baseDraft = createNewMobileTransactionDraft({
+      categories,
+      paymentMethods,
+      selectedDate: "2026-08-12",
+    })
+    const context = {
+      categories,
+      ledgerId: "ledger-1",
+      members,
+      paymentMethods,
+    }
+    const salary = validateMobileTransactionDraft(
+      {
+        ...baseDraft,
+        amount: "3000000",
+        categoryId: "income-category",
+        incomeKind: "salary",
+        paymentMethodId: "",
+        recurringType: "fixed",
+        type: "income",
+      },
+      context,
+    )
+    const installment = validateMobileTransactionDraft(
+      {
+        ...baseDraft,
+        amount: "120000",
+        installmentAmountType: "principal",
+        installmentMonths: "6",
+        recurringType: "installment",
+      },
+      context,
+    )
+
+    expect(salary.valid && salary.input).toMatchObject({
+      incomeKind: "salary",
+      recurringType: "fixed",
+    })
+    expect(installment.valid && installment.input).toMatchObject({
+      installmentAmountType: "principal",
+      installmentMonths: 6,
+      recurringType: "installment",
+    })
+  })
+
+  it("requires unique split categories whose amounts equal the total", () => {
+    const baseDraft = createNewMobileTransactionDraft({
+      categories,
+      paymentMethods,
+      selectedDate: "2026-08-12",
+    })
+    const context = {
+      categories,
+      ledgerId: "ledger-1",
+      members,
+      paymentMethods,
+    }
+    const result = validateMobileTransactionDraft(
+      {
+        ...baseDraft,
+        amount: "30000",
+        categoryId: "split-category",
+        splits: [
+          { amount: "18000", categoryId: "expense-category" },
+          { amount: "12000", categoryId: "transport-category" },
+        ],
+      },
+      context,
+    )
+
+    expect(result.valid).toBe(true)
+    if (!result.valid) return
+    expect(result.input.splits).toEqual([
+      { amount: 18_000, categoryId: "expense-category" },
+      { amount: 12_000, categoryId: "transport-category" },
+    ])
   })
 
   it("allows editing only when the transaction has no recurring or split structure", () => {

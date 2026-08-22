@@ -106,17 +106,52 @@ function createReadyFinanceData() {
 function createRepository(data = createReadyFinanceData()) {
   return {
     acceptLegalTerms: vi.fn(async () => "consent-1"),
+    acceptInvite: vi.fn(async () => ({
+      status: "accepted" as const,
+      ledgerId: "ledger-1",
+    })),
+    archiveCategory: vi.fn(async () => undefined),
+    archiveLedger: vi.fn(async () => undefined),
+    convertPersonalLedgerToShared: vi.fn(async () => undefined),
+    createAccount: vi.fn(async () => undefined),
+    createCard: vi.fn(async () => undefined),
+    createCategory: vi.fn(async () => "category-new"),
+    createInvite: vi.fn(async () => ({
+      id: "invite-1",
+      inviteCode: "ABC123",
+      expiresAt: "2026-08-20T00:00:00.000Z",
+    })),
     createLedger: vi.fn(async () => "ledger-1"),
+    deactivateFixedRule: vi.fn(async () => undefined),
+    deleteAccount: vi.fn(async () => undefined),
+    deleteCard: vi.fn(async () => undefined),
+    deleteInstallmentOccurrences: vi.fn(async () => undefined),
+    leaveSharedLedger: vi.fn(async () => undefined),
     load: vi.fn(async () => data),
     materializeMonth: vi.fn(async () => undefined),
+    removeLedgerMember: vi.fn(async () => undefined),
+    renameLedger: vi.fn(async () => undefined),
+    restoreLedger: vi.fn(async () => undefined),
+    revokeInvite: vi.fn(async () => undefined),
     saveTransaction: vi.fn(
       async (
         _userId: string,
         _input: RemoteTransactionInput,
         _options?: FinanceMutationOptions,
-      ) => "transaction-new",
+      ) => "transaction-new" as string | undefined,
     ),
+    setAccountActive: vi.fn(async () => undefined),
+    setCardActive: vi.fn(async () => undefined),
+    setCategoryBudget: vi.fn(async () => undefined),
+    setDefaultLedger: vi.fn(async () => undefined),
     softDeleteTransaction: vi.fn(async () => undefined),
+    syncMyLedgerPaymentMethods: vi.fn(async () => undefined),
+    transferLedgerOwnership: vi.fn(async () => undefined),
+    updateAccount: vi.fn(async () => undefined),
+    updateCard: vi.fn(async () => undefined),
+    updateCategory: vi.fn(async () => undefined),
+    updateCategoryOrder: vi.fn(async () => undefined),
+    updateLedgerMemberRole: vi.fn(async () => undefined),
   }
 }
 
@@ -784,6 +819,115 @@ describe("MobileAppStore authentication", () => {
     expect(repository.saveTransaction).toHaveBeenCalledOnce()
     expect(repository.load).toHaveBeenCalledTimes(2)
     expect(store.transactionMutationState).toBe("idle")
+  })
+
+  it("treats a fixed-rule save without a transaction id as successful", async () => {
+    const repository = createRepository()
+    repository.saveTransaction.mockResolvedValueOnce(undefined)
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+
+    const result = await store.saveGeneralTransaction({
+      ledgerId: "ledger-1",
+      type: "expense",
+      status: "confirmed",
+      amount: 120_000,
+      transactionAt: "2026-08-12T20:30:00+09:00",
+      categoryId: "food",
+      recurringType: "fixed",
+    })
+
+    expect(result).toEqual({ status: "saved" })
+    expect(store.transactionMutationState).toBe("idle")
+  })
+
+  it("loads an independent custom transaction range", async () => {
+    const repository = createRepository()
+    const rangeData = createReadyFinanceData()
+    rangeData.transactions = [
+      createTransaction("range-1", "ledger-1", "expense", 15_000, 10),
+    ]
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+    repository.load.mockResolvedValueOnce(rangeData)
+
+    await store.loadTransactionSearchRange("2026-07-20", "2026-08-10")
+
+    expect(repository.load).toHaveBeenLastCalledWith("user-1", {
+      transactionDateRange: {
+        start: "2026-07-20T00:00:00+09:00",
+        endExclusive: "2026-08-11T00:00:00+09:00",
+      },
+    })
+    expect(store.transactionSearchStatus).toBe("ready")
+    expect(store.transactionSearchRangeKey).toBe("2026-07-20:2026-08-10")
+    expect(store.transactionSearchTransactions?.[0]?.id).toBe("range-1")
+
+    store.clearTransactionSearchRange()
+
+    expect(store.transactionSearchStatus).toBe("idle")
+    expect(store.transactionSearchRangeKey).toBeUndefined()
+  })
+
+  it("creates a category and its initial budget in one management mutation", async () => {
+    const repository = createRepository()
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+
+    const created = await store.createCategory(
+      {
+        color: "#238276",
+        icon: "utensils",
+        name: "외식",
+        usageTypes: ["expense"],
+      },
+      250_000,
+    )
+
+    expect(created).toBe(true)
+    expect(repository.createCategory).toHaveBeenCalledWith({
+      color: "#238276",
+      icon: "utensils",
+      ledgerId: "ledger-1",
+      name: "외식",
+      parentCategoryId: undefined,
+      usageTypes: ["expense"],
+    })
+    expect(repository.setCategoryBudget).toHaveBeenCalledWith({
+      amount: 250_000,
+      categoryId: "category-new",
+      ledgerId: "ledger-1",
+      month: store.selectedMonth,
+      userId: "user-1",
+    })
+    expect(store.managementNoticeMessage).toBe("카테고리를 추가했습니다.")
+  })
+
+  it("uses the selected occurrence month for fixed and installment deletion scopes", async () => {
+    const repository = createRepository()
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+
+    expect(await store.endFixedRule("fixed-rule", "next", "2026-06")).toBe(true)
+    expect(
+      await store.deleteInstallmentOccurrences(
+        "installment-rule",
+        3,
+        "current_and_future",
+        "2026-05",
+      ),
+    ).toBe(true)
+
+    expect(repository.deactivateFixedRule).toHaveBeenCalledWith(
+      "fixed-rule",
+      "2026-07",
+    )
+    expect(repository.deleteInstallmentOccurrences).toHaveBeenCalledWith(
+      "installment-rule",
+      3,
+      "current_and_future",
+    )
+    expect(store.selectedMonth).toBe("2026-05")
   })
 
   it("preserves the loaded month and exposes an error when saving fails", async () => {
