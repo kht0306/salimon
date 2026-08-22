@@ -39,11 +39,24 @@ export const DashboardHome = observer(function DashboardHome() {
   }
 
   const isRefreshing = store.dataStatus === "refreshing"
+  const currentMembers = store.financeData.members.filter(
+    (member) =>
+      member.ledgerId === store.selectedLedgerId && member.status === "active",
+  )
+  const splitCountsByTransactionId = new Map<string, number>()
+  for (const split of store.financeData.transactionSplits) {
+    splitCountsByTransactionId.set(
+      split.transactionId,
+      (splitCountsByTransactionId.get(split.transactionId) ?? 0) + 1,
+    )
+  }
 
   function renderTransaction({ item }: { item: Transaction }) {
     return (
       <TransactionRow
         categories={store.financeData.categories}
+        members={currentMembers}
+        splitCount={splitCountsByTransactionId.get(item.id) ?? 0}
         transaction={item}
         onPress={() =>
           router.push({

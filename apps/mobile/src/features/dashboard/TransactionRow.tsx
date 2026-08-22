@@ -1,18 +1,26 @@
 import styled from "@emotion/native"
 import { formatKoreanTime, formatKrw, getCategoryLabel } from "@salimon/domain"
-import type { Category, Transaction } from "@salimon/types"
+import type { Category, LedgerMember, Transaction } from "@salimon/types"
 import { AppText } from "../../components/AppText"
 import { mobileTheme } from "../../theme"
+import {
+  transactionMemberLabel,
+  transactionStructureLabels,
+} from "../transactions/transactionPresentation"
 import { transactionTypeLabel } from "./dashboardPresentation"
 
 interface TransactionRowProps {
   categories: Category[]
+  members: LedgerMember[]
+  splitCount: number
   transaction: Transaction
   onPress: () => void
 }
 
 export function TransactionRow({
   categories,
+  members,
+  splitCount,
   transaction,
   onPress,
 }: TransactionRowProps) {
@@ -25,15 +33,24 @@ export function TransactionRow({
   const title = transaction.merchantName ?? transaction.memo ?? categoryLabel
   const typeLabel = transactionTypeLabel(transaction.type)
   const amountPrefix = transaction.type === "income" ? "+" : "−"
+  const actor = transactionMemberLabel(transaction.actorUserId, members, "공통")
+  const registrant = transactionMemberLabel(
+    transaction.createdBy,
+    members,
+    "탈퇴한 멤버 또는 알 수 없음",
+  )
+  const structureLabels = transactionStructureLabels(transaction, splitCount)
 
   return (
     <Row
       accessible
       accessibilityLabel={`${formatKoreanTime(
         transaction.transactionAt,
-      )}, ${title}, ${typeLabel} ${formatKrw(transaction.amount)}${
-        transaction.status === "excluded" ? ", 합계 제외" : ""
-      }`}
+      )}, ${title}, ${categoryLabel}, ${typeLabel} ${formatKrw(
+        transaction.amount,
+      )}, 거래자 ${actor}, 등록자 ${registrant}${
+        structureLabels.length > 0 ? `, ${structureLabels.join(", ")}` : ""
+      }${transaction.status === "excluded" ? ", 합계 제외" : ""}`}
       accessibilityRole="button"
       onPress={onPress}
     >
@@ -52,6 +69,16 @@ export function TransactionRow({
             {transaction.status === "excluded" ? " · 합계 제외" : ""}
           </Metadata>
         </MetadataRow>
+        <AuditInfo numberOfLines={1}>
+          거래 {actor} · 등록 {registrant}
+        </AuditInfo>
+        {structureLabels.length > 0 ? (
+          <BadgeRow>
+            {structureLabels.map((label) => (
+              <StructureBadge key={label}>{label}</StructureBadge>
+            ))}
+          </BadgeRow>
+        ) : null}
       </TransactionCopy>
       <Amount $type={transaction.type}>
         {amountPrefix}
@@ -62,7 +89,7 @@ export function TransactionRow({
 }
 
 const Row = styled.Pressable({
-  minHeight: 60,
+  minHeight: 78,
   flexDirection: "row",
   alignItems: "center",
   gap: mobileTheme.spacing[3],
@@ -113,6 +140,31 @@ const Metadata = styled(AppText)`
   color: ${mobileTheme.colors.muted};
   font-size: 10px;
   line-height: 15px;
+`
+
+const AuditInfo = styled(AppText)`
+  margin-top: ${mobileTheme.spacing[1]}px;
+  color: ${mobileTheme.colors.muted};
+  font-size: 10px;
+  line-height: 15px;
+`
+
+const BadgeRow = styled.View({
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: mobileTheme.spacing[1],
+  marginTop: mobileTheme.spacing[1],
+})
+
+const StructureBadge = styled(AppText)`
+  align-self: flex-start;
+  border-radius: ${mobileTheme.radii.round}px;
+  background-color: ${mobileTheme.colors.tealSoft};
+  color: ${mobileTheme.colors.teal};
+  padding: 2px ${mobileTheme.spacing[2]}px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
 `
 
 const Amount = styled(AppText)<{ $type: Transaction["type"] }>`
