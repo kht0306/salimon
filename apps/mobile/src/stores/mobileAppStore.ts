@@ -33,6 +33,8 @@ import {
 import {
   buildMonthDaySummaries,
   calculateConfirmedTotals,
+  type DashboardTransactionGrouping,
+  type DashboardTransactionRecurrenceKey,
   type MonthDaySummary,
   type TransactionTotals,
 } from "../features/dashboard/dashboardPresentation"
@@ -121,6 +123,9 @@ export class MobileAppStore {
   selectedDate: string
   selectedLedgerId = ""
   selectedMonth: string
+  dashboardTransactionGrouping: DashboardTransactionGrouping = "actor"
+  collapsedDashboardTransactionGroupKeys =
+    new Set<DashboardTransactionRecurrenceKey>()
   authState: MobileAuthState = "checking"
   authUser?: AuthUserInfo
   financeData: FinanceData = createEmptyFinanceData()
@@ -664,6 +669,22 @@ export class MobileAppStore {
     if (this.monthDaySummaries.some((summary) => summary.date === date)) {
       this.selectedDate = date
     }
+  }
+
+  setDashboardTransactionGrouping(
+    grouping: DashboardTransactionGrouping,
+  ): void {
+    this.dashboardTransactionGrouping = grouping
+  }
+
+  toggleDashboardTransactionGroup(
+    groupKey: DashboardTransactionRecurrenceKey,
+  ): void {
+    if (this.collapsedDashboardTransactionGroupKeys.has(groupKey)) {
+      this.collapsedDashboardTransactionGroupKeys.delete(groupKey)
+      return
+    }
+    this.collapsedDashboardTransactionGroupKeys.add(groupKey)
   }
 
   async acceptLegalTerms(): Promise<void> {
