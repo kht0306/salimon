@@ -1,8 +1,7 @@
 import styled from "@emotion/native"
-import { formatKrw, getCategoryLabel } from "@salimon/domain"
-import type { Transaction } from "@salimon/types"
+import { formatKrw, getCategoryLabel, toMonthKey } from "@salimon/domain"
+import type { InstallmentDeleteScope, Transaction } from "@salimon/types"
 import { Redirect, router, useLocalSearchParams } from "expo-router"
-import * as WebBrowser from "expo-web-browser"
 import { observer } from "mobx-react-lite"
 import { Alert, ScrollView } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
@@ -18,7 +17,6 @@ import {
   transactionStructureLabels,
   transactionTypeLabel,
 } from "./transactionPresentation"
-import { isGeneralMobileTransaction } from "./transactionDraft"
 
 const safeAreaEdges = ["top", "bottom"] as const
 const scrollContentStyle = { paddingBottom: 32 } as const
@@ -50,9 +48,10 @@ export const TransactionDetailScreen = observer(
       )
     }
 
-    const transaction = store.financeData.transactions.find(
-      (item) => item.id === id,
-    )
+    const transaction = [
+      ...store.financeData.transactions,
+      ...(store.transactionSearchTransactions ?? []),
+    ].find((item) => item.id === id)
     if (!transaction) {
       return (
         <DetailState
@@ -72,21 +71,25 @@ export const TransactionDetailScreen = observer(
     const paymentMethod = store.financeData.paymentMethods.find(
       (method) => method.id === transaction.paymentMethodId,
     )
-    const splits = store.financeData.transactionSplits
+    const splits = [
+      ...store.financeData.transactionSplits,
+      ...(store.transactionSearchSplits ?? []),
+    ]
       .filter((split) => split.transactionId === transaction.id)
+      .filter(
+        (split, index, items) =>
+          items.findIndex((item) => item.id === split.id) === index,
+      )
       .sort((first, second) => first.sortOrder - second.sortOrder)
     const structureLabel = transactionStructureLabels(
       transaction,
       splits.length,
     ).join(" · ")
-    const isGeneralTransaction = isGeneralMobileTransaction(
-      transaction,
-      splits.length,
-    )
     const canMutate =
       store.canMutateCurrentLedger &&
-      transaction.ledgerId === store.selectedLedgerId &&
-      isGeneralTransaction
+      transaction.ledgerId === store.selectedLedgerId
+    const canCopy =
+      canMutate && !transaction.recurringType && !transaction.recurringRuleId
     const paymentLabel = transactionPaymentLabel(transaction, paymentMethod)
     const title =
       transaction.merchantName ??
@@ -135,10 +138,24 @@ export const TransactionDetailScreen = observer(
                 >
                   <EditButtonLabel>수정</EditButtonLabel>
                 </EditButton>
+                {canCopy ? (
+                  <CopyButton
+                    accessibilityRole="button"
+                    disabled={store.transactionMutationState !== "idle"}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/transactions/new",
+                        params: { copyId: transaction.id },
+                      })
+                    }
+                  >
+                    <CopyButtonLabel>복사</CopyButtonLabel>
+                  </CopyButton>
+                ) : null}
                 <DeleteButton
                   accessibilityRole="button"
                   disabled={store.transactionMutationState !== "idle"}
-                  onPress={() => confirmDelete(transaction.id)}
+                  onPress={() => confirmDelete(transaction)}
                 >
                   <DeleteButtonLabel>
                     {store.transactionMutationState === "deleting"
@@ -156,19 +173,13 @@ export const TransactionDetailScreen = observer(
             ) : null}
 
             {structureLabel ? (
-              <ReadOnlyNotice>
-                <ReadOnlyTitle>{structureLabel}</ReadOnlyTitle>
-                <ReadOnlyDescription>
-                  고정·할부·분할 거래는 모바일에서 안전하게 조회만 할 수
-                  있습니다. 변경은 웹에서 관리해 주세요.
-                </ReadOnlyDescription>
-                <WebManageButton
-                  accessibilityRole="button"
-                  onPress={() => void openWebTransactions()}
-                >
-                  <WebManageButtonLabel>웹에서 관리</WebManageButtonLabel>
-                </WebManageButton>
-              </ReadOnlyNotice>
+              <StructureNotice>
+                <StructureTitle>{structureLabel}</StructureTitle>
+                <StructureDescription>
+                  수정 시 적용 범위를 선택할 수 있으며, 삭제 시 거래 구조에 맞는
+                  회차 범위를 안내합니다.
+                </StructureDescription>
+              </StructureNotice>
             ) : null}
 
             <Section>
@@ -287,41 +298,125 @@ export const TransactionDetailScreen = observer(
       </Page>
     )
 
-    function confirmDelete(transactionId: string): void {
+    function confirmDelete(target: Transaction): void {
+      if (target.recurringType === "fixed") {
+        confirmFixedDelete(target)
+        return
+      }
+      if (target.recurringType === "installment") {
+        confirmInstallmentDelete(target)
+        return
+      }
       Alert.alert(
         "거래를 삭제할까요?",
-        "삭제한 일반 거래는 월 합계와 목록에서 제외됩니다.",
+        splits.length > 0
+          ? "분할 내역과 함께 월 합계와 목록에서 제외됩니다."
+          : "삭제한 거래는 월 합계와 목록에서 제외됩니다.",
         [
           { text: "취소", style: "cancel" },
           {
             text: "삭제",
             style: "destructive",
-            onPress: () => void deleteTransaction(transactionId),
+            onPress: () => void deleteTransaction(target.id),
           },
         ],
       )
+    }
+
+    function confirmFixedDelete(target: Transaction): void {
+      if (!target.recurringRuleId) {
+        Alert.alert("삭제할 수 없음", "고정 거래 규칙 정보를 찾지 못했습니다.")
+        return
+      }
+      Alert.alert(
+        "고정 거래를 종료할까요?",
+        "이미 생성된 이전 달 거래는 유지됩니다.",
+        [
+          { text: "취소", style: "cancel" },
+          {
+            text: "이번 달부터 종료",
+            style: "destructive",
+            onPress: () => void endFixedRule(target, "current"),
+          },
+          {
+            text: "다음 달부터 종료",
+            onPress: () => void endFixedRule(target, "next"),
+          },
+        ],
+      )
+    }
+
+    function confirmInstallmentDelete(target: Transaction): void {
+      if (!target.recurringRuleId || !target.installmentNumber) {
+        Alert.alert("삭제할 수 없음", "할부 회차 정보를 찾지 못했습니다.")
+        return
+      }
+      Alert.alert("할부 삭제 범위", "삭제할 회차 범위를 선택해 주세요.", [
+        { text: "취소", style: "cancel" },
+        {
+          text: "이 회차만",
+          onPress: () => void deleteInstallment(target, "single"),
+        },
+        {
+          text: "범위 더 보기",
+          onPress: () => confirmInstallmentDeleteRange(target),
+        },
+      ])
+    }
+
+    function confirmInstallmentDeleteRange(target: Transaction): void {
+      Alert.alert("할부 삭제 범위", "선택한 범위의 회차를 삭제합니다.", [
+        { text: "취소", style: "cancel" },
+        {
+          text: "이 회차부터 이후 모두",
+          style: "destructive",
+          onPress: () => void deleteInstallment(target, "current_and_future"),
+        },
+        {
+          text: "다음 회차부터 이후 모두",
+          onPress: () => void deleteInstallment(target, "future"),
+        },
+        {
+          text: "전체 회차",
+          style: "destructive",
+          onPress: () => void deleteInstallment(target, "all"),
+        },
+      ])
     }
 
     async function deleteTransaction(transactionId: string): Promise<void> {
       const deleted = await store.deleteGeneralTransaction(transactionId)
       if (deleted) router.replace("/transactions")
     }
+
+    async function endFixedRule(
+      target: Transaction,
+      timing: "current" | "next",
+    ): Promise<void> {
+      if (!target.recurringRuleId) return
+      const deleted = await store.endFixedRule(
+        target.recurringRuleId,
+        timing,
+        toMonthKey(new Date(target.transactionAt)),
+      )
+      if (deleted) router.replace("/transactions")
+    }
+
+    async function deleteInstallment(
+      target: Transaction,
+      scope: InstallmentDeleteScope,
+    ): Promise<void> {
+      if (!target.recurringRuleId || !target.installmentNumber) return
+      const deleted = await store.deleteInstallmentOccurrences(
+        target.recurringRuleId,
+        target.installmentNumber,
+        scope,
+        toMonthKey(new Date(target.transactionAt)),
+      )
+      if (deleted) router.replace("/transactions")
+    }
   },
 )
-
-async function openWebTransactions(): Promise<void> {
-  const webUrl = process.env.EXPO_PUBLIC_WEB_URL?.replace(/\/$/, "")
-  if (!webUrl) {
-    Alert.alert("웹 주소 확인 필요", "모바일 웹 주소가 설정되지 않았습니다.")
-    return
-  }
-
-  try {
-    await WebBrowser.openBrowserAsync(`${webUrl}/transactions`)
-  } catch {
-    Alert.alert("웹을 열 수 없음", "잠시 후 다시 시도해 주세요.")
-  }
-}
 
 interface DetailRowProps {
   label: string
@@ -465,7 +560,7 @@ const TransactionDate = styled(AppText)({
   lineHeight: 17,
 })
 
-const ReadOnlyNotice = styled.View({
+const StructureNotice = styled.View({
   gap: mobileTheme.spacing[1],
   borderLeftWidth: 3,
   borderLeftColor: mobileTheme.colors.teal,
@@ -474,34 +569,16 @@ const ReadOnlyNotice = styled.View({
   paddingHorizontal: mobileTheme.spacing[4],
 })
 
-const ReadOnlyTitle = styled(AppText)({
+const StructureTitle = styled(AppText)({
   color: mobileTheme.colors.teal,
   fontSize: 12,
   fontWeight: "600",
 })
 
-const ReadOnlyDescription = styled(AppText)({
+const StructureDescription = styled(AppText)({
   color: mobileTheme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
-})
-
-const WebManageButton = styled.Pressable({
-  minHeight: mobileTheme.controls.touch,
-  alignSelf: "flex-start",
-  justifyContent: "center",
-  marginTop: mobileTheme.spacing[2],
-  borderWidth: 1,
-  borderColor: mobileTheme.colors.teal,
-  borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.panel,
-  paddingHorizontal: mobileTheme.spacing[3],
-})
-
-const WebManageButtonLabel = styled(AppText)({
-  color: mobileTheme.colors.teal,
-  fontSize: 11,
-  fontWeight: "600",
 })
 
 const ActionRow = styled.View({
@@ -521,6 +598,24 @@ const EditButton = styled.Pressable(({ disabled }) => ({
 
 const EditButtonLabel = styled(AppText)({
   color: mobileTheme.colors.panel,
+  fontSize: 13,
+  fontWeight: "600",
+})
+
+const CopyButton = styled.Pressable(({ disabled }) => ({
+  minHeight: 46,
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 1,
+  borderColor: mobileTheme.colors.teal,
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: mobileTheme.colors.panel,
+  opacity: disabled ? 0.45 : 1,
+}))
+
+const CopyButtonLabel = styled(AppText)({
+  color: mobileTheme.colors.teal,
   fontSize: 13,
   fontWeight: "600",
 })

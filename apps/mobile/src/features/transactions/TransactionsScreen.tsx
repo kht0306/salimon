@@ -1,6 +1,11 @@
 import styled from "@emotion/native"
 import { formatKrw } from "@salimon/domain"
-import type { Category, LedgerMember, Transaction } from "@salimon/types"
+import type {
+  Category,
+  LedgerMember,
+  PaymentMethod,
+  Transaction,
+} from "@salimon/types"
 import { router } from "expo-router"
 import { Plus, Search, SlidersHorizontal } from "lucide-react-native"
 import { observer } from "mobx-react-lite"
@@ -55,31 +60,75 @@ export const TransactionsScreen = observer(function TransactionsScreen() {
       ),
     [store.financeData.members, store.selectedLedgerId],
   )
+  const paymentMethods = useMemo(
+    () =>
+      store.financeData.paymentMethods
+        .filter(
+          (method) =>
+            method.ledgerId === store.selectedLedgerId && !method.isDeleted,
+        )
+        .sort((first, second) =>
+          first.name.localeCompare(second.name, "ko-KR"),
+        ),
+    [store.financeData.paymentMethods, store.selectedLedgerId],
+  )
+  const customRangeValid =
+    filters.period === "custom" &&
+    isDateKey(filters.startDate) &&
+    isDateKey(filters.endDate) &&
+    filters.startDate <= filters.endDate
+  const transactionSource = useMemo(
+    () =>
+      customRangeValid && store.transactionSearchStatus === "ready"
+        ? (store.transactionSearchTransactions ?? []).filter(
+            (transaction) => transaction.ledgerId === store.selectedLedgerId,
+          )
+        : filters.period === "custom"
+          ? []
+          : store.monthTransactions,
+    [
+      customRangeValid,
+      filters.period,
+      store.monthTransactions,
+      store.selectedLedgerId,
+      store.transactionSearchStatus,
+      store.transactionSearchTransactions,
+    ],
+  )
+  const splitSource = useMemo(
+    () =>
+      customRangeValid && store.transactionSearchStatus === "ready"
+        ? (store.transactionSearchSplits ?? [])
+        : filters.period === "custom"
+          ? []
+          : store.financeData.transactionSplits,
+    [
+      customRangeValid,
+      filters.period,
+      store.financeData.transactionSplits,
+      store.transactionSearchSplits,
+      store.transactionSearchStatus,
+    ],
+  )
   const filteredTransactions = useMemo(
     () =>
-      filterTransactions(store.monthTransactions, filters, {
+      filterTransactions(transactionSource, filters, {
         categories,
         selectedMonth: store.selectedMonth,
-        transactionSplits: store.financeData.transactionSplits,
+        transactionSplits: splitSource,
       }),
-    [
-      categories,
-      filters,
-      store.financeData.transactionSplits,
-      store.monthTransactions,
-      store.selectedMonth,
-    ],
+    [categories, filters, splitSource, store.selectedMonth, transactionSource],
   )
   const splitCountByTransaction = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const split of store.financeData.transactionSplits) {
+    for (const split of splitSource) {
       counts.set(
         split.transactionId,
         (counts.get(split.transactionId) ?? 0) + 1,
       )
     }
     return counts
-  }, [store.financeData.transactionSplits])
+  }, [splitSource])
   const sections = useMemo(
     () => groupTransactionsByDate(filteredTransactions),
     [filteredTransactions],
@@ -91,9 +140,34 @@ export const TransactionsScreen = observer(function TransactionsScreen() {
   const activeFilterCount = countActiveFilters(filters)
 
   useEffect(() => {
-    setFilters({ ...defaultTransactionFilters })
+    setFilters((current) => ({
+      ...current,
+      actorUserId: "",
+      categoryIds: [],
+      paymentMethodIds: [],
+    }))
     setFiltersOpen(false)
-  }, [store.selectedLedgerId, store.selectedMonth])
+  }, [store.selectedLedgerId])
+
+  useEffect(() => {
+    if (customRangeValid) {
+      const rangeKey = `${filters.startDate}:${filters.endDate}`
+      if (store.transactionSearchRangeKey !== rangeKey) {
+        void store.loadTransactionSearchRange(
+          filters.startDate,
+          filters.endDate,
+        )
+      }
+      return
+    }
+    store.clearTransactionSearchRange()
+  }, [
+    customRangeValid,
+    filters.endDate,
+    filters.startDate,
+    store,
+    store.transactionSearchRangeKey,
+  ])
 
   if (store.dataStatus === "idle" || store.dataStatus === "loading") {
     return (
@@ -158,7 +232,13 @@ export const TransactionsScreen = observer(function TransactionsScreen() {
             keyword={filters.keyword}
             ledgerName={store.currentLedgerName}
             members={members}
+            paymentMethods={paymentMethods}
             resultCount={filteredTransactions.length}
+            searchError={store.transactionSearchErrorMessage}
+            searchLoading={
+              filters.period === "custom" &&
+              store.transactionSearchStatus === "loading"
+            }
             totals={totals}
             onFilterChange={setFilters}
             onFilterReset={() => setFilters({ ...defaultTransactionFilters })}
@@ -173,9 +253,21 @@ export const TransactionsScreen = observer(function TransactionsScreen() {
         refreshControl={
           <RefreshControl
             colors={[mobileTheme.colors.teal]}
-            refreshing={store.dataStatus === "refreshing"}
+            refreshing={
+              store.dataStatus === "refreshing" ||
+              store.transactionSearchStatus === "loading"
+            }
             tintColor={mobileTheme.colors.teal}
-            onRefresh={() => void store.refreshSelectedMonth()}
+            onRefresh={() => {
+              if (customRangeValid) {
+                void store.loadTransactionSearchRange(
+                  filters.startDate,
+                  filters.endDate,
+                )
+              } else {
+                void store.refreshSelectedMonth()
+              }
+            }}
           />
         }
         renderItem={renderTransaction}
@@ -208,7 +300,10 @@ interface TransactionListHeaderProps {
   keyword: string
   ledgerName: string
   members: LedgerMember[]
+  paymentMethods: PaymentMethod[]
   resultCount: number
+  searchError?: string
+  searchLoading: boolean
   totals: ReturnType<typeof calculateTransactionTotals>
   onCreate: () => void
   onFilterChange: (filters: MobileTransactionFilters) => void
@@ -227,7 +322,10 @@ function TransactionListHeader({
   keyword,
   ledgerName,
   members,
+  paymentMethods,
   resultCount,
+  searchError,
+  searchLoading,
   totals,
   onCreate,
   onFilterChange,
@@ -244,7 +342,7 @@ function TransactionListHeader({
         <HeadingCopy>
           <Eyebrow>{ledgerName}</Eyebrow>
           <Title accessibilityRole="header">거래 내역</Title>
-          <Subtitle>이번 달 거래를 조건별로 빠르게 찾아보세요.</Subtitle>
+          <Subtitle>월별 또는 직접 선택한 기간의 거래를 찾아보세요.</Subtitle>
         </HeadingCopy>
         <HeadingActions>
           <ResultCount>{resultCount}건</ResultCount>
@@ -267,6 +365,16 @@ function TransactionListHeader({
         <StaleNotice accessibilityLiveRegion="polite">
           마지막으로 불러온 거래를 읽기 전용으로 표시하고 있습니다.
         </StaleNotice>
+      ) : null}
+
+      {searchLoading ? (
+        <SearchNotice accessibilityLiveRegion="polite">
+          선택한 기간의 거래를 불러오고 있습니다.
+        </SearchNotice>
+      ) : searchError ? (
+        <SearchError accessibilityLiveRegion="assertive">
+          {searchError}
+        </SearchError>
       ) : null}
 
       <SearchRow>
@@ -313,6 +421,7 @@ function TransactionListHeader({
           categories={categories}
           filters={filters}
           members={members}
+          paymentMethods={paymentMethods}
           onChange={onFilterChange}
           onReset={onFilterReset}
         />
@@ -351,7 +460,23 @@ function countActiveFilters(filters: MobileTransactionFilters): number {
     filters.categoryIds.length > 0,
     Boolean(filters.actorUserId),
     Boolean(filters.keyword.trim()),
+    filters.paymentMethodIds.length > 0,
   ].filter(Boolean).length
+}
+
+function isDateKey(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return false
+  const date = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+  )
+  return (
+    date.getFullYear() === Number(match[1]) &&
+    date.getMonth() === Number(match[2]) - 1 &&
+    date.getDate() === Number(match[3])
+  )
 }
 
 interface TransactionsStateProps {
@@ -479,6 +604,23 @@ const StaleNotice = styled(AppText)({
   lineHeight: 17,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[4],
+})
+
+const SearchNotice = styled(AppText)({
+  borderLeftWidth: 3,
+  borderLeftColor: mobileTheme.colors.teal,
+  backgroundColor: mobileTheme.colors.tealSoft,
+  color: mobileTheme.colors.muted,
+  fontSize: 11,
+  lineHeight: 17,
+  paddingVertical: mobileTheme.spacing[3],
+  paddingHorizontal: mobileTheme.spacing[4],
+})
+
+const SearchError = styled(SearchNotice)({
+  borderLeftColor: mobileTheme.colors.coral,
+  backgroundColor: mobileTheme.colors.coralSoft,
+  color: mobileTheme.colors.coral,
 })
 
 const SearchRow = styled.View({

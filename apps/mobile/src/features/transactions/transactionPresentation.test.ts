@@ -123,6 +123,47 @@ describe("mobile transaction presentation", () => {
     expect(result.map((transaction) => transaction.id)).toEqual(["recent"])
   })
 
+  it("filters a custom multi-month range and selected payment methods", () => {
+    const rangeTransactions = [
+      createTransaction("july-card", "expense", 10_000, 10, {
+        paymentMethodId: "card-1",
+        transactionAt: "2026-07-31T12:00:00+09:00",
+      }),
+      createTransaction("august-cash", "expense", 20_000, 1),
+      createTransaction("outside", "expense", 30_000, 3, {
+        paymentMethodId: "card-1",
+        transactionAt: "2026-08-03T12:00:00+09:00",
+      }),
+    ]
+
+    expect(
+      filterTransactions(
+        rangeTransactions,
+        {
+          ...defaultTransactionFilters,
+          endDate: "2026-08-02",
+          paymentMethodIds: ["card-1"],
+          period: "custom",
+          startDate: "2026-07-30",
+        },
+        context,
+      ).map((transaction) => transaction.id),
+    ).toEqual(["july-card"])
+    expect(
+      filterTransactions(
+        rangeTransactions,
+        {
+          ...defaultTransactionFilters,
+          endDate: "2026-08-02",
+          paymentMethodIds: ["cash"],
+          period: "custom",
+          startDate: "2026-07-30",
+        },
+        context,
+      ).map((transaction) => transaction.id),
+    ).toEqual(["august-cash"])
+  })
+
   it("filters regular, fixed, installment and split transaction structures", () => {
     const structuredTransactions = [
       transactions[0]!,

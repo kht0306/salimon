@@ -1,25 +1,40 @@
 import {
   fromDateTimeLocalValue,
   getDateTimeLocalValue,
+  isSplitCategory,
   toDateKey,
 } from "@salimon/domain"
 import type {
   Category,
+  IncomeKind,
   LedgerMember,
   PaymentMethod,
+  RecurringRule,
   Transaction,
+  TransactionSplit,
   TransactionStatus,
   TransactionType,
 } from "@salimon/types"
+
+export interface MobileTransactionSplitDraft {
+  amount: string
+  categoryId: string
+}
 
 export interface MobileTransactionDraft {
   actorUserId: string
   amount: string
   categoryId: string
   date: string
+  incomeKind: IncomeKind
+  installmentAmountType: "monthly" | "principal"
+  installmentMonths: string
   merchantName: string
   memo: string
   paymentMethodId: string
+  recurringType: "" | "fixed" | "installment"
+  applyChangesToFuture: boolean
+  splits: MobileTransactionSplitDraft[]
   status: TransactionStatus
   tagsInput: string
   time: string
@@ -31,11 +46,17 @@ export interface MobileGeneralTransactionInput {
   amount: number
   categoryId: string
   id?: string
-  incomeKind?: "side_income"
+  incomeKind?: IncomeKind
+  installmentAmountType?: "monthly" | "principal"
+  installmentMonths?: number
   ledgerId: string
   merchantName?: string
   memo?: string
   paymentMethodId?: string
+  recurringRuleId?: string
+  recurringType?: "fixed" | "installment"
+  applyChangesToFuture?: boolean
+  splits?: { amount: number; categoryId: string }[]
   sourceType: Transaction["sourceType"]
   status: TransactionStatus
   tags: string[]
@@ -49,6 +70,7 @@ export interface TransactionDraftContext {
   ledgerId: string
   members: LedgerMember[]
   paymentMethods: PaymentMethod[]
+  transactionSplits?: TransactionSplit[]
 }
 
 export type TransactionDraftValidation =
@@ -79,10 +101,16 @@ export function createNewMobileTransactionDraft(input: {
     amount: "",
     categoryId: preferredCategory(input.categories, "expense")?.id ?? "",
     date: selectedDate,
+    incomeKind: "side_income",
+    installmentAmountType: "monthly",
+    installmentMonths: "2",
     merchantName: "",
     memo: "",
     paymentMethodId:
       preferredPaymentMethod(input.paymentMethods, "expense")?.id ?? "",
+    recurringType: "",
+    applyChangesToFuture: true,
+    splits: [],
     status: "confirmed",
     tagsInput: "",
     time,
@@ -92,6 +120,8 @@ export function createNewMobileTransactionDraft(input: {
 
 export function createEditingMobileTransactionDraft(
   transaction: Transaction,
+  transactionSplits: TransactionSplit[] = [],
+  recurringRule?: RecurringRule,
 ): MobileTransactionDraft {
   const [date = "", time = "12:00"] = getDateTimeLocalValue(
     transaction.transactionAt,
@@ -102,13 +132,37 @@ export function createEditingMobileTransactionDraft(
     amount: String(transaction.amount),
     categoryId: transaction.categoryId ?? "",
     date,
+    incomeKind: transaction.incomeKind ?? "side_income",
+    installmentAmountType: recurringRule?.installmentAmountType ?? "monthly",
+    installmentMonths: String(
+      recurringRule?.installmentMonths ?? transaction.installmentTotal ?? 2,
+    ),
     merchantName: transaction.merchantName ?? "",
     memo: transaction.memo ?? "",
     paymentMethodId: transaction.paymentMethodId ?? "",
+    recurringType: transaction.recurringType ?? "",
+    applyChangesToFuture: true,
+    splits: transactionSplits.map((split) => ({
+      amount: String(split.amount),
+      categoryId: split.categoryId,
+    })),
     status: transaction.status,
     tagsInput: transaction.tags?.join(", ") ?? "",
     time: time.slice(0, 5),
     type: transaction.type,
+  }
+}
+
+export function createCopiedMobileTransactionDraft(
+  transaction: Transaction,
+  transactionSplits: TransactionSplit[] = [],
+): MobileTransactionDraft {
+  return {
+    ...createEditingMobileTransactionDraft(transaction, transactionSplits),
+    recurringType: "",
+    installmentAmountType: "monthly",
+    installmentMonths: "2",
+    applyChangesToFuture: true,
   }
 }
 
@@ -133,6 +187,14 @@ export function changeMobileTransactionType(
   return {
     ...draft,
     type,
+    incomeKind: type === "income" ? draft.incomeKind : "side_income",
+    recurringType:
+      type === "income" && draft.incomeKind === "salary"
+        ? "fixed"
+        : draft.recurringType === "installment" && type !== "expense"
+          ? ""
+          : draft.recurringType,
+    splits: [],
     categoryId:
       currentCategory?.id ?? preferredCategory(categories, type)?.id ?? "",
     paymentMethodId:
@@ -217,6 +279,95 @@ export function validateMobileTransactionDraft(
     return { valid: false, message: "저축 거래에는 계좌를 선택해 주세요." }
   }
 
+  if (
+    draft.type === "income" &&
+    draft.incomeKind === "salary" &&
+    draft.recurringType !== "fixed"
+  ) {
+    return { valid: false, message: "급여 수입은 고정 거래로 등록해 주세요." }
+  }
+
+  const installmentMonths = Number(draft.installmentMonths)
+  if (draft.recurringType === "installment") {
+    if (draft.type !== "expense") {
+      return {
+        valid: false,
+        message: "할부는 지출 거래에만 사용할 수 있습니다.",
+      }
+    }
+    if (
+      !Number.isSafeInteger(installmentMonths) ||
+      installmentMonths < 2 ||
+      installmentMonths > 120
+    ) {
+      return { valid: false, message: "할부 개월은 2~120개월로 입력해 주세요." }
+    }
+    if (!paymentMethod || paymentMethod.type !== "card") {
+      return { valid: false, message: "할부에 사용할 카드를 선택해 주세요." }
+    }
+    if (!context.editingTransaction && !paymentMethod.paymentDay) {
+      return {
+        valid: false,
+        message: "결제일이 설정된 카드만 새 할부에 사용할 수 있습니다.",
+      }
+    }
+    if (
+      draft.installmentAmountType === "principal" &&
+      amount < installmentMonths
+    ) {
+      return {
+        valid: false,
+        message: "총 원금은 할부 개월 수보다 작을 수 없습니다.",
+      }
+    }
+  }
+
+  const splitCategorySelected = isSplitCategory(category)
+  const splits = splitCategorySelected ? draft.splits : []
+  if (splitCategorySelected && draft.recurringType) {
+    return {
+      valid: false,
+      message: "분할 거래와 고정·할부 설정은 함께 사용할 수 없습니다.",
+    }
+  }
+  if (splitCategorySelected) {
+    const originalSplitCategoryIds = new Set(
+      context.transactionSplits?.map((split) => split.categoryId) ?? [],
+    )
+    const splitTotal = splits.reduce(
+      (sum, split) => sum + Number(split.amount),
+      0,
+    )
+    const categoryIds = new Set(splits.map((split) => split.categoryId))
+    const validSplits =
+      splits.length >= 2 &&
+      splits.length <= 10 &&
+      categoryIds.size === splits.length &&
+      splits.every((split) => {
+        const splitCategory = context.categories.find(
+          (item) => item.id === split.categoryId,
+        )
+        const splitAmount = Number(split.amount)
+        return Boolean(
+          splitCategory &&
+          (!splitCategory.isArchived ||
+            originalSplitCategoryIds.has(splitCategory.id)) &&
+          !isSplitCategory(splitCategory) &&
+          splitCategory.usageTypes.includes(draft.type) &&
+          Number.isSafeInteger(splitAmount) &&
+          splitAmount > 0,
+        )
+      }) &&
+      splitTotal === amount
+    if (!validSplits) {
+      return {
+        valid: false,
+        message:
+          "분할 항목은 서로 다른 카테고리 2~10개로 입력하고 합계를 거래 금액과 맞춰 주세요.",
+      }
+    }
+  }
+
   const tags = [
     ...new Set(
       draft.tagsInput
@@ -238,17 +389,36 @@ export function validateMobileTransactionDraft(
       id: context.editingTransaction?.id,
       ledgerId: context.ledgerId,
       type: draft.type,
-      incomeKind: draft.type === "income" ? "side_income" : undefined,
+      incomeKind: draft.type === "income" ? draft.incomeKind : undefined,
       status: draft.status,
       amount,
-      transactionAt: fromDateTimeLocalValue(`${draft.date}T${draft.time}`),
+      transactionAt: context.editingTransaction?.recurringType
+        ? context.editingTransaction.transactionAt
+        : fromDateTimeLocalValue(`${draft.date}T${draft.time}`),
       categoryId: category.id,
       merchantName: draft.merchantName.trim() || undefined,
       memo: draft.memo.trim() || undefined,
       actorUserId,
       paymentMethodId,
+      recurringRuleId: context.editingTransaction?.recurringRuleId,
+      ...(draft.recurringType ? { recurringType: draft.recurringType } : {}),
+      ...(draft.recurringType === "installment"
+        ? {
+            installmentMonths,
+            installmentAmountType: draft.installmentAmountType,
+          }
+        : {}),
+      applyChangesToFuture: context.editingTransaction
+        ? draft.applyChangesToFuture
+        : undefined,
       sourceType: context.editingTransaction?.sourceType ?? "manual",
       tags,
+      splits: splitCategorySelected
+        ? splits.map((split) => ({
+            amount: Number(split.amount),
+            categoryId: split.categoryId,
+          }))
+        : [],
     },
   }
 }
