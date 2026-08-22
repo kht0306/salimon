@@ -1,4 +1,5 @@
 import {
+  createTransactionRequestId,
   createEmptyFinanceData,
   DuplicateTransactionSourceError,
   SupabaseFinanceRepository,
@@ -10,6 +11,7 @@ import {
   type FinanceData,
   type FinanceLoadOptions,
   type RemoteTransactionInput,
+  type TransactionData,
   type TransactionDateRange,
 } from "@salimon/api-client"
 import {
@@ -91,6 +93,8 @@ type MobileFinanceRepository = Pick<
   | "deleteInstallmentOccurrences"
   | "leaveSharedLedger"
   | "load"
+  | "loadTransactions"
+  | "findTransactionRequest"
   | "importTransactions"
   | "materializeMonth"
   | "removeLedgerMember"
@@ -255,6 +259,9 @@ export class MobileAppStore {
   private dataRequestSequence = 0
   private transactionSearchSequence = 0
   private readonly financeQueryCache: QueryCache<FinanceData>
+  private readonly prefetchAdjacentMonths: boolean
+  private readonly prefetchingMonths = new Set<string>()
+  private financeCacheGeneration = 0
   private sessionSequence = 0
   private activationPromise?: Promise<void>
 
@@ -263,10 +270,12 @@ export class MobileAppStore {
     private readonly authGateway: MobileAuthGateway,
     now = new Date(),
     financeQueryCache = new QueryCache<FinanceData>(),
+    prefetchAdjacentMonths = false,
   ) {
     this.selectedMonth = toMonthKey(now)
     this.selectedDate = toDateKey(now)
     this.financeQueryCache = financeQueryCache
+    this.prefetchAdjacentMonths = prefetchAdjacentMonths
     makeAutoObservable(this, {}, { autoBind: true })
   }
 
@@ -594,6 +603,7 @@ export class MobileAppStore {
   async loadSelectedMonth(
     month = this.selectedMonth,
     forceRefresh = false,
+    reloadMetadata = false,
   ): Promise<void> {
     const userId = this.authUser?.id
     if (!userId) return
@@ -602,9 +612,11 @@ export class MobileAppStore {
     const requestSequence = ++this.dataRequestSequence
     const cacheKey = createFinanceCacheKey(userId, month)
     const cached = this.financeQueryCache.get(cacheKey)
-    const options: FinanceLoadOptions = {
-      transactionDateRange: createKoreaMonthTransactionRange(month),
-    }
+    const transactionDateRange = createKoreaMonthTransactionRange(month)
+    const options: FinanceLoadOptions = { transactionDateRange }
+    const canReuseMetadata =
+      !reloadMetadata && this.financeData.profile.id === userId
+    const baseFinanceData = cached?.data ?? this.financeData
 
     this.selectedMonth = month
     this.ensureSelectedDateBelongsToMonth(month)
@@ -613,11 +625,14 @@ export class MobileAppStore {
     if (cached?.isFresh && !forceRefresh) {
       this.applyFinanceData(cached.data)
       this.dataStatus = "ready"
+      this.scheduleAdjacentMonthPrefetch(month, userId, cached.data)
       return
     }
 
     if (cached) {
       this.applyFinanceData(cached.data)
+      this.dataStatus = "refreshing"
+    } else if (canReuseMetadata) {
       this.dataStatus = "refreshing"
     } else {
       this.dataStatus = "loading"
@@ -625,7 +640,12 @@ export class MobileAppStore {
 
     try {
       await this.repository.materializeMonth(month)
-      let financeData = await this.repository.load(userId, options)
+      let financeData = canReuseMetadata
+        ? mergeFinanceTransactionData(
+            baseFinanceData,
+            await this.repository.loadTransactions(transactionDateRange),
+          )
+        : await this.repository.load(userId, options)
 
       if (financeData.ledgers.length === 0) {
         await this.repository.createLedger({
@@ -652,6 +672,7 @@ export class MobileAppStore {
         this.financeQueryCache.set(cacheKey, financeData)
         this.dataStatus = "ready"
       })
+      this.scheduleAdjacentMonthPrefetch(month, userId, financeData)
     } catch (error) {
       if (
         sequence !== this.sessionSequence ||
@@ -670,6 +691,9 @@ export class MobileAppStore {
           this.applyFinanceData(cached.data)
           this.dataStatus = "stale"
           this.dataErrorMessage = `${message} 마지막 조회 내용을 읽기 전용으로 표시합니다.`
+        } else if (canReuseMetadata) {
+          this.dataStatus = "stale"
+          this.dataErrorMessage = `${message} 월 화면은 유지하며 읽기 전용으로 표시합니다.`
         } else {
           this.dataStatus = "error"
           this.dataErrorMessage = message
@@ -680,6 +704,65 @@ export class MobileAppStore {
 
   async refreshSelectedMonth(): Promise<void> {
     await this.loadSelectedMonth(this.selectedMonth, true)
+  }
+
+  private scheduleAdjacentMonthPrefetch(
+    month: string,
+    userId: string,
+    baseFinanceData: FinanceData,
+  ): void {
+    if (!this.prefetchAdjacentMonths) return
+
+    for (const offset of [-1, 1] as const) {
+      const adjacentMonth = moveMonth(month, offset)
+      const cacheKey = createFinanceCacheKey(userId, adjacentMonth)
+      if (
+        this.financeQueryCache.get(cacheKey)?.isFresh ||
+        this.prefetchingMonths.has(cacheKey)
+      ) {
+        continue
+      }
+
+      this.prefetchingMonths.add(cacheKey)
+      void this.prefetchMonth(
+        adjacentMonth,
+        userId,
+        baseFinanceData,
+        cacheKey,
+        this.financeCacheGeneration,
+      )
+    }
+  }
+
+  private async prefetchMonth(
+    month: string,
+    userId: string,
+    baseFinanceData: FinanceData,
+    cacheKey: string,
+    cacheGeneration: number,
+  ): Promise<void> {
+    const sequence = this.sessionSequence
+    try {
+      await this.repository.materializeMonth(month)
+      const transactionData = await this.repository.loadTransactions(
+        createKoreaMonthTransactionRange(month),
+      )
+      if (
+        sequence !== this.sessionSequence ||
+        userId !== this.authUser?.id ||
+        cacheGeneration !== this.financeCacheGeneration
+      ) {
+        return
+      }
+      this.financeQueryCache.set(
+        cacheKey,
+        mergeFinanceTransactionData(baseFinanceData, transactionData),
+      )
+    } catch {
+      // 인접 월 사전 로딩 실패는 현재 화면을 방해하지 않는다.
+    } finally {
+      this.prefetchingMonths.delete(cacheKey)
+    }
   }
 
   async loadTransactionSearchRange(
@@ -700,16 +783,13 @@ export class MobileAppStore {
     this.transactionSearchRangeKey = `${startDate}:${endDate}`
     this.transactionSearchErrorMessage = undefined
     try {
-      const financeData = await this.repository.load(userId, {
-        transactionDateRange: createKoreaTransactionDateRange(
-          startDate,
-          endDate,
-        ),
-      })
+      const transactionData = await this.repository.loadTransactions(
+        createKoreaTransactionDateRange(startDate, endDate),
+      )
       if (sequence !== this.transactionSearchSequence) return
       runInAction(() => {
-        this.transactionSearchTransactions = financeData.transactions
-        this.transactionSearchSplits = financeData.transactionSplits
+        this.transactionSearchTransactions = transactionData.transactions
+        this.transactionSearchSplits = transactionData.transactionSplits
         this.transactionSearchStatus = "ready"
       })
     } catch (error) {
@@ -756,36 +836,68 @@ export class MobileAppStore {
     this.transactionMutationState = "saving"
     this.transactionMutationErrorMessage = undefined
 
+    const userId = this.authUser.id
+    const requestInput =
+      input.id || input.requestId
+        ? input
+        : { ...input, requestId: createTransactionRequestId() }
     const abortController = new AbortController()
     let timeoutId: ReturnType<typeof setTimeout> | undefined
 
     try {
-      const transactionId = await Promise.race([
-        this.repository.saveTransaction(this.authUser.id, input, {
-          signal: abortController.signal,
-        }),
-        new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => {
-            reject(new TransactionSaveTimeoutError())
-            abortController.abort()
-          }, TRANSACTION_SAVE_TIMEOUT_MS)
-        }),
-      ])
+      let transactionId: string | undefined
+      try {
+        transactionId = await Promise.race([
+          this.repository.saveTransaction(userId, requestInput, {
+            signal: abortController.signal,
+          }),
+          new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => {
+              reject(new TransactionSaveTimeoutError())
+              abortController.abort()
+            }, TRANSACTION_SAVE_TIMEOUT_MS)
+          }),
+        ])
+      } catch (error) {
+        if (
+          !(error instanceof TransactionSaveTimeoutError) ||
+          !requestInput.requestId
+        ) {
+          throw error
+        }
+        const recovered = await this.repository.findTransactionRequest(
+          requestInput.requestId,
+        )
+        if (!recovered.transactionId && !recovered.recurringRuleId) {
+          throw error
+        }
+        transactionId = recovered.transactionId ?? recovered.recurringRuleId
+      }
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId)
         timeoutId = undefined
       }
-      const savedTransactionId = transactionId ?? input.id
+      const savedTransactionId = requestInput.recurringType
+        ? requestInput.id
+        : (transactionId ?? requestInput.id ?? requestInput.requestId)
+      const transactionMonth = toMonthKey(new Date(requestInput.transactionAt))
 
-      this.selectedDate = toDateKey(new Date(input.transactionAt))
-      this.clearTransactionSearchRange()
-      await this.loadSelectedMonth(
-        toMonthKey(new Date(input.transactionAt)),
-        true,
-      )
       runInAction(() => {
+        this.selectedDate = toDateKey(new Date(requestInput.transactionAt))
+        this.selectedMonth = transactionMonth
+        this.ensureSelectedDateBelongsToMonth(transactionMonth)
+        this.invalidateFinanceQueryCache()
+        if (savedTransactionId) {
+          this.applyOptimisticTransaction(
+            savedTransactionId,
+            requestInput,
+            userId,
+          )
+        }
+        this.clearTransactionSearchRange()
         this.transactionMutationState = "idle"
       })
+      void this.loadSelectedMonth(transactionMonth, true)
       return savedTransactionId
         ? { status: "saved", transactionId: savedTransactionId }
         : { status: "saved" }
@@ -932,6 +1044,7 @@ export class MobileAppStore {
   }
 
   async moveSelectedMonth(amount: number): Promise<void> {
+    if (this.transactionMutationState !== "idle") return
     const month = moveMonth(this.selectedMonth, amount)
     this.selectedDate = `${month}-01`
     await this.loadSelectedMonth(month)
@@ -1077,7 +1190,7 @@ export class MobileAppStore {
         this.selectedLedgerId,
         valid,
       )
-      this.financeQueryCache.clear()
+      this.invalidateFinanceQueryCache()
       await this.refreshSelectedMonth()
       runInAction(() => {
         this.dataToolState = "idle"
@@ -1103,7 +1216,7 @@ export class MobileAppStore {
     this.clearDataToolFeedback()
     try {
       const purgeAfter = await this.repository.requestAccountDeletion()
-      await this.refreshSelectedMonth()
+      await this.loadSelectedMonth(this.selectedMonth, true, true)
       runInAction(() => {
         this.dataToolState = "idle"
         this.dataToolNoticeMessage =
@@ -1129,7 +1242,7 @@ export class MobileAppStore {
     this.clearDataToolFeedback()
     try {
       await this.repository.cancelAccountDeletion()
-      await this.refreshSelectedMonth()
+      await this.loadSelectedMonth(this.selectedMonth, true, true)
       runInAction(() => {
         this.dataToolState = "idle"
         this.dataToolNoticeMessage = "계정 삭제 요청을 취소했습니다."
@@ -1528,7 +1641,7 @@ export class MobileAppStore {
     this.managementMutationState = "saving"
     try {
       const invitation = await this.repository.createInvite(ledger.id, role)
-      await this.refreshSelectedMonth()
+      await this.loadSelectedMonth(this.selectedMonth, true, true)
       runInAction(() => {
         this.managementMutationState = "idle"
         this.managementNoticeMessage = "초대 코드를 만들었습니다."
@@ -1577,7 +1690,7 @@ export class MobileAppStore {
         })
         return result
       }
-      await this.refreshSelectedMonth()
+      await this.loadSelectedMonth(this.selectedMonth, true, true)
       runInAction(() => {
         this.selectedLedgerId = result.ledgerId
         this.managementMutationState = "idle"
@@ -1731,8 +1844,8 @@ export class MobileAppStore {
     this.managementMutationState = "saving"
     try {
       await mutation()
-      this.financeQueryCache.clear()
-      await this.loadSelectedMonth(this.selectedMonth, true)
+      this.invalidateFinanceQueryCache()
+      await this.loadSelectedMonth(this.selectedMonth, true, true)
       runInAction(() => {
         this.managementMutationState = "idle"
         this.managementNoticeMessage = successMessage
@@ -1761,7 +1874,7 @@ export class MobileAppStore {
         CURRENT_TERMS_VERSION,
         CURRENT_PRIVACY_VERSION,
       )
-      await this.loadSelectedMonth(this.selectedMonth, true)
+      await this.loadSelectedMonth(this.selectedMonth, true, true)
       runInAction(() => {
         this.consentStatus = "idle"
       })
@@ -2081,8 +2194,14 @@ export class MobileAppStore {
         }
         this.notificationRegistrationState = "idle"
         this.notificationRegistrationErrorMessage = undefined
+        if (
+          transactionId &&
+          toMonthKey(new Date(input.transactionAt)) === this.selectedMonth
+        ) {
+          this.applyOptimisticTransaction(transactionId, input, userId)
+        }
       })
-      await this.loadSelectedMonth(this.selectedMonth, true)
+      void this.loadSelectedMonth(this.selectedMonth, true)
 
       if (serverResult === "already_registered") {
         return { status: "already_registered" }
@@ -2356,7 +2475,90 @@ export class MobileAppStore {
     this.notificationInboxNoticeMessage = undefined
     this.notificationRegistrationState = "idle"
     this.notificationRegistrationErrorMessage = undefined
+    this.invalidateFinanceQueryCache()
+  }
+
+  private invalidateFinanceQueryCache(): void {
+    this.financeCacheGeneration += 1
     this.financeQueryCache.clear()
+    this.prefetchingMonths.clear()
+  }
+
+  private applyOptimisticTransaction(
+    transactionId: string,
+    input: RemoteTransactionInput,
+    userId: string,
+  ): void {
+    const existing = this.financeData.transactions.find(
+      (transaction) => transaction.id === transactionId,
+    )
+    const transactionMonth = toMonthKey(new Date(input.transactionAt))
+    const monthTransactions = this.financeData.transactions.filter(
+      (transaction) =>
+        transaction.id !== transactionId &&
+        toMonthKey(new Date(transaction.transactionAt)) === transactionMonth,
+    )
+    const monthTransactionIds = new Set(
+      monthTransactions.map((transaction) => transaction.id),
+    )
+    const now = new Date().toISOString()
+    const transaction: Transaction = {
+      id: transactionId,
+      ledgerId: input.ledgerId,
+      createdBy: existing?.createdBy ?? userId,
+      updatedBy: userId,
+      actorUserId: input.actorUserId,
+      recurringRuleId: input.recurringRuleId ?? existing?.recurringRuleId,
+      recurringType: input.recurringType ?? existing?.recurringType,
+      installmentNumber: existing?.installmentNumber,
+      installmentTotal: input.installmentMonths ?? existing?.installmentTotal,
+      type: input.type,
+      incomeKind: input.incomeKind,
+      status: input.status,
+      amount: input.amount,
+      currency: "KRW",
+      transactionAt: input.transactionAt,
+      categoryId: input.categoryId,
+      paymentMethodId: input.paymentMethodId,
+      merchantName: input.merchantName,
+      memo: input.memo,
+      sourceType: input.sourceType ?? existing?.sourceType ?? "manual",
+      sourceApp: input.sourceApp,
+      sourceSender: input.sourceSender,
+      sourceHash: input.sourceHash,
+      parseConfidence: input.parseConfidence,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+      tags: input.tags ?? existing?.tags ?? [],
+    }
+    const existingSplits = this.financeData.transactionSplits.filter(
+      (split) => split.transactionId === transactionId,
+    )
+    const transactionSplits =
+      input.splits === undefined
+        ? existingSplits
+        : input.splits.map((split, index) => ({
+            id: `${transactionId}:${index}`,
+            transactionId,
+            categoryId: split.categoryId,
+            amount: split.amount,
+            sortOrder: index,
+          }))
+
+    this.financeData = {
+      ...this.financeData,
+      transactions: [transaction, ...monthTransactions],
+      transactionSplits: [
+        ...transactionSplits,
+        ...this.financeData.transactionSplits.filter((split) =>
+          monthTransactionIds.has(split.transactionId),
+        ),
+      ],
+    }
+    this.financeQueryCache.set(
+      createFinanceCacheKey(userId, transactionMonth),
+      this.financeData,
+    )
   }
 
   private applyFinanceData(financeData: FinanceData): void {
@@ -2397,6 +2599,8 @@ export function createMobileAppStore(now = new Date()): MobileAppStore {
     new SupabaseFinanceRepository(client),
     createMobileAuthGateway(client),
     now,
+    new QueryCache<FinanceData>(),
+    true,
   )
 }
 
@@ -2573,4 +2777,15 @@ function isNetworkError(error: unknown): boolean {
 
 function createFinanceCacheKey(userId: string, month: string): string {
   return `${userId}:${month}`
+}
+
+function mergeFinanceTransactionData(
+  financeData: FinanceData,
+  transactionData: TransactionData,
+): FinanceData {
+  return {
+    ...financeData,
+    transactions: transactionData.transactions,
+    transactionSplits: transactionData.transactionSplits,
+  }
 }

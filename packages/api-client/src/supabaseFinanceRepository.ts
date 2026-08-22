@@ -33,6 +33,7 @@ type Row = Record<string, unknown>
 
 export interface RemoteTransactionInput {
   id?: string
+  requestId?: string
   ledgerId: string
   type: TransactionType
   incomeKind?: IncomeKind
@@ -91,11 +92,33 @@ export interface FinanceMutationOptions {
   signal?: AbortSignal
 }
 
+export interface TransactionData {
+  transactions: Transaction[]
+  transactionSplits: TransactionSplit[]
+}
+
+export interface TransactionRequestResult {
+  recurringRuleId?: string
+  transactionId?: string
+}
+
 export class DuplicateTransactionSourceError extends Error {
   constructor() {
     super("이미 등록된 알림 거래입니다.")
     this.name = "DuplicateTransactionSourceError"
   }
+}
+
+export function createTransactionRequestId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID()
+  }
+
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (token) => {
+    const random = Math.floor(Math.random() * 16)
+    const value = token === "x" ? random : (random & 0x3) | 0x8
+    return value.toString(16)
+  })
 }
 
 export class SupabaseFinanceRepository {
@@ -311,6 +334,83 @@ export class SupabaseFinanceRepository {
     }
   }
 
+  async loadTransactions(
+    transactionDateRange: TransactionDateRange,
+  ): Promise<TransactionData> {
+    const client = this.requireClient()
+    validateTransactionDateRange(transactionDateRange)
+    const transactionsResult = await fetchAllTransactionRows(
+      client,
+      transactionDateRange,
+    )
+    if (transactionsResult.error) {
+      throw toError(transactionsResult.error, "월 거래를 불러오지 못했습니다.")
+    }
+
+    const transactionRows = (transactionsResult.data ?? []) as Row[]
+    const transactionIds = transactionRows
+      .map((row) => stringValue(row.id))
+      .filter((id) => id.length > 0)
+    const transactionSplitsResult = await fetchAllTransactionSplitRows(
+      client,
+      transactionIds,
+    )
+    if (transactionSplitsResult.error) {
+      throw toError(
+        transactionSplitsResult.error,
+        "거래 분할 데이터를 불러오지 못했습니다.",
+      )
+    }
+
+    return {
+      transactions: transactionRows.map(mapTransaction),
+      transactionSplits: ((transactionSplitsResult.data ?? []) as Row[]).map(
+        mapTransactionSplit,
+      ),
+    }
+  }
+
+  async findTransactionRequest(
+    requestId: string,
+  ): Promise<TransactionRequestResult> {
+    const client = this.requireClient()
+    const [transactionResult, recurringRuleResult] = await Promise.all([
+      client
+        .from("transactions")
+        .select("id")
+        .eq("id", requestId)
+        .maybeSingle(),
+      client
+        .from("recurring_rules")
+        .select("id")
+        .eq("id", requestId)
+        .maybeSingle(),
+    ])
+    if (transactionResult.error) {
+      throw toError(
+        transactionResult.error,
+        "거래 저장 결과를 확인하지 못했습니다.",
+      )
+    }
+    if (recurringRuleResult.error) {
+      throw toError(
+        recurringRuleResult.error,
+        "반복 거래 저장 결과를 확인하지 못했습니다.",
+      )
+    }
+
+    const transactionRow = transactionResult.data as Row | null
+    const recurringRuleRow = recurringRuleResult.data as Row | null
+    return {
+      transactionId: transactionRow
+        ? optionalString(transactionRow.id)
+        : undefined,
+      recurringRuleId: recurringRuleRow
+        ? optionalString(recurringRuleRow.id)
+        : undefined,
+    }
+  }
+
   private requireClient(): SalimonSupabaseClient {
     return this.client ?? requireSupabaseClient()
   }
@@ -388,8 +488,9 @@ export class SupabaseFinanceRepository {
     }
 
     if (input.recurringType === "installment") {
-      const installmentRequest = client.rpc("save_card_installment_series_v3", {
+      const installmentRequest = client.rpc("save_card_installment_series_v4", {
         p_rule_id: input.recurringRuleId ?? null,
+        p_request_id: input.requestId ?? null,
         p_ledger_id: input.ledgerId,
         p_amount: input.amount,
         p_amount_type: input.installmentAmountType ?? "monthly",
@@ -413,6 +514,7 @@ export class SupabaseFinanceRepository {
       const date = new Date(input.transactionAt)
       const startMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`
       const ruleRequest = client.from("recurring_rules").insert({
+        ...(input.requestId ? { id: input.requestId } : {}),
         ledger_id: input.ledgerId,
         created_by: userId,
         rule_type: input.recurringType,
@@ -433,7 +535,18 @@ export class SupabaseFinanceRepository {
       })
       if (options.signal) ruleRequest.abortSignal(options.signal)
       const { error: ruleError } = await ruleRequest
-      throwIfError(ruleError)
+      if (
+        ruleError &&
+        input.requestId &&
+        isDuplicatePrimaryKeyError(ruleError)
+      ) {
+        const existing = await this.findTransactionRequest(input.requestId)
+        if (existing.recurringRuleId !== input.requestId) {
+          throwIfError(ruleError)
+        }
+      } else {
+        throwIfError(ruleError)
+      }
       await this.materializeMonth(startMonth.slice(0, 7))
       return undefined
     }
@@ -442,17 +555,31 @@ export class SupabaseFinanceRepository {
       .from("transactions")
       .insert({
         ...payload,
+        ...(input.requestId ? { id: input.requestId } : {}),
         income_kind: input.incomeKind ?? null,
         created_by: userId,
       })
       .select("id")
     if (options.signal) saveRequest.abortSignal(options.signal)
     const result = await saveRequest.single()
-    throwIfError(result.error)
-    const transactionId =
-      result.data && typeof result.data.id === "string"
-        ? result.data.id
-        : undefined
+    let transactionId: string | undefined
+    if (
+      result.error &&
+      input.requestId &&
+      isDuplicatePrimaryKeyError(result.error)
+    ) {
+      const existing = await this.findTransactionRequest(input.requestId)
+      if (existing.transactionId !== input.requestId) {
+        throwIfError(result.error)
+      }
+      transactionId = existing.transactionId
+    } else {
+      throwIfError(result.error)
+      transactionId =
+        result.data && typeof result.data.id === "string"
+          ? result.data.id
+          : undefined
+    }
     if (transactionId && input.splits !== undefined) {
       await this.replaceTransactionSplits(transactionId, input.splits, options)
     }
@@ -1146,6 +1273,15 @@ function isDuplicateTransactionSourceError(
   if (error.code !== "23505") return false
   return /transactions_(?:ledger|creator)_source_hash_uidx|(?:ledger_id|created_by), source_hash/i.test(
     `${error.message} ${error.details ?? ""}`,
+  )
+}
+
+function isDuplicatePrimaryKeyError(error: RepositoryErrorLike): boolean {
+  return (
+    error.code === "23505" &&
+    /(?:encrypted_)?(?:transactions|recurring_rules)_pkey|Key \(id\)=/i.test(
+      `${error.message} ${error.details ?? ""}`,
+    )
   )
 }
 

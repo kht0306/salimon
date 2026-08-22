@@ -3,8 +3,9 @@ import { useFonts } from "expo-font"
 import { Stack } from "expo-router"
 import * as SplashScreen from "expo-splash-screen"
 import { StatusBar } from "expo-status-bar"
+import { observer } from "mobx-react-lite"
 import { useEffect, useState } from "react"
-import { AppState } from "react-native"
+import { ActivityIndicator, AppState, BackHandler } from "react-native"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
 import { AppText } from "../components/AppText"
 import { MobileStoreProvider } from "../stores/MobileStoreProvider"
@@ -68,7 +69,11 @@ interface MobileRuntimeProps {
   store: MobileAppStore
 }
 
-function MobileRuntime({ store }: MobileRuntimeProps) {
+const MobileRuntime = observer(function MobileRuntime({
+  store,
+}: MobileRuntimeProps) {
+  const isSaving = store.transactionMutationState === "saving"
+
   useEffect(() => {
     const stopObserving = store.observeAuthSession()
     const stopRefreshing = store.bindSessionRefresh()
@@ -89,12 +94,40 @@ function MobileRuntime({ store }: MobileRuntimeProps) {
     }
   }, [store])
 
+  useEffect(() => {
+    if (!isSaving) return
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => true,
+    )
+    return () => subscription.remove()
+  }, [isSaving])
+
   return (
     <MobileStoreProvider store={store}>
-      <Stack screenOptions={stackScreenOptions} />
+      <AppFrame>
+        <Stack
+          screenOptions={{ ...stackScreenOptions, gestureEnabled: !isSaving }}
+        />
+        {isSaving ? (
+          <SavingOverlay
+            accessibilityLabel="거래를 서버에 저장하고 있습니다"
+            accessibilityLiveRegion="assertive"
+            accessibilityViewIsModal
+          >
+            <SavingCard>
+              <ActivityIndicator color={mobileTheme.colors.teal} size="small" />
+              <SavingTitle>거래를 안전하게 저장하고 있어요.</SavingTitle>
+              <SavingDescription>
+                완료될 때까지 잠시만 기다려 주세요.
+              </SavingDescription>
+            </SavingCard>
+          </SavingOverlay>
+        ) : null}
+      </AppFrame>
     </MobileStoreProvider>
   )
-}
+})
 
 interface ConfigurationErrorScreenProps {
   message: string
@@ -124,6 +157,48 @@ const ConfigurationPage = styled(SafeAreaView)`
   justify-content: center;
   background-color: ${mobileTheme.colors.canvas};
   padding: ${mobileTheme.spacing[4]}px;
+`
+
+const AppFrame = styled.View`
+  flex: 1;
+`
+
+const SavingOverlay = styled.View`
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(247, 248, 248, 0.86);
+  padding: ${mobileTheme.spacing[5]}px;
+`
+
+const SavingCard = styled.View`
+  width: 100%;
+  max-width: 340px;
+  align-items: center;
+  gap: ${mobileTheme.spacing[2]}px;
+  border-width: 1px;
+  border-color: ${mobileTheme.colors.border};
+  border-radius: ${mobileTheme.radii.md}px;
+  background-color: ${mobileTheme.colors.panel};
+  padding: ${mobileTheme.spacing[5]}px;
+`
+
+const SavingTitle = styled(AppText)`
+  color: ${mobileTheme.colors.ink};
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+`
+
+const SavingDescription = styled(AppText)`
+  color: ${mobileTheme.colors.muted};
+  font-size: 12px;
+  text-align: center;
 `
 
 const ConfigurationCard = styled.View`

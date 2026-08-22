@@ -10,6 +10,7 @@ vi.mock("./supabaseClient", () => ({
 }))
 
 import {
+  createTransactionRequestId,
   DuplicateTransactionSourceError,
   mapPaymentMethodType,
   SupabaseFinanceRepository,
@@ -32,6 +33,7 @@ class LoadQueryDouble implements PromiseLike<QueryResult> {
   readonly in = vi.fn(() => this)
   readonly gte = vi.fn(() => this)
   readonly lt = vi.fn(() => this)
+  readonly eq = vi.fn(() => this)
 
   constructor(private readonly result: QueryResult) {}
 
@@ -209,6 +211,46 @@ describe("load", () => {
   })
 })
 
+describe("loadTransactions", () => {
+  it("loads only transactions and their splits for the requested range", async () => {
+    const { client, from: injectedFrom, queries } = createLoadClientDouble()
+    const repository = new SupabaseFinanceRepository(client)
+
+    const data = await repository.loadTransactions({
+      start: "2026-08-01T00:00:00+09:00",
+      endExclusive: "2026-09-01T00:00:00+09:00",
+    })
+
+    expect(injectedFrom).toHaveBeenCalledTimes(2)
+    expect(injectedFrom).toHaveBeenNthCalledWith(1, "transactions")
+    expect(injectedFrom).toHaveBeenNthCalledWith(2, "transaction_splits")
+    expect(queries.get("transactions")?.gte).toHaveBeenCalledWith(
+      "transaction_at",
+      "2026-08-01T00:00:00+09:00",
+    )
+    expect(data.transactions).toHaveLength(1)
+    expect(data.transactionSplits).toHaveLength(1)
+  })
+})
+
+describe("findTransactionRequest", () => {
+  it("checks transaction and recurring-rule ids without reloading finance metadata", async () => {
+    const { client, from: injectedFrom } = createLoadClientDouble({
+      transactions: { data: { id: "request-1" }, error: null },
+      recurring_rules: { data: null, error: null },
+    })
+    const repository = new SupabaseFinanceRepository(client)
+
+    await expect(
+      repository.findTransactionRequest("request-1"),
+    ).resolves.toEqual({
+      transactionId: "request-1",
+      recurringRuleId: undefined,
+    })
+    expect(injectedFrom).toHaveBeenCalledTimes(2)
+  })
+})
+
 describe("mapPaymentMethodType", () => {
   it("preserves bank accounts instead of mapping every method as a card", () => {
     expect(mapPaymentMethodType("bank")).toBe("bank")
@@ -217,6 +259,14 @@ describe("mapPaymentMethodType", () => {
 
   it("falls back to card for legacy or unknown values", () => {
     expect(mapPaymentMethodType(undefined)).toBe("card")
+  })
+})
+
+describe("createTransactionRequestId", () => {
+  it("creates a UUID suitable for a durable database request id", () => {
+    expect(createTransactionRequestId()).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    )
   })
 })
 
@@ -269,6 +319,7 @@ describe("saveTransaction", () => {
       sourceApp: "com.lotte",
       sourceHash: "hash-1",
       sourceType: "android_sms_notification",
+      requestId: "00000000-0000-4000-8000-000000000001",
       status: "confirmed",
       transactionAt: "2026-08-12T20:30:00+09:00",
       type: "expense",
@@ -276,6 +327,7 @@ describe("saveTransaction", () => {
 
     expect(query.insert).toHaveBeenCalledWith(
       expect.objectContaining({
+        id: "00000000-0000-4000-8000-000000000001",
         source_app: "com.lotte",
         source_hash: "hash-1",
         source_type: "android_sms_notification",
@@ -312,6 +364,43 @@ describe("saveTransaction", () => {
     expect(query.abortSignal).toHaveBeenCalledWith(abortController.signal)
   })
 
+  it("treats a retry with the same request id as the original transaction", async () => {
+    const requestId = "00000000-0000-4000-8000-000000000001"
+    const duplicateInsert = new MutationQueryDouble({
+      data: null,
+      error: {
+        code: "23505",
+        details: `Key (id)=(${requestId}) already exists.`,
+        message:
+          'duplicate key value violates unique constraint "encrypted_transactions_pkey"',
+      },
+    })
+    let transactionCalls = 0
+    const clientFrom = vi.fn((table: string) => {
+      if (table === "transactions" && transactionCalls++ === 0) {
+        return duplicateInsert
+      }
+      return new LoadQueryDouble({
+        data: table === "transactions" ? { id: requestId } : null,
+        error: null,
+      })
+    })
+    const repository = new SupabaseFinanceRepository({
+      from: clientFrom,
+    } as unknown as SalimonSupabaseClient)
+
+    await expect(
+      repository.saveTransaction("user-1", {
+        ledgerId: "ledger-1",
+        type: "expense",
+        status: "confirmed",
+        amount: 12_000,
+        transactionAt: "2026-08-12T20:30:00+09:00",
+        requestId,
+      }),
+    ).resolves.toBe(requestId)
+  })
+
   it("creates new installments with the purchase-first schedule RPC", async () => {
     rpc.mockResolvedValue({ data: "rule-1", error: null })
     const repository = new SupabaseFinanceRepository()
@@ -323,13 +412,15 @@ describe("saveTransaction", () => {
       amount: 300000,
       transactionAt: "2026-07-24T07:30:00.000Z",
       recurringType: "installment",
+      requestId: "00000000-0000-4000-8000-000000000001",
       installmentMonths: 3,
       installmentAmountType: "principal",
       paymentMethodId: "card-1",
     })
 
-    expect(rpc).toHaveBeenCalledWith("save_card_installment_series_v3", {
+    expect(rpc).toHaveBeenCalledWith("save_card_installment_series_v4", {
       p_rule_id: null,
+      p_request_id: "00000000-0000-4000-8000-000000000001",
       p_ledger_id: "ledger-1",
       p_amount: 300000,
       p_amount_type: "principal",

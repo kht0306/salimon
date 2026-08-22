@@ -38,7 +38,7 @@ export const OnboardingChecklist = observer(function OnboardingChecklist() {
   }, [dismissalKey])
 
   if (
-    store.dataState !== "ready" ||
+    (store.dataState !== "ready" && store.dataState !== "refreshing") ||
     !store.currentLedger ||
     temporarilyDismissedLedgerId === store.selectedLedgerId ||
     (dismissalKey && persistentDismissal?.key !== dismissalKey) ||

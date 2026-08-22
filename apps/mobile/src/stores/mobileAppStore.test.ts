@@ -2,9 +2,11 @@ import {
   createEmptyFinanceData,
   DuplicateTransactionSourceError,
   type AuthSessionInfo,
-  type FinanceData,
   type FinanceMutationOptions,
   type RemoteTransactionInput,
+  type TransactionData,
+  type TransactionDateRange,
+  type TransactionRequestResult,
 } from "@salimon/api-client"
 import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "@salimon/types"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -130,6 +132,13 @@ function createRepository(data = createReadyFinanceData()) {
     leaveSharedLedger: vi.fn(async () => undefined),
     importTransactions: vi.fn(async () => undefined),
     load: vi.fn(async () => data),
+    loadTransactions: vi.fn(async (_range: TransactionDateRange) => ({
+      transactions: data.transactions,
+      transactionSplits: data.transactionSplits,
+    })),
+    findTransactionRequest: vi.fn(
+      async (_requestId: string): Promise<TransactionRequestResult> => ({}),
+    ),
     materializeMonth: vi.fn(async () => undefined),
     removeLedgerMember: vi.fn(async () => undefined),
     requestAccountDeletion: vi.fn(async () => "2026-08-29T00:00:00.000Z"),
@@ -669,7 +678,34 @@ describe("MobileAppStore authentication", () => {
     expect(repository.load).toHaveBeenCalledOnce()
 
     await store.refreshSelectedMonth()
-    expect(repository.load).toHaveBeenCalledTimes(2)
+    expect(repository.load).toHaveBeenCalledOnce()
+    expect(repository.loadTransactions).toHaveBeenCalledOnce()
+  })
+
+  it("prefetches adjacent months and reuses the prefetched month", async () => {
+    const repository = createRepository()
+    const store = new MobileAppStore(
+      repository,
+      createAuthGateway(),
+      new Date("2026-08-10T12:00:00+09:00"),
+      new QueryCache(),
+      true,
+    )
+
+    await store.initializeAuth()
+    await vi.waitFor(() =>
+      expect(repository.loadTransactions).toHaveBeenCalledTimes(2),
+    )
+
+    await store.moveSelectedMonth(-1)
+
+    expect(store.selectedMonth).toBe("2026-07")
+    expect(store.dataStatus).toBe("ready")
+    expect(
+      repository.loadTransactions.mock.calls.filter(
+        ([range]) => range.start === "2026-07-01T00:00:00+09:00",
+      ),
+    ).toHaveLength(1)
   })
 
   it("keeps the last successful month read-only when refresh fails", async () => {
@@ -685,7 +721,7 @@ describe("MobileAppStore authentication", () => {
       new QueryCache(),
     )
     await store.initializeAuth()
-    repository.load.mockRejectedValueOnce(
+    repository.loadTransactions.mockRejectedValueOnce(
       new Error(
         "fetch failed: UnknownHostException: unable to resolve host private.example.test",
       ),
@@ -821,7 +857,10 @@ describe("MobileAppStore authentication", () => {
       transactionId: "transaction-new",
     })
     expect(repository.saveTransaction).toHaveBeenCalledOnce()
-    expect(repository.load).toHaveBeenCalledTimes(2)
+    await vi.waitFor(() =>
+      expect(repository.loadTransactions).toHaveBeenCalledOnce(),
+    )
+    expect(repository.load).toHaveBeenCalledOnce()
     expect(store.transactionMutationState).toBe("idle")
   })
 
@@ -853,15 +892,16 @@ describe("MobileAppStore authentication", () => {
     ]
     const store = new MobileAppStore(repository, createAuthGateway())
     await store.initializeAuth()
-    repository.load.mockResolvedValueOnce(rangeData)
+    repository.loadTransactions.mockResolvedValueOnce({
+      transactions: rangeData.transactions,
+      transactionSplits: rangeData.transactionSplits,
+    })
 
     await store.loadTransactionSearchRange("2026-07-20", "2026-08-10")
 
-    expect(repository.load).toHaveBeenLastCalledWith("user-1", {
-      transactionDateRange: {
-        start: "2026-07-20T00:00:00+09:00",
-        endExclusive: "2026-08-11T00:00:00+09:00",
-      },
+    expect(repository.loadTransactions).toHaveBeenLastCalledWith({
+      start: "2026-07-20T00:00:00+09:00",
+      endExclusive: "2026-08-11T00:00:00+09:00",
     })
     expect(store.transactionSearchStatus).toBe("ready")
     expect(store.transactionSearchRangeKey).toBe("2026-07-20:2026-08-10")
@@ -1014,6 +1054,44 @@ describe("MobileAppStore authentication", () => {
     expect(repository.saveTransaction).toHaveBeenCalledTimes(2)
   })
 
+  it("recovers a completed transaction after its response times out", async () => {
+    vi.useFakeTimers()
+    const repository = createRepository()
+    repository.saveTransaction.mockImplementationOnce(
+      (_userId, _input, options) =>
+        new Promise<string>((_resolve, reject) => {
+          options?.signal?.addEventListener(
+            "abort",
+            () => reject(new Error("aborted")),
+            { once: true },
+          )
+        }),
+    )
+    repository.findTransactionRequest.mockImplementationOnce(
+      async (requestId) => ({ transactionId: requestId }),
+    )
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+
+    const save = store.saveGeneralTransaction({
+      ledgerId: "ledger-1",
+      type: "expense",
+      status: "confirmed",
+      amount: 20_000,
+      transactionAt: "2026-08-12T20:30:00+09:00",
+      categoryId: "food",
+    })
+    await vi.advanceTimersByTimeAsync(15_000)
+
+    await expect(save).resolves.toEqual({
+      status: "saved",
+      transactionId: expect.any(String),
+    })
+    expect(repository.findTransactionRequest).toHaveBeenCalledOnce()
+    expect(store.transactionMutationErrorMessage).toBeUndefined()
+    expect(store.transactionMutationState).toBe("idle")
+  })
+
   it("hides mutations from viewers and rejects a write defensively", async () => {
     const data = createReadyFinanceData()
     data.ledgers[0] = { ...data.ledgers[0]!, role: "viewer" }
@@ -1051,7 +1129,8 @@ describe("MobileAppStore authentication", () => {
       "expense-1",
       "user-1",
     )
-    expect(repository.load).toHaveBeenCalledTimes(2)
+    expect(repository.load).toHaveBeenCalledOnce()
+    expect(repository.loadTransactions).toHaveBeenCalledOnce()
   })
 
   it("saves the selected month note with the existing note id", async () => {
@@ -1150,20 +1229,38 @@ describe("MobileAppStore authentication", () => {
       new Date("2026-08-10T12:00:00+09:00"),
     )
     await store.initializeAuth()
-    const julyData = createReadyFinanceData()
-    julyData.profile.nickname = "7월 응답"
-    const juneData = createReadyFinanceData()
-    juneData.profile.nickname = "6월 응답"
-    const julyRequestResult = createDeferred<FinanceData>()
-    const juneRequestResult = createDeferred<FinanceData>()
-    repository.load
+    const julyData = {
+      transactions: [
+        {
+          ...createTransaction("july-1", "ledger-1", "expense", 10_000, 10),
+          transactionAt: "2026-07-10T12:00:00+09:00",
+        },
+      ],
+      transactionSplits: [],
+    }
+    const juneData = {
+      transactions: [
+        {
+          ...createTransaction("june-1", "ledger-1", "expense", 20_000, 10),
+          transactionAt: "2026-06-10T12:00:00+09:00",
+        },
+      ],
+      transactionSplits: [],
+    }
+    const julyRequestResult = createDeferred<TransactionData>()
+    const juneRequestResult = createDeferred<TransactionData>()
+    repository.loadTransactions
       .mockImplementationOnce(() => julyRequestResult.promise)
       .mockImplementationOnce(() => juneRequestResult.promise)
 
     const julyRequest = store.moveSelectedMonth(-1)
-    await vi.waitFor(() => expect(repository.load).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() =>
+      expect(repository.loadTransactions).toHaveBeenCalledTimes(1),
+    )
     const juneRequest = store.moveSelectedMonth(-1)
-    await vi.waitFor(() => expect(repository.load).toHaveBeenCalledTimes(3))
+    await vi.waitFor(() =>
+      expect(repository.loadTransactions).toHaveBeenCalledTimes(2),
+    )
 
     juneRequestResult.resolve(juneData)
     await juneRequest
@@ -1171,7 +1268,7 @@ describe("MobileAppStore authentication", () => {
     await julyRequest
 
     expect(store.selectedMonth).toBe("2026-06")
-    expect(store.financeData.profile.nickname).toBe("6월 응답")
+    expect(store.financeData.transactions[0]?.id).toBe("june-1")
   })
 })
 

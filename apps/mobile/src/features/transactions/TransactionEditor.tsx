@@ -1,4 +1,5 @@
 import styled from "@emotion/native"
+import { createTransactionRequestId } from "@salimon/api-client"
 import {
   formatKrw,
   getCategoryLabel,
@@ -224,11 +225,19 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
   const [picker, setPicker] = useState<PickerKind>()
   const [splitPickerIndex, setSplitPickerIndex] = useState<number>()
   const savingRef = useRef(false)
+  const requestIdRef = useRef<string | undefined>(undefined)
+  if (!requestIdRef.current) {
+    requestIdRef.current = createTransactionRequestId()
+  }
   const isSaving = store.transactionMutationState === "saving"
 
   useEffect(() => {
     store.clearTransactionMutationError()
   }, [store])
+
+  useEffect(() => {
+    requestIdRef.current = createTransactionRequestId()
+  }, [draft])
 
   const availableCategories = categories
     .filter(
@@ -395,7 +404,11 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
         { text: "취소", style: "cancel" },
         {
           text: transaction ? "수정" : "등록",
-          onPress: () => void persistTransaction(validation.input),
+          onPress: () =>
+            void persistTransaction({
+              ...validation.input,
+              requestId: requestIdRef.current,
+            }),
         },
       ],
     )
