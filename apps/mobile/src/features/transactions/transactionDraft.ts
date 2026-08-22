@@ -32,10 +32,12 @@ export interface MobileTransactionDraft {
   merchantName: string
   memo: string
   paymentMethodId: string
+  parseConfidence?: number
   recurringType: "" | "fixed" | "installment"
   applyChangesToFuture: boolean
   splits: MobileTransactionSplitDraft[]
   status: TransactionStatus
+  sourceType: Transaction["sourceType"]
   tagsInput: string
   time: string
   type: TransactionType
@@ -53,6 +55,7 @@ export interface MobileGeneralTransactionInput {
   merchantName?: string
   memo?: string
   paymentMethodId?: string
+  parseConfidence?: number
   recurringRuleId?: string
   recurringType?: "fixed" | "installment"
   applyChangesToFuture?: boolean
@@ -108,10 +111,12 @@ export function createNewMobileTransactionDraft(input: {
     memo: "",
     paymentMethodId:
       preferredPaymentMethod(input.paymentMethods, "expense")?.id ?? "",
+    parseConfidence: undefined,
     recurringType: "",
     applyChangesToFuture: true,
     splits: [],
     status: "confirmed",
+    sourceType: "manual",
     tagsInput: "",
     time,
     type: "expense",
@@ -140,6 +145,7 @@ export function createEditingMobileTransactionDraft(
     merchantName: transaction.merchantName ?? "",
     memo: transaction.memo ?? "",
     paymentMethodId: transaction.paymentMethodId ?? "",
+    parseConfidence: transaction.parseConfidence,
     recurringType: transaction.recurringType ?? "",
     applyChangesToFuture: true,
     splits: transactionSplits.map((split) => ({
@@ -147,6 +153,7 @@ export function createEditingMobileTransactionDraft(
       categoryId: split.categoryId,
     })),
     status: transaction.status,
+    sourceType: transaction.sourceType,
     tagsInput: transaction.tags?.join(", ") ?? "",
     time: time.slice(0, 5),
     type: transaction.type,
@@ -163,6 +170,8 @@ export function createCopiedMobileTransactionDraft(
     installmentAmountType: "monthly",
     installmentMonths: "2",
     applyChangesToFuture: true,
+    parseConfidence: undefined,
+    sourceType: "manual",
   }
 }
 
@@ -411,7 +420,8 @@ export function validateMobileTransactionDraft(
       applyChangesToFuture: context.editingTransaction
         ? draft.applyChangesToFuture
         : undefined,
-      sourceType: context.editingTransaction?.sourceType ?? "manual",
+      sourceType: draft.sourceType,
+      parseConfidence: draft.parseConfidence,
       tags,
       splits: splitCategorySelected
         ? splits.map((split) => ({

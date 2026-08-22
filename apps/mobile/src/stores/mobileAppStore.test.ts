@@ -112,6 +112,7 @@ function createRepository(data = createReadyFinanceData()) {
     })),
     archiveCategory: vi.fn(async () => undefined),
     archiveLedger: vi.fn(async () => undefined),
+    cancelAccountDeletion: vi.fn(async () => undefined),
     convertPersonalLedgerToShared: vi.fn(async () => undefined),
     createAccount: vi.fn(async () => undefined),
     createCard: vi.fn(async () => undefined),
@@ -127,9 +128,11 @@ function createRepository(data = createReadyFinanceData()) {
     deleteCard: vi.fn(async () => undefined),
     deleteInstallmentOccurrences: vi.fn(async () => undefined),
     leaveSharedLedger: vi.fn(async () => undefined),
+    importTransactions: vi.fn(async () => undefined),
     load: vi.fn(async () => data),
     materializeMonth: vi.fn(async () => undefined),
     removeLedgerMember: vi.fn(async () => undefined),
+    requestAccountDeletion: vi.fn(async () => "2026-08-29T00:00:00.000Z"),
     renameLedger: vi.fn(async () => undefined),
     restoreLedger: vi.fn(async () => undefined),
     revokeInvite: vi.fn(async () => undefined),
@@ -140,6 +143,7 @@ function createRepository(data = createReadyFinanceData()) {
         _options?: FinanceMutationOptions,
       ) => "transaction-new" as string | undefined,
     ),
+    saveMonthNote: vi.fn(async () => undefined),
     setAccountActive: vi.fn(async () => undefined),
     setCardActive: vi.fn(async () => undefined),
     setCategoryBudget: vi.fn(async () => undefined),
@@ -1048,6 +1052,76 @@ describe("MobileAppStore authentication", () => {
       "user-1",
     )
     expect(repository.load).toHaveBeenCalledTimes(2)
+  })
+
+  it("saves the selected month note with the existing note id", async () => {
+    const data = createReadyFinanceData()
+    data.monthNotes = [
+      {
+        id: "note-1",
+        ledgerId: "ledger-1",
+        month: "2026-08",
+        note: "기존 메모",
+        updatedAt: "2026-08-10T00:00:00.000Z",
+      },
+    ]
+    const repository = createRepository(data)
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+
+    await expect(store.saveMonthNote("수정 메모")).resolves.toBe(true)
+    expect(repository.saveMonthNote).toHaveBeenCalledWith(
+      "ledger-1",
+      "2026-08",
+      "수정 메모",
+      "note-1",
+    )
+  })
+
+  it("restores only new valid backup transactions with safe current ids", async () => {
+    const data = createReadyFinanceData()
+    data.categories = [createExpenseCategory()]
+    data.transactions = [
+      {
+        ...createTransaction("existing", "ledger-1", "expense", 12_000, 10),
+        merchantName: "동네마트",
+      },
+    ]
+    const repository = createRepository(data)
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+
+    const restored = await store.importBackupTransactions([
+      {
+        type: "expense",
+        status: "confirmed",
+        amount: 12_000,
+        transactionAt: "2026-08-10T12:00:00+09:00",
+        merchantName: "동네마트",
+      },
+      {
+        type: "expense",
+        status: "confirmed",
+        amount: 8_000,
+        transactionAt: "2026-08-11T12:00:00+09:00",
+        categoryId: "foreign-category",
+        tags: [" 가족 ", "가족"],
+      },
+      { type: "expense", amount: -1, transactionAt: "invalid" },
+    ])
+
+    expect(restored).toBe(1)
+    expect(repository.importTransactions).toHaveBeenCalledWith(
+      "user-1",
+      "ledger-1",
+      [
+        expect.objectContaining({
+          amount: 8_000,
+          categoryId: "category-1",
+          tags: ["가족"],
+        }),
+      ],
+    )
   })
 
   it("updates dashboard grouping and toggles recurrence sections", () => {

@@ -6,12 +6,14 @@ import type {
   LedgerMember,
   Transaction,
 } from "@salimon/types"
+import { AppButton } from "../../components/AppButton"
 import { AppText } from "../../components/AppText"
 import { mobileTheme } from "../../theme"
 import {
   getSettlementRoleAccess,
   settlementMemberName,
   type MobileSettlementSummary,
+  type SettlementMonthTrendRow,
   type SettlementRoleAccess,
   type VisiblePaymentMethodSummary,
 } from "./settlementPresentation"
@@ -20,10 +22,15 @@ interface SettlementBreakdownProps {
   categories: Category[]
   ledgerType: Ledger["type"]
   members: LedgerMember[]
-  monthNote?: string
+  monthNote: string
+  monthNoteBusy: boolean
   paymentMethodSummary: VisiblePaymentMethodSummary
   roleAccess: SettlementRoleAccess
   summary: MobileSettlementSummary
+  trend: SettlementMonthTrendRow[]
+  trendLoading: boolean
+  onMonthNoteChange: (note: string) => void
+  onMonthNoteSave: () => void
   onTransactionPress: (transactionId: string) => void
 }
 
@@ -32,9 +39,14 @@ export function SettlementBreakdown({
   ledgerType,
   members,
   monthNote,
+  monthNoteBusy,
   paymentMethodSummary,
   roleAccess,
   summary,
+  trend,
+  trendLoading,
+  onMonthNoteChange,
+  onMonthNoteSave,
   onTransactionPress,
 }: SettlementBreakdownProps) {
   const maxMemberExpense = Math.max(
@@ -50,6 +62,7 @@ export function SettlementBreakdown({
     1,
     ...summary.weekRows.map((row) => row.amount),
   )
+  const maxTrendExpense = Math.max(1, ...trend.map((row) => row.amount))
 
   return (
     <>
@@ -131,6 +144,35 @@ export function SettlementBreakdown({
             않습니다.
           </PrivacyDescription>
         </PrivacyNotice>
+      </SectionCard>
+
+      <SectionCard>
+        <SectionHeading>
+          <SectionHeadingCopy>
+            <SectionTitle>최근 3개월 지출 추이</SectionTitle>
+            <SectionDescription>
+              선택한 달까지 확정 지출만 비교합니다.
+            </SectionDescription>
+          </SectionHeadingCopy>
+          {trendLoading ? <SectionCount>불러오는 중</SectionCount> : null}
+        </SectionHeading>
+        <BreakdownList>
+          {trend.map((row) => (
+            <BreakdownRow key={row.month}>
+              <BreakdownHeading>
+                <BreakdownName>{row.label}</BreakdownName>
+                <BreakdownValue $warning={false}>
+                  {formatKrw(row.amount)}
+                </BreakdownValue>
+              </BreakdownHeading>
+              <BreakdownTrack>
+                <TrendFill
+                  style={{ width: `${(row.amount / maxTrendExpense) * 100}%` }}
+                />
+              </BreakdownTrack>
+            </BreakdownRow>
+          ))}
+        </BreakdownList>
       </SectionCard>
 
       <SectionCard>
@@ -231,13 +273,28 @@ export function SettlementBreakdown({
               이월·환급·가족 합의 등 거래 밖의 정산 내용을 확인합니다.
             </SectionDescription>
           </SectionHeadingCopy>
-          <ReadOnlyLabel>
-            {roleAccess.canEditMonthNote ? "모바일 읽기 전용" : "조회 권한"}
-          </ReadOnlyLabel>
+          {!roleAccess.canEditMonthNote ? (
+            <ReadOnlyLabel>조회 권한</ReadOnlyLabel>
+          ) : null}
         </SectionHeading>
-        <MonthNote $empty={!monthNote?.trim()}>
-          {monthNote?.trim() || "이 달에 작성된 정산 메모가 없습니다."}
-        </MonthNote>
+        <MonthNoteInput
+          accessibilityLabel="공동 월 정산 메모"
+          editable={roleAccess.canEditMonthNote && !monthNoteBusy}
+          maxLength={1_000}
+          multiline
+          placeholder="예: 이번 달 공과금 30,000원은 다음 달에 이월 정산"
+          textAlignVertical="top"
+          value={monthNote}
+          onChangeText={onMonthNoteChange}
+        />
+        {roleAccess.canEditMonthNote ? (
+          <AppButton
+            disabled={monthNoteBusy}
+            label={monthNoteBusy ? "저장 중..." : "메모 저장"}
+            tone="secondary"
+            onPress={onMonthNoteSave}
+          />
+        ) : null}
       </SectionCard>
 
       <SectionCard>
@@ -507,6 +564,12 @@ const WeekFill = styled.View({
   backgroundColor: mobileTheme.colors.teal,
 })
 
+const TrendFill = styled.View({
+  height: "100%",
+  borderRadius: mobileTheme.radii.round,
+  backgroundColor: mobileTheme.colors.green,
+})
+
 const WarningLabel = styled(AppText)({
   color: mobileTheme.colors.amber,
   fontSize: 9,
@@ -528,17 +591,18 @@ const ReadOnlyLabel = styled(AppText)({
   fontWeight: "600",
 })
 
-const MonthNote = styled(AppText)<{ $empty: boolean }>(({ $empty }) => ({
+const MonthNoteInput = styled.TextInput({
   minHeight: 68,
   borderWidth: 1,
   borderColor: mobileTheme.colors.border,
   borderRadius: mobileTheme.radii.sm,
   backgroundColor: mobileTheme.colors.panelSubtle,
-  color: $empty ? mobileTheme.colors.subtle : mobileTheme.colors.ink,
+  color: mobileTheme.colors.ink,
+  fontFamily: "Pretendard",
   fontSize: 11,
   lineHeight: 18,
   padding: mobileTheme.spacing[3],
-}))
+})
 
 const RecentList = styled.View({ gap: mobileTheme.spacing[2] })
 

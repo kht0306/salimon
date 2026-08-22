@@ -11,6 +11,7 @@ import type {
   LedgerMember,
   PaymentMethod,
   RecurringRule,
+  ReceiptParseResult,
   Transaction,
   TransactionSplit,
   TransactionType,
@@ -31,6 +32,8 @@ import { AppButton } from "../../components/AppButton"
 import { AppText } from "../../components/AppText"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
+import { ReceiptImportPanel } from "../receipts/ReceiptImportPanel"
+import { applyReceiptToMobileDraft } from "../receipts/receiptDraft"
 import {
   changeMobileTransactionType,
   createCopiedMobileTransactionDraft,
@@ -217,6 +220,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
           }),
   )
   const [formError, setFormError] = useState<string>()
+  const [receiptWarnings, setReceiptWarnings] = useState<string[]>([])
   const [picker, setPicker] = useState<PickerKind>()
   const [splitPickerIndex, setSplitPickerIndex] = useState<number>()
   const savingRef = useRef(false)
@@ -288,6 +292,19 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
     updateDraft(
       changeMobileTransactionType(draft, type, categories, paymentMethods),
     )
+  }
+
+  function applyReceipt(result: ReceiptParseResult): void {
+    updateDraft(
+      applyReceiptToMobileDraft({
+        categories,
+        draft,
+        ledgerId: store.selectedLedgerId,
+        paymentMethods,
+        result,
+      }),
+    )
+    setReceiptWarnings(result.warnings)
   }
 
   function selectIncomeKind(
@@ -549,6 +566,19 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                 반영합니다.
               </IntroDescription>
             </Intro>
+
+            {!transaction && !copySource ? (
+              <ReceiptImportPanel disabled={isSaving} onApply={applyReceipt} />
+            ) : null}
+
+            {draft.sourceType === "receipt_ai" ? (
+              <InlineNotice accessibilityLiveRegion="polite">
+                영수증을 읽었습니다. 금액·거래일·결제수단을 확인해 주세요.
+                {receiptWarnings.length > 0
+                  ? ` ${receiptWarnings.join(" ")}`
+                  : ""}
+              </InlineNotice>
+            ) : null}
 
             {formError ? (
               <ErrorNotice accessibilityLiveRegion="assertive">
