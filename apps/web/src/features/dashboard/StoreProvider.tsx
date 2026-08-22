@@ -20,7 +20,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (
         store.authState !== "authenticated" ||
         !store.authUser ||
-        store.dataState === "loading"
+        store.dataState === "loading" ||
+        store.dataState === "refreshing" ||
+        store.transactionMutationState !== "idle"
       ) {
         return
       }

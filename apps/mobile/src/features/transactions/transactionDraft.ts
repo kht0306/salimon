@@ -58,6 +58,7 @@ export interface MobileGeneralTransactionInput {
   parseConfidence?: number
   recurringRuleId?: string
   recurringType?: "fixed" | "installment"
+  requestId?: string
   applyChangesToFuture?: boolean
   splits?: { amount: number; categoryId: string }[]
   sourceType: Transaction["sourceType"]

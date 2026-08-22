@@ -1,6 +1,7 @@
 "use client"
 
 import styled from "@emotion/styled"
+import { createTransactionRequestId } from "@salimon/api-client"
 import { isSplitCategory } from "@salimon/domain"
 import type { Transaction } from "@salimon/types"
 import { colors, radii } from "@salimon/ui-tokens"
@@ -47,13 +48,17 @@ export const TransactionEditor = observer(function TransactionEditor({
     initialTagsInput,
     initialSplits,
   } = session
-  const [isSaving, setSaving] = useState(false)
+  const isSaving = store.transactionMutationState === "saving"
   const [tagsInput, setTagsInput] = useState(initialTagsInput)
   const [splits, setSplits] = useState(initialSplits)
   const initialTagsRef = useRef(initialTagsInput)
   const initialSplitsRef = useRef(initialSplits)
   const editorRef = useRef<HTMLDivElement>(null)
   const savingRef = useRef(false)
+  const requestIdRef = useRef<string | undefined>(undefined)
+  if (!requestIdRef.current) {
+    requestIdRef.current = createTransactionRequestId()
+  }
   const [draft, setDraft] = useState(initialDraft)
   const initialDraftRef = useRef(initialDraft)
   const isEditingInstallment = isInstallmentEditLocked(editing)
@@ -73,6 +78,10 @@ export const TransactionEditor = observer(function TransactionEditor({
         JSON.stringify(splits) !== JSON.stringify(initialSplitsRef.current))
     store.setTransactionEditorDirty(dirty)
   }, [draft, splits, store, store.transactionEditorOpen, tagsInput])
+
+  useEffect(() => {
+    requestIdRef.current = createTransactionRequestId()
+  }, [draft, splits, tagsInput])
 
   const amount = Number(draft.amount)
   const splitCategorySelected = isSplitCategory(
@@ -154,6 +163,7 @@ export const TransactionEditor = observer(function TransactionEditor({
     )
   })
   function closeForm() {
+    if (isSaving) return
     onClose()
   }
 
@@ -174,10 +184,10 @@ export const TransactionEditor = observer(function TransactionEditor({
     }
 
     savingRef.current = true
-    setSaving(true)
     try {
       const saved = await store.saveTransaction({
         id: editing?.id,
+        requestId: requestIdRef.current,
         ledgerId: store.selectedLedgerId,
         type: draft.type as Transaction["type"],
         incomeKind: draft.type === "income" ? draft.incomeKind : undefined,
@@ -222,7 +232,6 @@ export const TransactionEditor = observer(function TransactionEditor({
       }
     } finally {
       savingRef.current = false
-      setSaving(false)
     }
   }
 
@@ -236,7 +245,7 @@ export const TransactionEditor = observer(function TransactionEditor({
               ? "거래 복사 · 신규 등록"
               : "거래 추가"}
         </strong>
-        <IconButton title="닫기" onClick={closeForm}>
+        <IconButton title="닫기" disabled={isSaving} onClick={closeForm}>
           <X size={16} />
         </IconButton>
       </EditorHeader>

@@ -60,6 +60,7 @@ export const DashboardShell = observer(function DashboardShell({
   const store = useAppStore()
   const router = useRouter()
   const currentMembership = store.currentMembership
+  const isSavingTransaction = store.transactionMutationState === "saving"
   const hasCurrentLedger = Boolean(store.currentLedger)
   const isArchivedLedger = Boolean(store.currentLedger?.archivedAt)
   const canRenderContent =
@@ -83,7 +84,7 @@ export const DashboardShell = observer(function DashboardShell({
 
     if (
       store.authState === "authenticated" &&
-      store.dataState === "ready" &&
+      (store.dataState === "ready" || store.dataState === "refreshing") &&
       shouldRedirectToLedgerManagement(view, store.currentLedger)
     ) {
       router.replace(dashboardRoutes.ledger)
@@ -106,6 +107,16 @@ export const DashboardShell = observer(function DashboardShell({
     view,
   ])
 
+  useEffect(() => {
+    if (!isSavingTransaction) return
+    const preventUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ""
+    }
+    window.addEventListener("beforeunload", preventUnload)
+    return () => window.removeEventListener("beforeunload", preventUnload)
+  }, [isSavingTransaction])
+
   if (store.authState !== "authenticated" || !store.authUser) {
     return (
       <AuthLoading>
@@ -117,7 +128,7 @@ export const DashboardShell = observer(function DashboardShell({
   }
 
   if (
-    store.dataState === "ready" &&
+    store.data.profile.id &&
     (store.data.legalConsent?.termsVersion !== CURRENT_TERMS_VERSION ||
       store.data.legalConsent?.privacyVersion !== CURRENT_PRIVACY_VERSION)
   ) {
@@ -125,7 +136,10 @@ export const DashboardShell = observer(function DashboardShell({
   }
 
   return (
-    <Shell $showTransactionPanel={showSidePanel}>
+    <Shell
+      $showTransactionPanel={showSidePanel}
+      aria-busy={isSavingTransaction}
+    >
       <Sidebar>
         <Brand
           href={dashboardRoutes.calendar}
@@ -347,6 +361,19 @@ export const DashboardShell = observer(function DashboardShell({
         >
           {store.toast.message}
         </Toast>
+      ) : null}
+      {isSavingTransaction ? (
+        <TransactionSavingShield
+          aria-live="assertive"
+          aria-label="거래를 서버에 저장하고 있습니다"
+          role="status"
+        >
+          <TransactionSavingCard>
+            <TransactionSavingSpinner aria-hidden="true" />
+            <strong>거래를 안전하게 저장하고 있습니다.</strong>
+            <span>완료될 때까지 이 화면을 유지해 주세요.</span>
+          </TransactionSavingCard>
+        </TransactionSavingShield>
       ) : null}
     </Shell>
   )
@@ -584,4 +611,51 @@ const Toast = styled.button<{ $tone: "success" | "error" | "info" }>`
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
   font-size: 13px;
   font-weight: 650;
+`
+
+const TransactionSavingShield = styled.div`
+  position: fixed;
+  z-index: 2000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(247, 248, 248, 0.82);
+  padding: 20px;
+`
+
+const TransactionSavingCard = styled.div`
+  width: min(360px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  border: 1px solid ${colors.border};
+  border-radius: ${radii.md};
+  background: ${colors.panel};
+  padding: 24px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.14);
+  text-align: center;
+
+  span {
+    color: ${colors.muted};
+    font-size: 12px;
+  }
+`
+
+const TransactionSavingSpinner = styled.i`
+  width: 22px;
+  height: 22px;
+  border: 2px solid ${colors.borderStrong};
+  border-top-color: ${colors.teal};
+  border-radius: 50%;
+  animation: transaction-saving-spin 700ms linear infinite;
+
+  @keyframes transaction-saving-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 `

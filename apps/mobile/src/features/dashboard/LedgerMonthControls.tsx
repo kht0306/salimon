@@ -1,6 +1,6 @@
 import styled from "@emotion/native"
 import { observer } from "mobx-react-lite"
-import { ScrollView } from "react-native"
+import { ActivityIndicator, ScrollView } from "react-native"
 import { ChevronLeft, ChevronRight } from "lucide-react-native"
 import { AppText } from "../../components/AppText"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
@@ -56,9 +56,18 @@ export const LedgerMonthControls = observer(function LedgerMonthControls() {
             strokeWidth={1.8}
           />
         </MonthButton>
-        <MonthLabel accessibilityRole="header">
-          {year}년 {month}월
-        </MonthLabel>
+        <MonthLabelGroup>
+          <MonthLabel accessibilityRole="header">
+            {year}년 {month}월
+          </MonthLabel>
+          {store.dataStatus === "refreshing" ? (
+            <ActivityIndicator
+              accessibilityLabel="선택한 월을 불러오는 중"
+              color={mobileTheme.colors.teal}
+              size="small"
+            />
+          ) : null}
+        </MonthLabelGroup>
         <MonthButton
           accessibilityLabel="다음 달"
           accessibilityRole="button"
@@ -152,3 +161,10 @@ const MonthLabel = styled(AppText)`
   line-height: 25px;
   text-align: center;
 `
+
+const MonthLabelGroup = styled.View({
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: mobileTheme.spacing[2],
+})

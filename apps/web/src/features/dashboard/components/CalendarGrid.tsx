@@ -9,7 +9,12 @@ import {
   toDateKey,
 } from "@salimon/domain"
 import { colors, radii } from "@salimon/ui-tokens"
-import { CalendarCheck2, ChevronLeft, ChevronRight } from "lucide-react"
+import {
+  CalendarCheck2,
+  ChevronLeft,
+  ChevronRight,
+  LoaderCircle,
+} from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useMemo, useState } from "react"
 import { useAppStore } from "../StoreProvider"
@@ -99,6 +104,7 @@ export const CalendarGrid = observer(function CalendarGrid() {
           <MonthControls>
             <IconButton
               title="이전 달"
+              disabled={store.transactionMutationState === "saving"}
               onClick={() => store.moveSelectedMonth(-1)}
             >
               <ChevronLeft size={18} />
@@ -106,8 +112,17 @@ export const CalendarGrid = observer(function CalendarGrid() {
             <PanelTitle>
               {baseMonth.getFullYear()}년 {baseMonth.getMonth() + 1}월
             </PanelTitle>
+            {store.dataState === "refreshing" ? (
+              <MonthRefreshIndicator
+                aria-label="선택한 월을 불러오는 중"
+                role="status"
+              >
+                <LoaderCircle size={15} />
+              </MonthRefreshIndicator>
+            ) : null}
             <IconButton
               title="다음 달"
+              disabled={store.transactionMutationState === "saving"}
               onClick={() => store.moveSelectedMonth(1)}
             >
               <ChevronRight size={18} />
@@ -307,6 +322,27 @@ const MonthControls = styled.div`
   h2 {
     min-width: 104px;
     text-align: center;
+  }
+`
+
+const MonthRefreshIndicator = styled.span`
+  display: inline-flex;
+  color: ${colors.teal};
+
+  svg {
+    animation: month-refresh-spin 800ms linear infinite;
+  }
+
+  @keyframes month-refresh-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    svg {
+      animation: none;
+    }
   }
 `
 
