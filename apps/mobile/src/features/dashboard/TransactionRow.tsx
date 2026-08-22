@@ -21,6 +21,7 @@ export function TransactionRow({
     transaction.categoryId,
     "미분류",
   )
+  const category = categories.find((item) => item.id === transaction.categoryId)
   const title = transaction.merchantName ?? transaction.memo ?? categoryLabel
   const typeLabel = transactionTypeLabel(transaction.type)
   const amountPrefix = transaction.type === "income" ? "+" : "−"
@@ -38,10 +39,19 @@ export function TransactionRow({
     >
       <TransactionCopy>
         <Title>{title}</Title>
-        <Metadata>
-          {categoryLabel} · {formatKoreanTime(transaction.transactionAt)}
-          {transaction.status === "excluded" ? " · 합계 제외" : ""}
-        </Metadata>
+        <MetadataRow>
+          <CategoryChip
+            style={{
+              borderLeftColor: category?.color ?? mobileTheme.colors.subtle,
+            }}
+          >
+            <CategoryLabel>{categoryLabel}</CategoryLabel>
+          </CategoryChip>
+          <Metadata>
+            {formatKoreanTime(transaction.transactionAt)}
+            {transaction.status === "excluded" ? " · 합계 제외" : ""}
+          </Metadata>
+        </MetadataRow>
       </TransactionCopy>
       <Amount $type={transaction.type}>
         {amountPrefix}
@@ -74,8 +84,32 @@ const Title = styled(AppText)`
   line-height: 20px;
 `
 
+const MetadataRow = styled.View({
+  flexDirection: "row",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: mobileTheme.spacing[1],
+  marginTop: mobileTheme.spacing[1],
+})
+
+const CategoryChip = styled.View({
+  borderWidth: 1,
+  borderLeftWidth: 3,
+  borderColor: mobileTheme.colors.border,
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: mobileTheme.colors.panel,
+  paddingVertical: 3,
+  paddingHorizontal: 6,
+})
+
+const CategoryLabel = styled(AppText)`
+  color: ${mobileTheme.colors.ink};
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+`
+
 const Metadata = styled(AppText)`
-  margin-top: ${mobileTheme.spacing[1]}px;
   color: ${mobileTheme.colors.muted};
   font-size: 10px;
   line-height: 15px;

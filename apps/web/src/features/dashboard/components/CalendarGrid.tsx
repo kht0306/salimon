@@ -60,32 +60,38 @@ export const CalendarGrid = observer(function CalendarGrid() {
     <CalendarStack>
       {store.selectedMonthBudgets.length > 0 ? (
         <BudgetStrip>
-          {store.selectedMonthBudgets.map(({ category, amount, spent }) => (
-            <BudgetCard
-              key={category.id}
-              type="button"
-              $color={category.color}
-              aria-haspopup="dialog"
-              aria-label={`${getCategoryLabel(store.data.categories, category.id)} 예산 포함 거래 보기`}
-              onClick={() => setSelectedBudgetCategoryId(category.id)}
-            >
-              <strong>
-                <CategoryDot $color={category.color} />
-                {getCategoryLabel(store.data.categories, category.id)}
-              </strong>
-              <span>
-                {formatKrw(spent)} / {formatKrw(amount)}
-              </span>
-              <Progress>
-                <i
-                  style={{
-                    width: `${Math.min(100, amount ? (spent / amount) * 100 : 0)}%`,
-                    background: category.color,
-                  }}
-                />
-              </Progress>
-            </BudgetCard>
-          ))}
+          {store.selectedMonthBudgets.map(({ category, amount, spent }) => {
+            const isOverBudget = spent > amount
+            return (
+              <BudgetCard
+                key={category.id}
+                type="button"
+                $color={category.color}
+                aria-haspopup="dialog"
+                aria-label={`${getCategoryLabel(store.data.categories, category.id)} 예산 포함 거래 보기`}
+                onClick={() => setSelectedBudgetCategoryId(category.id)}
+              >
+                <strong>
+                  <CategoryDot $color={category.color} />
+                  {getCategoryLabel(store.data.categories, category.id)}
+                </strong>
+                <BudgetAmounts>
+                  <BudgetSpent $over={isOverBudget}>
+                    {formatKrw(spent)}
+                  </BudgetSpent>{" "}
+                  / {formatKrw(amount)}
+                </BudgetAmounts>
+                <Progress>
+                  <i
+                    style={{
+                      width: `${Math.min(100, amount ? (spent / amount) * 100 : 0)}%`,
+                      background: category.color,
+                    }}
+                  />
+                </Progress>
+              </BudgetCard>
+            )
+          })}
         </BudgetStrip>
       ) : null}
       <Panel>
@@ -267,10 +273,14 @@ const BudgetCard = styled.button<{ $color: string }>`
     gap: 6px;
     font-size: 12px;
   }
-  span {
-    color: ${colors.muted};
-    font-size: 11px;
-  }
+`
+const BudgetAmounts = styled.div`
+  color: ${colors.muted};
+  font-size: 11px;
+`
+const BudgetSpent = styled.span<{ $over: boolean }>`
+  color: ${({ $over }) => ($over ? colors.coral : "inherit")};
+  font-weight: ${({ $over }) => ($over ? 700 : 400)};
 `
 const CategoryDot = styled.i<{ $color: string }>`
   width: 8px;

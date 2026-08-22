@@ -46,13 +46,18 @@ export function BudgetOverview({ budgets }: BudgetOverviewProps) {
                 accessible
                 accessibilityLabel={`${category.name}, ${formatKrw(
                   spent,
-                )} 사용, ${formatKrw(amount)} 예산`}
+                )} 사용, ${formatKrw(amount)} 예산${
+                  isOverBudget ? ", 예산 초과" : ""
+                }`}
               >
                 <BudgetHeading>
                   <BudgetName>{category.name}</BudgetName>
-                  <BudgetAmount $over={isOverBudget}>
-                    {formatKrw(spent)} / {formatKrw(amount)}
-                  </BudgetAmount>
+                  <BudgetAmounts>
+                    <BudgetSpent $over={isOverBudget}>
+                      {formatKrw(spent)}
+                    </BudgetSpent>
+                    <BudgetLimit> / {formatKrw(amount)}</BudgetLimit>
+                  </BudgetAmounts>
                 </BudgetHeading>
                 <ProgressTrack
                   accessibilityRole="progressbar"
@@ -65,9 +70,7 @@ export function BudgetOverview({ budgets }: BudgetOverviewProps) {
                   <ProgressFill
                     style={{
                       width: `${percentage}%`,
-                      backgroundColor: isOverBudget
-                        ? mobileTheme.colors.amber
-                        : mobileTheme.colors.teal,
+                      backgroundColor: category.color,
                     }}
                   />
                 </ProgressTrack>
@@ -137,14 +140,26 @@ const BudgetName = styled(AppText)`
   font-weight: 600;
 `
 
-const BudgetAmount = styled(AppText)<{ $over: boolean }>`
-  flex-shrink: 1;
+const BudgetAmounts = styled.View({
+  flexShrink: 1,
+  flexDirection: "row",
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
+})
+
+const BudgetSpent = styled(AppText)<{ $over: boolean }>`
   color: ${({ $over }) =>
-    $over ? mobileTheme.colors.amber : mobileTheme.colors.muted};
+    $over ? mobileTheme.colors.coral : mobileTheme.colors.muted};
   font-size: 10px;
   font-weight: ${({ $over }) => ($over ? 700 : 500)};
   line-height: 15px;
-  text-align: right;
+`
+
+const BudgetLimit = styled(AppText)`
+  color: ${mobileTheme.colors.muted};
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 15px;
 `
 
 const ProgressTrack = styled.View({
