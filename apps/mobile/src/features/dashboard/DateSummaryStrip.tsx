@@ -15,11 +15,17 @@ export function DateSummaryStrip({
   onSelect,
   selectedDate,
 }: DateSummaryStripProps) {
+  const selectedDay = days.find((day) => day.date === selectedDate)
+
   return (
     <Section>
       <SectionHeading>
         <SectionTitle>날짜별 요약</SectionTitle>
-        <SectionHint>좌우로 밀어 날짜를 선택하세요.</SectionHint>
+        <SectionHint>
+          {selectedDay
+            ? `${Number(selectedDate.slice(5, 7))}월 ${selectedDay.dayOfMonth}일 · ${selectedDay.count}건`
+            : "날짜를 선택하세요."}
+        </SectionHint>
       </SectionHeading>
       <ScrollView
         horizontal
@@ -41,26 +47,6 @@ export function DateSummaryStrip({
               <TransactionCount $selected={selected}>
                 {day.count}건
               </TransactionCount>
-              <AmountStack>
-                {day.expense > 0 ? (
-                  <DayAmount $selected={selected} $tone="expense">
-                    지 {formatCompactAmount(day.expense)}
-                  </DayAmount>
-                ) : null}
-                {day.income > 0 ? (
-                  <DayAmount $selected={selected} $tone="income">
-                    수 {formatCompactAmount(day.income)}
-                  </DayAmount>
-                ) : null}
-                {day.saving > 0 ? (
-                  <DayAmount $selected={selected} $tone="saving">
-                    저 {formatCompactAmount(day.saving)}
-                  </DayAmount>
-                ) : null}
-                {day.expense + day.income + day.saving === 0 ? (
-                  <NoAmount $selected={selected}>—</NoAmount>
-                ) : null}
-              </AmountStack>
             </DayButton>
           )
         })}
@@ -69,16 +55,14 @@ export function DateSummaryStrip({
   )
 }
 
-function formatCompactAmount(amount: number): string {
-  return new Intl.NumberFormat("ko-KR", {
-    maximumFractionDigits: 1,
-    notation: "compact",
-  }).format(amount)
-}
+const dateContentStyle = { gap: 6, paddingRight: 16 } as const
 
-const dateContentStyle = { gap: 8, paddingRight: 20 } as const
-
-const Section = styled.View({ gap: mobileTheme.spacing[3] })
+const Section = styled.View({
+  gap: mobileTheme.spacing[3],
+  borderBottomWidth: 1,
+  borderBottomColor: mobileTheme.colors.border,
+  paddingBottom: mobileTheme.spacing[4],
+})
 
 const SectionHeading = styled.View({
   flexDirection: "row",
@@ -102,8 +86,8 @@ const SectionHint = styled(AppText)`
 `
 
 const DayButton = styled.Pressable<{ $selected: boolean }>(({ $selected }) => ({
-  width: 68,
-  minHeight: 94,
+  width: 60,
+  minHeight: 64,
   gap: mobileTheme.spacing[1],
   borderWidth: 1,
   borderColor: $selected ? mobileTheme.colors.teal : mobileTheme.colors.border,
@@ -125,25 +109,4 @@ const TransactionCount = styled(AppText)<{ $selected: boolean }>`
   color: ${mobileTheme.colors.muted};
   font-size: 10px;
   font-weight: 600;
-`
-
-const AmountStack = styled.View({
-  gap: 1,
-  marginTop: mobileTheme.spacing[1],
-})
-
-const DayAmount = styled(AppText)<{
-  $selected: boolean
-  $tone: "expense" | "income" | "saving"
-}>`
-  color: ${({ $tone }) =>
-    $tone === "income" ? mobileTheme.colors.green : mobileTheme.colors.muted};
-  font-size: 9px;
-  font-weight: 600;
-  line-height: 13px;
-`
-
-const NoAmount = styled(AppText)<{ $selected: boolean }>`
-  color: ${mobileTheme.colors.subtle};
-  font-size: 10px;
 `

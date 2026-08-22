@@ -196,6 +196,24 @@ export class MobileAppStore {
     )
   }
 
+  get defaultLedgerId(): string {
+    const configuredLedgerId = this.financeData.members.find(
+      (member) =>
+        member.userId === this.authUser?.id &&
+        member.status === "active" &&
+        member.isDefault,
+    )?.ledgerId
+    const configuredLedger = this.selectableLedgers.find(
+      (ledger) => ledger.id === configuredLedgerId && ledger.role !== "viewer",
+    )
+
+    return (
+      configuredLedger?.id ??
+      this.selectableLedgers.find((ledger) => ledger.role !== "viewer")?.id ??
+      ""
+    )
+  }
+
   get currentLedgerName(): string {
     return this.currentLedger?.name ?? "내 가계부"
   }
@@ -210,7 +228,7 @@ export class MobileAppStore {
       (ledger) => ledger.id === configuredLedgerId,
     )
       ? configuredLedgerId
-      : this.selectedLedgerId
+      : this.defaultLedgerId
   }
 
   get selectedMonthNote() {
@@ -777,7 +795,7 @@ export class MobileAppStore {
         (ledger) => ledger.id === status.targetLedgerId,
       )
         ? status.targetLedgerId
-        : this.selectedLedgerId
+        : this.defaultLedgerId
       const deferredIds = new Set(
         this.notificationCandidates
           .filter((candidate) => candidate.status === "deferred")
@@ -855,6 +873,7 @@ export class MobileAppStore {
       authUserId: userId,
       canWriteData: this.dataStatus !== "stale" && this.dataStatus !== "error",
       categories: this.financeData.categories,
+      defaultLedgerId: this.defaultLedgerId,
       ledgers: this.selectableLedgers,
       members: this.financeData.members,
       paymentMethods: this.financeData.paymentMethods,

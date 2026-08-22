@@ -13,7 +13,6 @@ export function MonthlySummary({ totals }: MonthlySummaryProps) {
     <Panel accessibilityLabel="이번 달 수입 지출 저축 합계">
       <HeroLabel>이번 달 지출</HeroLabel>
       <HeroValue>{formatKrw(totals.expense)}</HeroValue>
-      <SummaryDivider />
       <SummaryGrid>
         <SummaryItem>
           <SummaryLabel>들어온 돈</SummaryLabel>
@@ -30,11 +29,10 @@ export function MonthlySummary({ totals }: MonthlySummaryProps) {
 
 const Panel = styled.View({
   gap: mobileTheme.spacing[3],
-  borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
-  borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
-  padding: mobileTheme.spacing[5],
+  borderBottomWidth: 1,
+  borderBottomColor: mobileTheme.colors.border,
+  paddingTop: mobileTheme.spacing[1],
+  paddingBottom: mobileTheme.spacing[5],
 })
 
 const HeroLabel = styled(AppText)`
@@ -50,12 +48,6 @@ const HeroValue = styled(AppText)`
   letter-spacing: -0.5px;
   line-height: 40px;
 `
-
-const SummaryDivider = styled.View({
-  height: 1,
-  marginVertical: mobileTheme.spacing[2],
-  backgroundColor: mobileTheme.colors.border,
-})
 
 const SummaryGrid = styled.View({
   flexDirection: "row",

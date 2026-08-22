@@ -30,6 +30,7 @@ export interface CandidateRegistrationContext {
   authUserId: string
   canWriteData: boolean
   categories: Category[]
+  defaultLedgerId: string
   ledgers: Ledger[]
   members: LedgerMember[]
   paymentMethods: PaymentMethod[]
@@ -48,12 +49,13 @@ export function createCandidateRegistrationDraft(
   candidate: LocalSmsCandidate,
   context: Pick<
     CandidateRegistrationContext,
-    "categories" | "ledgers" | "paymentMethods"
+    "categories" | "defaultLedgerId" | "ledgers" | "paymentMethods"
   >,
 ): CandidateRegistrationDraft {
   const registrationState = candidate.registrationState
-  const candidateLedgerId =
-    registrationState?.targetLedgerId ?? candidate.targetLedgerId ?? ""
+  const candidateLedgerId = registrationState
+    ? registrationState.targetLedgerId
+    : context.defaultLedgerId || candidate.targetLedgerId || ""
   const ledgerId = context.ledgers.some(
     (ledger) => ledger.id === candidateLedgerId && !ledger.archivedAt,
   )
