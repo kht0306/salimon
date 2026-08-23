@@ -39,8 +39,8 @@ export async function selectAndParseReceipt(
     asset.height,
   )
   const response = await fetch(prepared.uri)
-  const image = await response.blob()
-  if (image.size === 0 || image.size > MAX_IMAGE_BYTES) {
+  const image = await response.arrayBuffer()
+  if (image.byteLength === 0 || image.byteLength > MAX_IMAGE_BYTES) {
     throw new Error("처리된 영수증 이미지가 8MB를 넘습니다.")
   }
 
