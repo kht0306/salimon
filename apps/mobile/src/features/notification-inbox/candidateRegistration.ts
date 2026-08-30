@@ -22,7 +22,9 @@ export interface CandidateRegistrationDraft {
   date: string
   ledgerId: string
   merchantName: string
+  memo: string
   paymentMethodId: string
+  tagsInput: string
   time: string
 }
 
@@ -98,8 +100,10 @@ export function createCandidateRegistrationDraft(
     ledgerId,
     merchantName:
       registrationState?.merchantName ?? candidate.parsed.merchantName ?? "",
+    memo: registrationState?.memo ?? candidateRegistrationMemo(candidate),
     paymentMethodId:
       registrationState?.paymentMethodId ?? defaults.paymentMethodId,
+    tagsInput: registrationState?.tags?.join(", ") ?? "",
     time: dateTime.slice(0, 5),
   }
 }
@@ -187,14 +191,14 @@ export function validateCandidateRegistrationDraft(
     installmentAmountType: "monthly",
     installmentMonths: "2",
     merchantName: draft.merchantName,
-    memo: candidateRegistrationMemo(candidate),
+    memo: draft.memo,
     paymentMethodId: draft.paymentMethodId,
     recurringType: "",
     applyChangesToFuture: true,
     splits: [],
     status: "confirmed",
     sourceType: "android_sms_notification",
-    tagsInput: "",
+    tagsInput: draft.tagsInput,
     time: draft.time,
     type: candidate.parsed.type,
   }
@@ -227,8 +231,10 @@ export function validateCandidateRegistrationDraft(
         amount: input.amount,
         categoryId: input.categoryId ?? "",
         merchantName: input.merchantName,
+        memo: input.memo,
         paymentMethodId: input.paymentMethodId,
         targetLedgerId: input.ledgerId,
+        tags: input.tags,
         transactionAt: input.transactionAt,
         updatedAt: now.toISOString(),
       },
@@ -273,7 +279,13 @@ function matchesPendingRegistration(
     draft.date === date &&
     draft.ledgerId === state.targetLedgerId &&
     draft.merchantName.trim() === (state.merchantName ?? "") &&
+    draft.memo.trim() === (state.memo ?? "") &&
     draft.paymentMethodId === (state.paymentMethodId ?? "") &&
+    draft.tagsInput
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+      .join(",") === (state.tags ?? []).join(",") &&
     draft.time === dateTime.slice(0, 5)
   )
 }

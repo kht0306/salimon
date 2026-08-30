@@ -44,6 +44,33 @@ describe("notification inbox candidate", () => {
     expect(candidateAmountLabel(candidate)).toBe("₩45,000")
   })
 
+  it("creates a candidate from the Today House Lotte Card notification", () => {
+    const candidate = createCandidateFromNotificationRecord({
+      record: {
+        capturedAt: new Date("2026-08-28T14:16:00+09:00").getTime(),
+        expandedText: [
+          "59,900원 승인",
+          "쇼핑엔 로카(8*3*)",
+          "일시불, 08/28 14:15",
+          "누적금액 2,710,755원",
+        ].join("\n"),
+        id: "t".repeat(64),
+        receivedAt: new Date("2026-08-28T14:16:00+09:00").getTime(),
+        sourcePackageName: "com.lcacApp",
+        text: "59,900원 승인",
+        title: "오늘의집",
+      },
+      targetLedgerId: "ledger-1",
+      userId: "user-1",
+    })
+
+    expect(candidate.status).toBe("notified")
+    expect(candidate.parsed).toMatchObject({
+      amount: 59_900,
+      merchantName: "오늘의집",
+    })
+  })
+
   it("shows foreign approvals without using the cumulative KRW amount", () => {
     const candidate = createCandidateFromNotificationRecord({
       record: {

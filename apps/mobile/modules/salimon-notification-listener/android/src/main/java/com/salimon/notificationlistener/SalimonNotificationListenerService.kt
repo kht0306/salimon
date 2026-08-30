@@ -51,9 +51,8 @@ class SalimonNotificationListenerService : NotificationListenerService() {
   }
 
   private fun shouldIgnore(notification: Notification): Boolean {
-    val ignoredFlags = Notification.FLAG_GROUP_SUMMARY or
-      Notification.FLAG_ONGOING_EVENT
-    val hasIgnoredFlag = notification.flags and ignoredFlags != 0
+    val hasIgnoredFlag =
+      notification.flags and Notification.FLAG_ONGOING_EVENT != 0
     val isProgressNotification =
       notification.category == Notification.CATEGORY_PROGRESS ||
         notification.extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0) > 0

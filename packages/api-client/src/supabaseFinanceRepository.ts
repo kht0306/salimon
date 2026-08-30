@@ -151,7 +151,7 @@ export class SupabaseFinanceRepository {
       client
         .from("profiles")
         .select(
-          "id, kakao_id, nickname, avatar_url, default_currency, timezone",
+          "id, kakao_id, nickname, avatar_url, default_currency, timezone, monthly_summary_visible",
         )
         .single(),
       client
@@ -926,6 +926,18 @@ export class SupabaseFinanceRepository {
     throwIfError(error)
   }
 
+  async updateMonthlySummaryVisibility(
+    userId: string,
+    visible: boolean,
+  ): Promise<void> {
+    const client = this.requireClient()
+    const { error } = await client
+      .from("profiles")
+      .update({ monthly_summary_visible: visible })
+      .eq("id", userId)
+    throwIfError(error)
+  }
+
   async createLedger(input: {
     name: string
     type: LedgerType
@@ -1306,6 +1318,7 @@ function mapProfile(row: Row): Profile {
     avatarUrl: optionalString(row.avatar_url),
     defaultCurrency: "KRW",
     timezone: optionalString(row.timezone) ?? "Asia/Seoul",
+    monthlySummaryVisible: row.monthly_summary_visible !== false,
   }
 }
 

@@ -87,6 +87,8 @@ describe("candidate registration", () => {
       categoryId: "category-1",
       ledgerId: "ledger-1",
       merchantName: "테스트주유소",
+      memo: "",
+      tagsInput: "",
     })
     expect(validation).toEqual({
       valid: true,
@@ -102,6 +104,34 @@ describe("candidate registration", () => {
           amount: 45_000,
           categoryId: "category-1",
           targetLedgerId: "ledger-1",
+        }),
+      },
+    })
+  })
+
+  it("includes editable memo and tags in a candidate transaction", () => {
+    const draft = {
+      ...createCandidateRegistrationDraft(candidate, context),
+      memo: "주말 주유",
+      tagsInput: "차량, 가족",
+    }
+    const validation = validateCandidateRegistrationDraft(
+      draft,
+      candidate,
+      context,
+      new Date("2026-08-13T06:00:00.000Z"),
+    )
+
+    expect(validation).toEqual({
+      valid: true,
+      value: {
+        input: expect.objectContaining({
+          memo: "주말 주유",
+          tags: ["차량", "가족"],
+        }),
+        registrationState: expect.objectContaining({
+          memo: "주말 주유",
+          tags: ["차량", "가족"],
         }),
       },
     })

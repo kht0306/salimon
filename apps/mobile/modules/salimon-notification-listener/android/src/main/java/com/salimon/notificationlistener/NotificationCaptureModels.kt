@@ -42,8 +42,10 @@ internal data class NotificationRegistrationState(
   val amount: Long,
   val categoryId: String,
   val merchantName: String,
+  val memo: String = "",
   val paymentMethodId: String,
   val targetLedgerId: String,
+  val tags: List<String> = emptyList(),
   val transactionAt: String,
   val updatedAt: Long,
 ) {
@@ -51,8 +53,10 @@ internal data class NotificationRegistrationState(
     "amount" to amount,
     "categoryId" to categoryId,
     "merchantName" to merchantName,
+    "memo" to memo,
     "paymentMethodId" to paymentMethodId,
     "targetLedgerId" to targetLedgerId,
+    "tags" to tags,
     "transactionAt" to transactionAt,
     "updatedAt" to updatedAt,
   )

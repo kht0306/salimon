@@ -22,8 +22,10 @@ class NotificationRegistrationStateInput(
   @Field val amount: Double = 0.0,
   @Field val categoryId: String = "",
   @Field val merchantName: String = "",
+  @Field val memo: String = "",
   @Field val paymentMethodId: String = "",
   @Field val targetLedgerId: String = "",
+  @Field val tags: List<String> = emptyList(),
   @Field val transactionAt: String = "",
 ) : Record
 
@@ -138,8 +140,10 @@ class SalimonNotificationListenerModule : Module() {
           amount = state.amount.toLong(),
           categoryId = state.categoryId,
           merchantName = state.merchantName,
+          memo = state.memo,
           paymentMethodId = state.paymentMethodId,
           targetLedgerId = state.targetLedgerId,
+          tags = state.tags,
           transactionAt = state.transactionAt,
           updatedAt = System.currentTimeMillis(),
         ),
