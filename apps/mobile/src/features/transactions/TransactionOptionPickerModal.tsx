@@ -8,6 +8,7 @@ import { mobileTheme } from "../../theme"
 export interface TransactionOption {
   color?: string
   description?: string
+  groupLabel?: string
   id: string
   label: string
 }
@@ -115,31 +116,39 @@ export function TransactionOptionPickerModal({
                 </OptionButton>
               ) : null
             }
-            renderItem={({ item }) => {
+            renderItem={({ item, index }) => {
               const selected = item.id === selectedId
+              const showGroupLabel =
+                Boolean(item.groupLabel) &&
+                item.groupLabel !== filteredOptions[index - 1]?.groupLabel
               return (
-                <OptionButton
-                  $selected={selected}
-                  accessibilityLabel={item.label}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  onPress={() => select(item.id)}
-                >
-                  {item.color ? (
-                    <OptionMarker style={{ backgroundColor: item.color }} />
+                <OptionGroup>
+                  {showGroupLabel ? (
+                    <OptionGroupLabel>{item.groupLabel}</OptionGroupLabel>
                   ) : null}
-                  <OptionCopy>
-                    <OptionLabel $selected={selected} numberOfLines={2}>
-                      {item.label}
-                    </OptionLabel>
-                    {item.description ? (
-                      <OptionDescription numberOfLines={2}>
-                        {item.description}
-                      </OptionDescription>
+                  <OptionButton
+                    $selected={selected}
+                    accessibilityLabel={item.label}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => select(item.id)}
+                  >
+                    {item.color ? (
+                      <OptionMarker style={{ backgroundColor: item.color }} />
                     ) : null}
-                  </OptionCopy>
-                  {selected ? <SelectedMark>선택</SelectedMark> : null}
-                </OptionButton>
+                    <OptionCopy>
+                      <OptionLabel $selected={selected} numberOfLines={2}>
+                        {item.label}
+                      </OptionLabel>
+                      {item.description ? (
+                        <OptionDescription numberOfLines={2}>
+                          {item.description}
+                        </OptionDescription>
+                      ) : null}
+                    </OptionCopy>
+                    {selected ? <SelectedMark>선택</SelectedMark> : null}
+                  </OptionButton>
+                </OptionGroup>
               )
             }}
             showsVerticalScrollIndicator={false}
@@ -227,6 +236,18 @@ const SearchInput = styled.TextInput({
 })
 
 const OptionList = styled(FlatList<TransactionOption>)({ flex: 1 })
+
+const OptionGroup = styled.View({ backgroundColor: mobileTheme.colors.panel })
+
+const OptionGroupLabel = styled(AppText)({
+  minHeight: 32,
+  color: mobileTheme.colors.muted,
+  fontSize: 11,
+  fontWeight: "700",
+  lineHeight: 32,
+  paddingHorizontal: mobileTheme.spacing[3],
+  backgroundColor: mobileTheme.colors.panelSubtle,
+})
 
 const OptionButton = styled.Pressable<{ $selected: boolean }>(
   ({ $selected }) => ({

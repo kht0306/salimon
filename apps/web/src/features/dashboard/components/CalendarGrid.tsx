@@ -13,6 +13,7 @@ import {
   CalendarCheck2,
   ChevronLeft,
   ChevronRight,
+  GripVertical,
   LoaderCircle,
 } from "lucide-react"
 import { observer } from "mobx-react-lite"
@@ -31,6 +32,12 @@ import { BudgetTransactionsDialog } from "./BudgetTransactionsDialog"
 export const CalendarGrid = observer(function CalendarGrid() {
   const store = useAppStore()
   const [selectedBudgetCategoryId, setSelectedBudgetCategoryId] = useState<
+    string | null
+  >(null)
+  const [draggingBudgetCategoryId, setDraggingBudgetCategoryId] = useState<
+    string | null
+  >(null)
+  const [dragOverBudgetCategoryId, setDragOverBudgetCategoryId] = useState<
     string | null
   >(null)
   const days = useMemo(
@@ -61,6 +68,32 @@ export const CalendarGrid = observer(function CalendarGrid() {
     store.selectDate(date)
   }
 
+  function canReorderBudget(sourceId: string, targetId: string): boolean {
+    const source = store.currentCategories.find(
+      (category) => category.id === sourceId,
+    )
+    const target = store.currentCategories.find(
+      (category) => category.id === targetId,
+    )
+    return Boolean(
+      source && target && source.parentCategoryId === target.parentCategoryId,
+    )
+  }
+
+  async function reorderBudgetCards(targetCategoryId: string): Promise<void> {
+    const sourceCategoryId = draggingBudgetCategoryId
+    setDraggingBudgetCategoryId(null)
+    setDragOverBudgetCategoryId(null)
+    if (
+      !sourceCategoryId ||
+      sourceCategoryId === targetCategoryId ||
+      !canReorderBudget(sourceCategoryId, targetCategoryId)
+    ) {
+      return
+    }
+    await store.reorderCategories(sourceCategoryId, targetCategoryId)
+  }
+
   return (
     <CalendarStack>
       {store.selectedMonthBudgets.length > 0 ? (
@@ -72,11 +105,49 @@ export const CalendarGrid = observer(function CalendarGrid() {
                 key={category.id}
                 type="button"
                 $color={category.color}
+                $dragging={draggingBudgetCategoryId === category.id}
+                $dragOver={dragOverBudgetCategoryId === category.id}
+                draggable
+                aria-grabbed={draggingBudgetCategoryId === category.id}
                 aria-haspopup="dialog"
                 aria-label={`${getCategoryLabel(store.data.categories, category.id)} 예산 포함 거래 보기`}
-                onClick={() => setSelectedBudgetCategoryId(category.id)}
+                title="클릭하면 거래를 보고, 드래그하면 같은 단계의 예산 순서를 변경합니다"
+                onClick={() => {
+                  if (!draggingBudgetCategoryId) {
+                    setSelectedBudgetCategoryId(category.id)
+                  }
+                }}
+                onDragStart={(event) => {
+                  event.dataTransfer.effectAllowed = "move"
+                  event.dataTransfer.setData("text/plain", category.id)
+                  setDraggingBudgetCategoryId(category.id)
+                }}
+                onDragOver={(event) => {
+                  if (
+                    draggingBudgetCategoryId &&
+                    canReorderBudget(draggingBudgetCategoryId, category.id)
+                  ) {
+                    event.preventDefault()
+                    event.dataTransfer.dropEffect = "move"
+                    setDragOverBudgetCategoryId(category.id)
+                  }
+                }}
+                onDragLeave={() =>
+                  setDragOverBudgetCategoryId((current) =>
+                    current === category.id ? null : current,
+                  )
+                }
+                onDrop={(event) => {
+                  event.preventDefault()
+                  void reorderBudgetCards(category.id)
+                }}
+                onDragEnd={() => {
+                  setDraggingBudgetCategoryId(null)
+                  setDragOverBudgetCategoryId(null)
+                }}
               >
                 <strong>
+                  <GripVertical size={13} aria-hidden="true" />
                   <CategoryDot $color={category.color} />
                   {getCategoryLabel(store.data.categories, category.id)}
                 </strong>
@@ -252,7 +323,11 @@ const BudgetStrip = styled.div`
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 8px;
 `
-const BudgetCard = styled.button<{ $color: string }>`
+const BudgetCard = styled.button<{
+  $color: string
+  $dragging: boolean
+  $dragOver: boolean
+}>`
   width: 100%;
   display: grid;
   gap: 5px;
@@ -261,10 +336,13 @@ const BudgetCard = styled.button<{ $color: string }>`
   border-left-width: 4px;
   border-radius: ${radii.sm};
   background: ${colors.panel};
+  box-shadow: ${({ $dragOver, $color }) =>
+    $dragOver ? `0 0 0 2px ${$color}` : "none"};
   color: ${colors.ink};
   font-family: inherit;
   text-align: left;
-  cursor: pointer;
+  cursor: ${({ $dragging }) => ($dragging ? "grabbing" : "grab")};
+  opacity: ${({ $dragging }) => ($dragging ? 0.55 : 1)};
   transition:
     background-color 140ms ease,
     box-shadow 140ms ease;

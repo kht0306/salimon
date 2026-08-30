@@ -45,6 +45,7 @@ export function createEmptyFinanceData(): FinanceData {
       nickname: "로그인 필요",
       defaultCurrency: "KRW",
       timezone: "Asia/Seoul",
+      monthlySummaryVisible: true,
     },
     ledgers: [],
     members: [],

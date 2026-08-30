@@ -243,8 +243,10 @@ internal class EncryptedNotificationStore(context: Context) {
       .put("amount", amount)
       .put("categoryId", categoryId)
       .put("merchantName", merchantName)
+      .put("memo", memo)
       .put("paymentMethodId", paymentMethodId)
       .put("targetLedgerId", targetLedgerId)
+      .put("tags", tags)
       .put("transactionAt", transactionAt)
       .put("updatedAt", updatedAt)
 
@@ -253,8 +255,12 @@ internal class EncryptedNotificationStore(context: Context) {
       amount = getLong("amount"),
       categoryId = getString("categoryId"),
       merchantName = optString("merchantName"),
+      memo = optString("memo"),
       paymentMethodId = optString("paymentMethodId"),
       targetLedgerId = getString("targetLedgerId"),
+      tags = optJSONArray("tags")?.let { values ->
+        (0 until values.length()).map { index -> values.optString(index) }
+      }.orEmpty(),
       transactionAt = getString("transactionAt"),
       updatedAt = getLong("updatedAt"),
     )

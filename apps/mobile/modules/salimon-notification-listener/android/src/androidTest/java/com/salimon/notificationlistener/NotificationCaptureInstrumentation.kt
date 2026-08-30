@@ -79,6 +79,15 @@ class NotificationCaptureInstrumentation : Instrumentation() {
       ),
     )
     check(
+      PaymentNotificationFilter.shouldStore(
+        NotificationText(
+          title = "오늘의집",
+          text = "59,900원 승인",
+          expandedText = "쇼핑엔 로카(8*3*)\n일시불, 08/28 14:15\n누적금액 2,710,755원",
+        ),
+      ),
+    )
+    check(
       store.capture(
         sourcePackageName = "com.example.card",
         notificationKey = "notification-key",

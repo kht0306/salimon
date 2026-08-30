@@ -73,6 +73,7 @@ function createReadyFinanceData() {
     nickname: "살림 가족",
     defaultCurrency: "KRW",
     timezone: "Asia/Seoul",
+    monthlySummaryVisible: true,
   }
   data.ledgers = [
     {
@@ -164,6 +165,7 @@ function createRepository(data = createReadyFinanceData()) {
     updateCard: vi.fn(async () => undefined),
     updateCategory: vi.fn(async () => undefined),
     updateCategoryOrder: vi.fn(async () => undefined),
+    updateMonthlySummaryVisibility: vi.fn(async () => undefined),
     updateLedgerMemberRole: vi.fn(async () => undefined),
   }
 }
@@ -230,6 +232,21 @@ describe("MobileAppStore authentication", () => {
     expect(setAuthenticatedNotificationCaptureUser).toHaveBeenCalledWith(
       "user-1",
     )
+  })
+
+  it("persists the monthly summary visibility for web and app parity", async () => {
+    const repository = createRepository()
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+
+    await expect(store.setMonthlySummaryVisibility(false)).resolves.toBe(true)
+
+    expect(store.monthlySummaryVisible).toBe(false)
+    expect(repository.updateMonthlySummaryVisibility).toHaveBeenCalledWith(
+      "user-1",
+      false,
+    )
+    expect(store.profilePreferenceMutationState).toBe("idle")
   })
 
   it("returns to the login state without an error when login is cancelled", async () => {
@@ -468,7 +485,9 @@ describe("MobileAppStore authentication", () => {
       date: "2026-08-13",
       ledgerId: "ledger-1",
       merchantName: "테스트주유소",
+      memo: "가족 생활비",
       paymentMethodId: "",
+      tagsInput: "가족, 생활비",
       time: "14:00",
     })
 
@@ -522,7 +541,9 @@ describe("MobileAppStore authentication", () => {
       date: "2026-08-13",
       ledgerId: "ledger-1",
       merchantName: "수정한 주유소",
+      memo: "후보 메모",
       paymentMethodId: "",
+      tagsInput: "카드, 검토",
       time: "14:00",
     }
 
@@ -569,7 +590,9 @@ describe("MobileAppStore authentication", () => {
         date: "2026-08-13",
         ledgerId: "ledger-1",
         merchantName: "테스트주유소",
+        memo: "",
         paymentMethodId: "",
+        tagsInput: "",
         time: "14:00",
       }),
     ).resolves.toEqual({ status: "already_registered" })

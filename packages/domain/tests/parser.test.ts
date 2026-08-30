@@ -58,6 +58,27 @@ describe("parseCardSmsText", () => {
     expect(parsed.rawTextMasked).not.toContain("(8*3*)")
   })
 
+  it("parses the Lotte Card Today House approval notification", () => {
+    const parsed = parseCardSmsText(
+      [
+        "오늘의집",
+        "59,900원 승인",
+        "쇼핑엔 로카(8*3*)",
+        "일시불, 08/28 14:15",
+        "누적금액 2,710,755원",
+      ].join("\n"),
+      new Date("2026-08-28T14:16:00+09:00"),
+    )
+
+    expect(parsed).toMatchObject({
+      amount: 59_900,
+      cardNotificationEvent: "approval",
+      merchantName: "오늘의집",
+      type: "expense",
+    })
+    expect(parsed.amount).not.toBe(2_710_755)
+  })
+
   it("preserves a foreign approval amount and never substitutes the cumulative KRW amount", () => {
     const parsed = parseCardSmsText(
       [

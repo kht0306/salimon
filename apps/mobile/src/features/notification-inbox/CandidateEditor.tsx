@@ -22,6 +22,7 @@ import {
   TransactionOptionPickerModal,
   type TransactionOption,
 } from "../transactions/TransactionOptionPickerModal"
+import { CategoryPickerModal } from "../transactions/CategoryPickerModal"
 import {
   createCandidateRegistrationDraft,
   resetCandidateDraftForLedger,
@@ -88,6 +89,10 @@ export const CandidateEditor = observer(function CandidateEditor({
         Number(second.isPrimary) - Number(first.isPrimary) ||
         first.name.localeCompare(second.name, "ko-KR"),
     )
+  const members = store.financeData.members.filter(
+    (member) =>
+      member.ledgerId === draft.ledgerId && member.status === "active",
+  )
   const selectedLedger = ledgers.find((ledger) => ledger.id === draft.ledgerId)
   const selectedCategory = categories.find(
     (category) => category.id === draft.categoryId,
@@ -220,15 +225,10 @@ export const CandidateEditor = observer(function CandidateEditor({
       )
     }
     if (picker === "category") {
-      const options: TransactionOption[] = categories.map((category) => ({
-        color: category.color,
-        id: category.id,
-        label: getCategoryLabel(categories, category.id),
-      }))
       return (
-        <TransactionOptionPickerModal
+        <CategoryPickerModal
+          categories={categories}
           emptyMessage="사용할 카테고리가 없습니다. 웹에서 먼저 설정해 주세요."
-          options={options}
           selectedId={draft.categoryId}
           title="카테고리 선택"
           onClose={() => setPicker(undefined)}
@@ -237,11 +237,30 @@ export const CandidateEditor = observer(function CandidateEditor({
       )
     }
     if (picker === "payment") {
-      const options: TransactionOption[] = paymentMethods.map((method) => ({
-        description: method.isPrimary ? "주 결제수단" : undefined,
-        id: method.id,
-        label: paymentMethodLabel(method),
-      }))
+      const memberIds = new Set(members.map((member) => member.userId))
+      const options: TransactionOption[] = [
+        ...members.flatMap((member) =>
+          paymentMethods
+            .filter((method) => method.ownerUserId === member.userId)
+            .map((method) => ({
+              description: method.isPrimary ? "주 결제수단" : undefined,
+              groupLabel: member.nickname,
+              id: method.id,
+              label: paymentMethodLabel(method),
+            })),
+        ),
+        ...paymentMethods
+          .filter(
+            (method) =>
+              !method.ownerUserId || !memberIds.has(method.ownerUserId),
+          )
+          .map((method) => ({
+            description: method.isPrimary ? "주 결제수단" : undefined,
+            groupLabel: "공통·기타",
+            id: method.id,
+            label: paymentMethodLabel(method),
+          })),
+      ]
       return (
         <TransactionOptionPickerModal
           clearLabel="현금 · 결제수단 없음"
@@ -445,6 +464,33 @@ export const CandidateEditor = observer(function CandidateEditor({
                     editable={!isPending}
                     onChangeText={(merchantName) =>
                       updateDraft({ ...draft, merchantName })
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>메모</FieldLabel>
+                  <MultilineInput
+                    accessibilityLabel="후보 거래 메모"
+                    multiline
+                    placeholder="거래에 남길 메모"
+                    placeholderTextColor={mobileTheme.colors.subtle}
+                    textAlignVertical="top"
+                    value={draft.memo}
+                    editable={!isPending}
+                    onChangeText={(memo) => updateDraft({ ...draft, memo })}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>태그</FieldLabel>
+                  <Input
+                    accessibilityLabel="후보 거래 태그"
+                    autoCapitalize="none"
+                    placeholder="쉼표로 구분 · 예: 가족, 생활비"
+                    placeholderTextColor={mobileTheme.colors.subtle}
+                    value={draft.tagsInput}
+                    editable={!isPending}
+                    onChangeText={(tagsInput) =>
+                      updateDraft({ ...draft, tagsInput })
                     }
                   />
                 </Field>
@@ -689,6 +735,11 @@ const AmountInput = styled(Input)({
   minHeight: 60,
   fontSize: 28,
   fontWeight: "700",
+})
+const MultilineInput = styled(Input)({
+  minHeight: 88,
+  paddingTop: mobileTheme.spacing[3],
+  paddingBottom: mobileTheme.spacing[3],
 })
 const AmountPreview = styled(AppText)({
   color: mobileTheme.colors.teal,

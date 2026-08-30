@@ -34,8 +34,10 @@ export interface NativeNotificationRegistrationState {
   amount: number
   categoryId: string
   merchantName: string
+  memo?: string
   paymentMethodId: string
   targetLedgerId: string
+  tags?: string[]
   transactionAt: string
   updatedAt: number
 }

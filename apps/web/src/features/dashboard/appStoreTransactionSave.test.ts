@@ -26,6 +26,7 @@ function createReadyStore(
     nickname: "사용자",
     defaultCurrency: "KRW",
     timezone: "Asia/Seoul",
+    monthlySummaryVisible: true,
   }
   data.ledgers = [
     {
@@ -60,6 +61,21 @@ afterEach(() => {
 })
 
 describe("AppStore transaction saves", () => {
+  it("persists and applies the monthly summary visibility", async () => {
+    const repository = {
+      updateMonthlySummaryVisibility: vi.fn(async () => undefined),
+    }
+    const store = createReadyStore(repository)
+
+    await expect(store.setMonthlySummaryVisibility(false)).resolves.toBe(true)
+
+    expect(store.monthlySummaryVisible).toBe(false)
+    expect(repository.updateMonthlySummaryVisibility).toHaveBeenCalledWith(
+      "user-1",
+      false,
+    )
+  })
+
   it("finishes after the database write without waiting for the background refresh", async () => {
     const repository = {
       saveTransaction: vi.fn(async () => "transaction-1"),

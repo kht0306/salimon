@@ -38,6 +38,7 @@ export interface Profile {
   avatarUrl?: string
   defaultCurrency: Currency
   timezone: string
+  monthlySummaryVisible: boolean
 }
 
 export interface AccountDeletionRequest {
@@ -292,8 +293,10 @@ export interface SmsCandidateRegistrationState {
   amount: number
   categoryId: string
   merchantName?: string
+  memo?: string
   paymentMethodId?: string
   targetLedgerId: string
+  tags?: string[]
   transactionAt: string
   updatedAt: string
 }

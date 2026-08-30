@@ -49,6 +49,7 @@ import {
   TransactionOptionPickerModal,
   type TransactionOption,
 } from "./TransactionOptionPickerModal"
+import { CategoryPickerModal } from "./CategoryPickerModal"
 
 interface TransactionEditorScreenProps {
   copyTransactionId?: string
@@ -444,22 +445,15 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
           .filter((_, index) => index !== splitPickerIndex)
           .map((item) => item.categoryId),
       )
-      const options: TransactionOption[] = availableSplitCategories
-        .filter(
-          (item) =>
-            !usedCategoryIds.has(item.id) || item.id === split?.categoryId,
-        )
-        .map((item) => ({
-          id: item.id,
-          label: getCategoryLabel(categories, item.id),
-          description: item.isArchived ? "보관된 카테고리" : undefined,
-          color: item.color,
-        }))
+      const splitCategories = availableSplitCategories.filter(
+        (item) =>
+          !usedCategoryIds.has(item.id) || item.id === split?.categoryId,
+      )
       return (
-        <TransactionOptionPickerModal
+        <CategoryPickerModal
+          categories={splitCategories}
           emptyMessage="분할에 사용할 다른 카테고리가 없습니다."
-          options={options}
-          selectedId={split?.categoryId}
+          selectedId={split?.categoryId ?? ""}
           title={`분할 항목 ${splitPickerIndex + 1} 카테고리`}
           onClose={() => setSplitPickerIndex(undefined)}
           onSelect={(categoryId) => {
@@ -470,16 +464,10 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
       )
     }
     if (picker === "category") {
-      const options: TransactionOption[] = availableCategories.map((item) => ({
-        id: item.id,
-        label: getCategoryLabel(categories, item.id),
-        description: item.isArchived ? "보관된 카테고리" : undefined,
-        color: item.color,
-      }))
       return (
-        <TransactionOptionPickerModal
+        <CategoryPickerModal
+          categories={availableCategories}
           emptyMessage="이 거래 유형에 사용할 카테고리가 없습니다."
-          options={options}
           selectedId={draft.categoryId}
           title="카테고리 선택"
           onClose={() => setPicker(undefined)}
@@ -488,12 +476,9 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
       )
     }
     if (picker === "payment") {
-      const options: TransactionOption[] = availablePaymentMethods.map(
-        (method) => ({
-          id: method.id,
-          label: paymentMethodLabel(method),
-          description: paymentMethodDescription(method, members),
-        }),
+      const options = paymentMethodOptionsByMember(
+        availablePaymentMethods,
+        members,
       )
       return (
         <TransactionOptionPickerModal
@@ -1143,16 +1128,33 @@ function paymentMethodLabel(method: PaymentMethod): string {
   return `[${type}] ${issuer}${method.name}${last4}`
 }
 
-function paymentMethodDescription(
-  method: PaymentMethod,
+function paymentMethodOptionsByMember(
+  methods: PaymentMethod[],
   members: LedgerMember[],
-): string | undefined {
-  const owner = members.find((member) => member.userId === method.ownerUserId)
-  return (
-    [owner?.nickname, method.isPrimary ? "주 결제수단" : undefined]
-      .filter(Boolean)
-      .join(" · ") || undefined
-  )
+): TransactionOption[] {
+  const memberIds = new Set(members.map((member) => member.userId))
+  return [
+    ...members.flatMap((member) =>
+      methods
+        .filter((method) => method.ownerUserId === member.userId)
+        .map((method) => ({
+          description: method.isPrimary ? "주 결제수단" : undefined,
+          groupLabel: member.nickname,
+          id: method.id,
+          label: paymentMethodLabel(method),
+        })),
+    ),
+    ...methods
+      .filter(
+        (method) => !method.ownerUserId || !memberIds.has(method.ownerUserId),
+      )
+      .map((method) => ({
+        description: method.isPrimary ? "주 결제수단" : undefined,
+        groupLabel: "공통·기타",
+        id: method.id,
+        label: paymentMethodLabel(method),
+      })),
+  ]
 }
 
 function ledgerRoleLabel(role: LedgerMember["role"]): string {

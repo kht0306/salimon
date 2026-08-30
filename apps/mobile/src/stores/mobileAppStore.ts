@@ -116,6 +116,7 @@ type MobileFinanceRepository = Pick<
   | "updateCard"
   | "updateCategory"
   | "updateCategoryOrder"
+  | "updateMonthlySummaryVisibility"
   | "updateLedgerMemberRole"
 >
 
@@ -242,6 +243,7 @@ export class MobileAppStore {
   notificationCandidates: LocalSmsCandidate[] = []
   notificationInboxStatus: NotificationInboxStatus = "idle"
   notificationRegistrationState: NotificationRegistrationState = "idle"
+  profilePreferenceMutationState: "idle" | "saving" = "idle"
   authErrorMessage?: string
   dataErrorMessage?: string
   consentErrorMessage?: string
@@ -441,6 +443,10 @@ export class MobileAppStore {
 
   get monthTotals(): TransactionTotals {
     return calculateConfirmedTotals(this.monthTransactions)
+  }
+
+  get monthlySummaryVisible(): boolean {
+    return this.financeData.profile.monthlySummaryVisible
   }
 
   get monthDaySummaries(): MonthDaySummary[] {
@@ -1061,6 +1067,41 @@ export class MobileAppStore {
   selectDate(date: string): void {
     if (this.monthDaySummaries.some((summary) => summary.date === date)) {
       this.selectedDate = date
+    }
+  }
+
+  async setMonthlySummaryVisibility(visible: boolean): Promise<boolean> {
+    if (
+      !this.authUser ||
+      this.profilePreferenceMutationState !== "idle" ||
+      this.financeData.profile.monthlySummaryVisible === visible
+    ) {
+      return false
+    }
+
+    const previous = this.financeData.profile.monthlySummaryVisible
+    this.profilePreferenceMutationState = "saving"
+    this.financeData.profile.monthlySummaryVisible = visible
+    try {
+      await this.repository.updateMonthlySummaryVisibility(
+        this.authUser.id,
+        visible,
+      )
+      runInAction(() => {
+        this.profilePreferenceMutationState = "idle"
+        this.invalidateFinanceQueryCache()
+      })
+      return true
+    } catch (error) {
+      runInAction(() => {
+        this.financeData.profile.monthlySummaryVisible = previous
+        this.profilePreferenceMutationState = "idle"
+        this.dataErrorMessage = errorMessage(
+          error,
+          "월 합계 표시 설정을 저장하지 못했습니다.",
+        )
+      })
+      return false
     }
   }
 
@@ -2091,8 +2132,10 @@ export class MobileAppStore {
           amount: registrationState.amount,
           categoryId: registrationState.categoryId,
           merchantName: registrationState.merchantName ?? "",
+          memo: registrationState.memo ?? "",
           paymentMethodId: registrationState.paymentMethodId ?? "",
           targetLedgerId: registrationState.targetLedgerId,
+          tags: registrationState.tags ?? [],
           transactionAt: registrationState.transactionAt,
         },
       )
@@ -2462,6 +2505,7 @@ export class MobileAppStore {
     this.transactionMutationState = "idle"
     this.transactionMutationErrorMessage = undefined
     this.managementMutationState = "idle"
+    this.profilePreferenceMutationState = "idle"
     this.managementErrorMessage = undefined
     this.managementNoticeMessage = undefined
     this.dataToolState = "idle"

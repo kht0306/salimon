@@ -127,6 +127,7 @@ export class AppStore {
   dataState: "idle" | "loading" | "refreshing" | "ready" | "error" = "idle"
   dataError: string | null = null
   transactionMutationState: "idle" | "saving" = "idle"
+  profilePreferenceMutationState: "idle" | "saving" = "idle"
   ledgerMutationState:
     | "idle"
     | "creating"
@@ -377,6 +378,10 @@ export class AppStore {
       .reduce((sum, transaction) => sum + transaction.amount, 0)
   }
 
+  get monthlySummaryVisible(): boolean {
+    return this.data.profile.monthlySummaryVisible
+  }
+
   get deferredSmsCandidates(): LocalSmsCandidate[] {
     return this.data.smsCandidates.filter(
       (candidate) =>
@@ -433,6 +438,37 @@ export class AppStore {
             ? error.message
             : "가계부 데이터를 불러오지 못했습니다."
       })
+    }
+  }
+
+  async setMonthlySummaryVisibility(visible: boolean): Promise<boolean> {
+    if (
+      !this.authUser ||
+      this.profilePreferenceMutationState !== "idle" ||
+      this.data.profile.monthlySummaryVisible === visible
+    ) {
+      return false
+    }
+
+    const previous = this.data.profile.monthlySummaryVisible
+    this.profilePreferenceMutationState = "saving"
+    this.data.profile.monthlySummaryVisible = visible
+    try {
+      await this.repository.updateMonthlySummaryVisibility(
+        this.authUser.id,
+        visible,
+      )
+      runInAction(() => {
+        this.profilePreferenceMutationState = "idle"
+      })
+      return true
+    } catch (error) {
+      runInAction(() => {
+        this.data.profile.monthlySummaryVisible = previous
+        this.profilePreferenceMutationState = "idle"
+      })
+      this.setDataError(error)
+      return false
     }
   }
 

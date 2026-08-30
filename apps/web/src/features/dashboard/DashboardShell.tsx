@@ -13,6 +13,8 @@ import {
   Tags,
   WalletCards,
   ChartNoAxesCombined,
+  Eye,
+  EyeOff,
 } from "lucide-react"
 import { useAppStore } from "./StoreProvider"
 import { AuthControls } from "./components/AuthControls"
@@ -33,10 +35,7 @@ import { colors, radii, spacing } from "@salimon/ui-tokens"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Fragment, useEffect } from "react"
-import {
-  CURRENT_PRIVACY_VERSION,
-  CURRENT_TERMS_VERSION,
-} from "@salimon/types"
+import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "@salimon/types"
 import {
   dashboardRoutes,
   getLedgerSelectionRoute,
@@ -72,6 +71,10 @@ export const DashboardShell = observer(function DashboardShell({
     view === "ledger" || view === "accounts"
       ? `${view}-${store.selectedLedgerId}`
       : view
+  const isBootstrapping =
+    store.authState === "loading" ||
+    (store.authState === "authenticated" &&
+      (store.dataState === "idle" || store.dataState === "loading"))
 
   useEffect(() => {
     if (
@@ -117,14 +120,12 @@ export const DashboardShell = observer(function DashboardShell({
     return () => window.removeEventListener("beforeunload", preventUnload)
   }, [isSavingTransaction])
 
+  if (isBootstrapping) {
+    return <DashboardLoadingState />
+  }
+
   if (store.authState !== "authenticated" || !store.authUser) {
-    return (
-      <AuthLoading>
-        {store.authState === "loading"
-          ? "로그인 상태를 확인하고 있습니다."
-          : "로그인 페이지로 이동합니다."}
-      </AuthLoading>
-    )
+    return <DashboardLoadingState redirecting />
   }
 
   if (
@@ -215,26 +216,62 @@ export const DashboardShell = observer(function DashboardShell({
         </LedgerField>
 
         {hasCurrentLedger && !isArchivedLedger ? (
-          <MetricRow>
-            <Metric>
-              <MetricLabel>월 지출</MetricLabel>
-              <MetricValue $tone="expense">
-                {formatKrw(store.monthExpenseTotal)}
-              </MetricValue>
-            </Metric>
-            <Metric>
-              <MetricLabel>월 수입</MetricLabel>
-              <MetricValue $tone="income">
-                {formatKrw(store.monthIncomeTotal)}
-              </MetricValue>
-            </Metric>
-            <Metric>
-              <MetricLabel>월 저축</MetricLabel>
-              <MetricValue $tone="saving">
-                {formatKrw(store.monthSavingTotal)}
-              </MetricValue>
-            </Metric>
-          </MetricRow>
+          <MetricToggle
+            type="button"
+            aria-label={
+              store.monthlySummaryVisible
+                ? "월 지출, 수입, 저축 금액 숨기기"
+                : "월 지출, 수입, 저축 금액 보기"
+            }
+            aria-pressed={store.monthlySummaryVisible}
+            disabled={store.profilePreferenceMutationState === "saving"}
+            title={store.monthlySummaryVisible ? "금액 숨기기" : "금액 보기"}
+            onClick={() =>
+              void store.setMonthlySummaryVisibility(
+                !store.monthlySummaryVisible,
+              )
+            }
+          >
+            <MetricVisibilityIcon aria-hidden="true">
+              {store.monthlySummaryVisible ? (
+                <EyeOff size={14} />
+              ) : (
+                <Eye size={14} />
+              )}
+            </MetricVisibilityIcon>
+            <MetricRow>
+              <Metric>
+                <MetricLabel>월 지출</MetricLabel>
+                <MetricValue
+                  $tone={store.monthlySummaryVisible ? "expense" : undefined}
+                >
+                  {store.monthlySummaryVisible
+                    ? formatKrw(store.monthExpenseTotal)
+                    : "••••••"}
+                </MetricValue>
+              </Metric>
+              <Metric>
+                <MetricLabel>월 수입</MetricLabel>
+                <MetricValue
+                  $tone={store.monthlySummaryVisible ? "income" : undefined}
+                >
+                  {store.monthlySummaryVisible
+                    ? formatKrw(store.monthIncomeTotal)
+                    : "••••••"}
+                </MetricValue>
+              </Metric>
+              <Metric>
+                <MetricLabel>월 저축</MetricLabel>
+                <MetricValue
+                  $tone={store.monthlySummaryVisible ? "saving" : undefined}
+                >
+                  {store.monthlySummaryVisible
+                    ? formatKrw(store.monthSavingTotal)
+                    : "••••••"}
+                </MetricValue>
+              </Metric>
+            </MetricRow>
+          </MetricToggle>
         ) : null}
 
         <Nav>
@@ -379,12 +416,230 @@ export const DashboardShell = observer(function DashboardShell({
   )
 })
 
-const AuthLoading = styled.main`
+function DashboardLoadingState({
+  redirecting = false,
+}: {
+  redirecting?: boolean
+}) {
+  return (
+    <LoadingShell aria-busy="true" aria-live="polite">
+      <LoadingSidebar aria-hidden="true">
+        <LoadingBrand>
+          <BrandMark>S</BrandMark>
+          <LoadingBlock $height={18} $width="118px" />
+        </LoadingBrand>
+        <LoadingBlock $height={12} $width="54px" />
+        <LoadingControlRow>
+          <LoadingBlock $height={36} $width="136px" />
+          <LoadingBlock $height={36} $width="36px" />
+          <LoadingBlock $height={36} $width="36px" />
+        </LoadingControlRow>
+        <LoadingMetricGroup>
+          <LoadingMetric />
+          <LoadingMetric />
+          <LoadingMetric />
+        </LoadingMetricGroup>
+        <LoadingNav>
+          {Array.from({ length: 7 }, (_, index) => (
+            <LoadingBlock key={index} $height={34} $width="100%" />
+          ))}
+        </LoadingNav>
+      </LoadingSidebar>
+      <LoadingWorkspace aria-hidden="true">
+        <LoadingBlock $height={12} $width="86px" />
+        <LoadingBlock $height={32} $width="220px" />
+        <LoadingPanel>
+          <LoadingBlock $height={36} $width="180px" />
+          <LoadingCalendar>
+            {Array.from({ length: 35 }, (_, index) => (
+              <LoadingCalendarCell key={index} />
+            ))}
+          </LoadingCalendar>
+        </LoadingPanel>
+      </LoadingWorkspace>
+      <LoadingStatus role="status">
+        {redirecting
+          ? "로그인 페이지로 이동하고 있습니다."
+          : "로그인과 가계부 정보를 불러오고 있습니다."}
+      </LoadingStatus>
+    </LoadingShell>
+  )
+}
+
+const MetricToggle = styled.button`
+  position: relative;
+  width: 100%;
+  display: block;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: ${colors.panelSubtle};
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${colors.focus};
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: wait;
+    opacity: 0.72;
+  }
+`
+
+const MetricVisibilityIcon = styled.span`
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  color: ${colors.muted};
+`
+
+const LoadingShell = styled.main`
+  position: relative;
   min-height: 100dvh;
   display: grid;
-  place-items: center;
+  grid-template-columns: 224px minmax(0, 1fr);
   background: ${colors.canvas};
-  color: ${colors.muted};
+
+  @media (max-width: 820px) {
+    display: block;
+  }
+`
+
+const LoadingSidebar = styled.aside`
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: ${spacing[4]};
+  border-right: 1px solid ${colors.border};
+  background: ${colors.sidebar};
+  padding: ${spacing[4]} ${spacing[3]};
+
+  @media (max-width: 820px) {
+    min-height: auto;
+    border-right: 0;
+    border-bottom: 1px solid ${colors.border};
+  }
+`
+
+const LoadingBrand = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${spacing[3]};
+`
+
+const LoadingControlRow = styled.div`
+  display: flex;
+  gap: 8px;
+`
+
+const LoadingMetricGroup = styled.div`
+  display: grid;
+  border-top: 1px solid ${colors.border};
+  border-bottom: 1px solid ${colors.border};
+`
+
+const LoadingMetric = styled.div`
+  height: 56px;
+  background: linear-gradient(
+    90deg,
+    ${colors.panelSubtle} 0%,
+    ${colors.panel} 48%,
+    ${colors.panelSubtle} 100%
+  );
+  background-size: 220% 100%;
+  animation: loading-shimmer 1.5s ease-in-out infinite;
+
+  & + & {
+    border-top: 1px solid ${colors.border};
+  }
+`
+
+const LoadingNav = styled.div`
+  display: grid;
+  gap: 8px;
+`
+
+const LoadingWorkspace = styled.section`
+  display: grid;
+  align-content: start;
+  gap: ${spacing[3]};
+  padding: ${spacing[6]} ${spacing[7]};
+
+  @media (max-width: 820px) {
+    padding: ${spacing[4]} ${spacing[3]};
+  }
+`
+
+const LoadingPanel = styled.div`
+  display: grid;
+  gap: ${spacing[4]};
+  margin-top: ${spacing[4]};
+  border: 1px solid ${colors.border};
+  border-radius: ${radii.md};
+  background: ${colors.panel};
+  padding: ${spacing[4]};
+`
+
+const LoadingCalendar = styled.div`
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-top: 1px solid ${colors.border};
+  border-left: 1px solid ${colors.border};
+`
+
+const LoadingCalendarCell = styled.div`
+  min-height: 86px;
+  border-right: 1px solid ${colors.border};
+  border-bottom: 1px solid ${colors.border};
+  background: ${colors.panelSubtle};
+
+  @media (max-width: 640px) {
+    min-height: 58px;
+  }
+`
+
+const LoadingBlock = styled.div<{ $height: number; $width: string }>`
+  width: ${({ $width }) => $width};
+  height: ${({ $height }) => $height}px;
+  border-radius: ${radii.sm};
+  background: linear-gradient(
+    90deg,
+    ${colors.border} 0%,
+    ${colors.panel} 48%,
+    ${colors.border} 100%
+  );
+  background-size: 220% 100%;
+  animation: loading-shimmer 1.5s ease-in-out infinite;
+
+  @keyframes loading-shimmer {
+    0% {
+      background-position: 100% 0;
+    }
+    100% {
+      background-position: -100% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`
+
+const LoadingStatus = styled.p`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 `
 
 const Brand = styled(Link)`
@@ -505,7 +760,8 @@ const NavButton = styled(Link)<{ $active: boolean }>`
   width: 100%;
   border: 1px solid transparent;
   border-radius: ${radii.sm};
-  background: ${({ $active }) => ($active ? colors.panelSubtle : "transparent")};
+  background: ${({ $active }) =>
+    $active ? colors.panelSubtle : "transparent"};
   color: ${({ $active }) => ($active ? colors.ink : colors.muted)};
   padding: 0 10px;
   font-size: 13px;

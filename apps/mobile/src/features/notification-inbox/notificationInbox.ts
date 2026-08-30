@@ -26,8 +26,10 @@ export interface NotificationRecordInput {
     amount: number
     categoryId: string
     merchantName: string
+    memo?: string
     paymentMethodId: string
     targetLedgerId: string
+    tags?: string[]
     transactionAt: string
     updatedAt: number
   }
@@ -49,9 +51,11 @@ export function createCandidateFromNotificationRecord(input: {
         amount: input.record.registrationState.amount,
         categoryId: input.record.registrationState.categoryId,
         merchantName: input.record.registrationState.merchantName || undefined,
+        memo: input.record.registrationState.memo || undefined,
         paymentMethodId:
           input.record.registrationState.paymentMethodId || undefined,
         targetLedgerId: input.record.registrationState.targetLedgerId,
+        tags: input.record.registrationState.tags ?? [],
         transactionAt: input.record.registrationState.transactionAt,
         updatedAt: new Date(
           input.record.registrationState.updatedAt,

@@ -89,7 +89,16 @@ export const DashboardHeader = observer(function DashboardHeader({
 
       <OverviewColumns $isWide={isWide}>
         <OverviewColumn>
-          <MonthlySummary totals={store.monthTotals} />
+          <MonthlySummary
+            disabled={store.profilePreferenceMutationState === "saving"}
+            totals={store.monthTotals}
+            visible={store.monthlySummaryVisible}
+            onToggle={() =>
+              void store.setMonthlySummaryVisibility(
+                !store.monthlySummaryVisible,
+              )
+            }
+          />
         </OverviewColumn>
         <OverviewColumn>
           <BudgetOverview budgets={store.selectedMonthBudgets} />
@@ -99,6 +108,7 @@ export const DashboardHeader = observer(function DashboardHeader({
       <DateSummaryStrip
         days={store.monthDaySummaries}
         selectedDate={store.selectedDate}
+        selectedMonth={store.selectedMonth}
         onSelect={store.selectDate}
       />
 
