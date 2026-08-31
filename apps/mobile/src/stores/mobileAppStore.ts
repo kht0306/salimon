@@ -93,10 +93,10 @@ type MobileFinanceRepository = Pick<
   | "deleteInstallmentOccurrences"
   | "leaveSharedLedger"
   | "load"
+  | "loadMonth"
   | "loadTransactions"
   | "findTransactionRequest"
   | "importTransactions"
-  | "materializeMonth"
   | "removeLedgerMember"
   | "requestAccountDeletion"
   | "renameLedger"
@@ -645,13 +645,15 @@ export class MobileAppStore {
     }
 
     try {
-      await this.repository.materializeMonth(month)
-      let financeData = canReuseMetadata
-        ? mergeFinanceTransactionData(
-            baseFinanceData,
-            await this.repository.loadTransactions(transactionDateRange),
-          )
-        : await this.repository.load(userId, options)
+      let financeData: FinanceData
+      if (canReuseMetadata) {
+        financeData = mergeFinanceTransactionData(
+          baseFinanceData,
+          await this.repository.loadTransactions(transactionDateRange),
+        )
+      } else {
+        financeData = await this.repository.loadMonth(userId, month, options)
+      }
 
       if (financeData.ledgers.length === 0) {
         await this.repository.createLedger({
@@ -661,8 +663,7 @@ export class MobileAppStore {
           paymentInstrumentIds: [],
           ledgerVisibleInstrumentIds: [],
         })
-        await this.repository.materializeMonth(month)
-        financeData = await this.repository.load(userId, options)
+        financeData = await this.repository.loadMonth(userId, month, options)
       }
 
       if (
@@ -749,7 +750,6 @@ export class MobileAppStore {
   ): Promise<void> {
     const sequence = this.sessionSequence
     try {
-      await this.repository.materializeMonth(month)
       const transactionData = await this.repository.loadTransactions(
         createKoreaMonthTransactionRange(month),
       )
@@ -2440,12 +2440,6 @@ export class MobileAppStore {
 
   private async finishSessionActivation(userId: string): Promise<void> {
     try {
-      await setAuthenticatedNotificationCaptureUser(userId)
-    } catch {
-      // 알림 자동 수집 오류가 수동 가계부 로그인을 막지 않게 한다.
-    }
-
-    try {
       await this.authGateway.ensureProfile()
     } catch (error) {
       await this.rejectSession(error)
@@ -2453,10 +2447,35 @@ export class MobileAppStore {
     }
 
     if (userId !== this.authUser?.id) return
+    const sessionSequence = this.sessionSequence
+    const notificationSetup = setAuthenticatedNotificationCaptureUser(userId)
+      .then(() => true)
+      .catch(() => false)
     await this.loadSelectedMonth()
     if (userId === this.authUser?.id) {
-      await this.refreshNotificationInbox()
+      void this.finishNotificationActivation(
+        userId,
+        sessionSequence,
+        notificationSetup,
+      )
     }
+  }
+
+  private async finishNotificationActivation(
+    userId: string,
+    sessionSequence: number,
+    notificationSetup: Promise<boolean>,
+  ): Promise<void> {
+    const configured = await notificationSetup
+    if (!configured) return
+    if (
+      userId !== this.authUser?.id ||
+      sessionSequence !== this.sessionSequence
+    ) {
+      await this.safelyClearNotificationCaptureSession()
+      return
+    }
+    await this.refreshNotificationInbox()
   }
 
   private async rejectSession(error: unknown): Promise<void> {

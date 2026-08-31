@@ -44,6 +44,39 @@ describe("createChunkedAuthStorage", () => {
     }
   })
 
+  it("writes independent session chunks in parallel before the manifest", async () => {
+    const values = new Map<string, string>()
+    const pendingChunkWrites: (() => void)[] = []
+    const driver: SecureStoreDriver = {
+      getItem: vi.fn(async (key) => values.get(key) ?? null),
+      setItem: vi.fn((key, value) => {
+        if (key === "auth-key") {
+          values.set(key, value)
+          return Promise.resolve()
+        }
+        return new Promise<void>((resolve) => {
+          pendingChunkWrites.push(() => {
+            values.set(key, value)
+            resolve()
+          })
+        })
+      }),
+      removeItem: vi.fn(async (key) => {
+        values.delete(key)
+      }),
+    }
+    const storage = createChunkedAuthStorage(driver)
+
+    const writing = storage.setItem("auth-key", "session".repeat(1_000))
+    await vi.waitFor(() => expect(pendingChunkWrites.length).toBeGreaterThan(1))
+    expect(values.has("auth-key")).toBe(false)
+
+    pendingChunkWrites.forEach((finish) => finish())
+    await writing
+
+    expect(await storage.getItem("auth-key")).toBe("session".repeat(1_000))
+  })
+
   it("removes the previous generation after replacing a session", async () => {
     const { driver, values } = createMemoryDriver()
     const storage = createChunkedAuthStorage(driver)

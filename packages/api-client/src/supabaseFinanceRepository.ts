@@ -128,6 +128,22 @@ export class SupabaseFinanceRepository {
     userId: string,
     options: FinanceLoadOptions = {},
   ): Promise<FinanceData> {
+    return this.loadFinanceData(userId, options)
+  }
+
+  async loadMonth(
+    userId: string,
+    month: string,
+    options: FinanceLoadOptions,
+  ): Promise<FinanceData> {
+    return this.loadFinanceData(userId, options, month)
+  }
+
+  private async loadFinanceData(
+    userId: string,
+    options: FinanceLoadOptions,
+    transactionMonth?: string,
+  ): Promise<FinanceData> {
     const client = this.requireClient()
     validateTransactionDateRange(options.transactionDateRange)
     const [
@@ -204,7 +220,12 @@ export class SupabaseFinanceRepository {
         )
         .in("type", ["card", "bank"])
         .order("created_at"),
-      fetchAllTransactionRows(client, options.transactionDateRange),
+      fetchAllTransactionRows(
+        client,
+        options.transactionDateRange,
+        transactionMonth ??
+          koreaMonthFromTransactionDateRange(options.transactionDateRange),
+      ),
       client
         .from("ledger_invitations")
         .select(
@@ -342,6 +363,7 @@ export class SupabaseFinanceRepository {
     const transactionsResult = await fetchAllTransactionRows(
       client,
       transactionDateRange,
+      koreaMonthFromTransactionDateRange(transactionDateRange),
     )
     if (transactionsResult.error) {
       throw toError(transactionsResult.error, "월 거래를 불러오지 못했습니다.")
@@ -1192,13 +1214,18 @@ const DATABASE_PAGE_SIZE = 500
 async function fetchAllTransactionRows(
   client: SalimonSupabaseClient,
   dateRange?: TransactionDateRange,
+  transactionMonth?: string,
 ): Promise<{ data: Row[] | null; error: unknown }> {
+  if (transactionMonth) {
+    return fetchAllMonthTransactionRows(client, transactionMonth)
+  }
+
   const rows: Row[] = []
   for (let from = 0; ; from += DATABASE_PAGE_SIZE) {
     let query = client
       .from("transactions")
       .select(
-        "id, ledger_id, created_by, updated_by, actor_user_id, type, status, amount, currency, transaction_at, category_id, payment_method_id, merchant_name, memo, source_type, source_app, source_sender, source_hash, parse_confidence, recurring_rule_id, recurring_type, installment_number, installment_total, created_at, updated_at, deleted_at, tags",
+        "id, ledger_id, created_by, updated_by, actor_user_id, type, status, amount, currency, transaction_at, category_id, payment_method_id, merchant_name, memo, source_type, source_app, source_sender, source_hash, parse_confidence, recurring_rule_id, recurring_type, installment_number, installment_total, created_at, updated_at, deleted_at, tags, income_kind",
       )
       .is("deleted_at", null)
 
@@ -1211,6 +1238,24 @@ async function fetchAllTransactionRows(
     const { data, error } = await query
       .order("transaction_at", { ascending: false })
       .order("id")
+      .range(from, from + DATABASE_PAGE_SIZE - 1)
+    if (error) return { data: null, error }
+    rows.push(...((data ?? []) as Row[]))
+    if ((data?.length ?? 0) < DATABASE_PAGE_SIZE) break
+  }
+  return { data: rows, error: null }
+}
+
+async function fetchAllMonthTransactionRows(
+  client: SalimonSupabaseClient,
+  month: string,
+): Promise<{ data: Row[] | null; error: unknown }> {
+  const rows: Row[] = []
+  for (let from = 0; ; from += DATABASE_PAGE_SIZE) {
+    const { data, error } = await client
+      .rpc("load_finance_month_transactions", {
+        target_month: `${month}-01`,
+      })
       .range(from, from + DATABASE_PAGE_SIZE - 1)
     if (error) return { data: null, error }
     rows.push(...((data ?? []) as Row[]))
@@ -1262,6 +1307,32 @@ function validateTransactionDateRange(
   ) {
     throw new Error("거래 조회 기간이 올바르지 않습니다.")
   }
+}
+
+function koreaMonthFromTransactionDateRange(
+  dateRange: TransactionDateRange | undefined,
+): string | undefined {
+  if (!dateRange) return undefined
+
+  const match = /^(\d{4})-(\d{2})-01/.exec(dateRange.start)
+  if (!match) return undefined
+
+  const year = Number(match[1])
+  const monthNumber = Number(match[2])
+  if (monthNumber < 1 || monthNumber > 12) return undefined
+
+  const month = `${year}-${String(monthNumber).padStart(2, "0")}`
+  const nextYear = monthNumber === 12 ? year + 1 : year
+  const nextMonth = monthNumber === 12 ? 1 : monthNumber + 1
+  const expectedStart = Date.parse(`${month}-01T00:00:00+09:00`)
+  const expectedEnd = Date.parse(
+    `${nextYear}-${String(nextMonth).padStart(2, "0")}-01T00:00:00+09:00`,
+  )
+
+  return Date.parse(dateRange.start) === expectedStart &&
+    Date.parse(dateRange.endExclusive) === expectedEnd
+    ? month
+    : undefined
 }
 
 interface RepositoryErrorLike {
