@@ -3,7 +3,6 @@
 import {
   clearLocalAuthSession,
   completeAuthCallback,
-  ensureAuthenticatedProfile,
 } from "@salimon/api-client"
 import { colors, radii, shadows } from "@salimon/ui-tokens"
 import styled from "@emotion/styled"
@@ -14,20 +13,19 @@ import { useEffect, useState } from "react"
 export default function AuthCallbackPage() {
   const router = useRouter()
   const [state, setState] = useState<"loading" | "error">("loading")
-  const [message, setMessage] = useState("카카오 로그인 결과를 확인하고 있습니다.")
+  const [message, setMessage] = useState(
+    "카카오 로그인 결과를 확인하고 있습니다.",
+  )
 
   useEffect(() => {
     let active = true
-    let redirectTimer: number | undefined
 
     async function finishLogin() {
       try {
         await completeAuthCallback()
-        await ensureAuthenticatedProfile()
         if (!active) return
 
-        setMessage("로그인이 완료되었습니다. 살림온으로 이동합니다.")
-        redirectTimer = window.setTimeout(() => router.replace("/"), 350)
+        router.replace("/")
       } catch (error) {
         const errorMessage =
           error instanceof Error
@@ -49,18 +47,23 @@ export default function AuthCallbackPage() {
     void finishLogin()
     return () => {
       active = false
-      if (redirectTimer) {
-        window.clearTimeout(redirectTimer)
-      }
     }
   }, [router])
 
   return (
     <CallbackMain>
       <StatusPanel role={state === "error" ? "alert" : "status"}>
-        {state === "loading" ? <LoaderCircle className="spinner" size={28} /> : <TriangleAlert size={28} />}
+        {state === "loading" ? (
+          <LoaderCircle className="spinner" size={28} />
+        ) : (
+          <TriangleAlert size={28} />
+        )}
         <div>
-          <h1>{state === "loading" ? "로그인 연결 중" : "로그인을 완료하지 못했습니다"}</h1>
+          <h1>
+            {state === "loading"
+              ? "로그인 연결 중"
+              : "로그인을 완료하지 못했습니다"}
+          </h1>
           <p>{message}</p>
         </div>
         {state === "error" ? (

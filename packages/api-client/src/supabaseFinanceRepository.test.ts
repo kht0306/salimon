@@ -35,7 +35,9 @@ class LoadQueryDouble implements PromiseLike<QueryResult> {
   readonly lt = vi.fn(() => this)
   readonly eq = vi.fn(() => this)
 
-  constructor(private readonly result: QueryResult) {}
+  constructor(
+    private readonly result: QueryResult | PromiseLike<QueryResult>,
+  ) {}
 
   then<TResult1 = QueryResult, TResult2 = never>(
     onfulfilled?:
@@ -69,12 +71,24 @@ interface LoadClientDouble {
   client: SalimonSupabaseClient
   from: ReturnType<typeof vi.fn>
   queries: Map<string, LoadQueryDouble>
+  rpc: ReturnType<typeof vi.fn>
+  rpcQueries: Map<string, LoadQueryDouble>
 }
 
 function createLoadClientDouble(
   overrides: Record<string, QueryResult> = {},
 ): LoadClientDouble {
   const queries = new Map<string, LoadQueryDouble>()
+  const rpcQueries = new Map<string, LoadQueryDouble>()
+  const clientRpc = vi.fn((functionName: string) => {
+    const result =
+      functionName === "load_finance_month_transactions"
+        ? (overrides.transactions ?? defaultLoadResult("transactions"))
+        : { data: null, error: null }
+    const query = new LoadQueryDouble(result)
+    rpcQueries.set(functionName, query)
+    return query
+  })
   const clientFrom = vi.fn((table: string) => {
     const result = overrides[table] ?? defaultLoadResult(table)
     const query = new LoadQueryDouble(result)
@@ -83,9 +97,14 @@ function createLoadClientDouble(
   })
 
   return {
-    client: { from: clientFrom } as unknown as SalimonSupabaseClient,
+    client: {
+      from: clientFrom,
+      rpc: clientRpc,
+    } as unknown as SalimonSupabaseClient,
     from: clientFrom,
     queries,
+    rpc: clientRpc,
+    rpcQueries,
   }
 }
 
@@ -147,8 +166,13 @@ beforeEach(() => {
 })
 
 describe("load", () => {
-  it("uses an injected client and limits transactions and splits to the requested month", async () => {
-    const { client, from: injectedFrom, queries } = createLoadClientDouble()
+  it("uses the indexed month function and limits splits to returned transactions", async () => {
+    const {
+      client,
+      from: injectedFrom,
+      queries,
+      rpc: injectedRpc,
+    } = createLoadClientDouble()
     const repository = new SupabaseFinanceRepository(client)
 
     const data = await repository.load("user-1", {
@@ -158,16 +182,12 @@ describe("load", () => {
       },
     })
 
-    expect(injectedFrom).toHaveBeenCalledWith("transactions")
+    expect(injectedRpc).toHaveBeenCalledWith(
+      "load_finance_month_transactions",
+      { target_month: "2026-08-01" },
+    )
+    expect(injectedFrom).not.toHaveBeenCalledWith("transactions")
     expect(from).not.toHaveBeenCalled()
-    expect(queries.get("transactions")?.gte).toHaveBeenCalledWith(
-      "transaction_at",
-      "2026-08-01T00:00:00+09:00",
-    )
-    expect(queries.get("transactions")?.lt).toHaveBeenCalledWith(
-      "transaction_at",
-      "2026-09-01T00:00:00+09:00",
-    )
     expect(queries.get("transaction_splits")?.in).toHaveBeenCalledWith(
       "transaction_id",
       ["transaction-1"],
@@ -209,11 +229,77 @@ describe("load", () => {
     ).rejects.toThrow("거래 조회 기간이 올바르지 않습니다.")
     expect(injectedFrom).not.toHaveBeenCalled()
   })
+
+  it("loads metadata while the indexed month function is running", async () => {
+    let finishMonthLoad: (() => void) | undefined
+    const monthLoad = new Promise<QueryResult>((resolve) => {
+      finishMonthLoad = () => resolve(defaultLoadResult("transactions"))
+    })
+    const {
+      client,
+      from: injectedFrom,
+      rpc: injectedRpc,
+    } = createLoadClientDouble()
+    injectedRpc.mockReturnValue(new LoadQueryDouble(monthLoad))
+    const repository = new SupabaseFinanceRepository(client)
+
+    const loading = repository.loadMonth("user-1", "2026-08", {
+      transactionDateRange: {
+        start: "2026-08-01T00:00:00+09:00",
+        endExclusive: "2026-09-01T00:00:00+09:00",
+      },
+    })
+
+    await vi.waitFor(() =>
+      expect(injectedFrom).toHaveBeenCalledWith("profiles"),
+    )
+    expect(injectedFrom).not.toHaveBeenCalledWith("transactions")
+
+    finishMonthLoad?.()
+    await loading
+
+    expect(injectedRpc).toHaveBeenCalledWith(
+      "load_finance_month_transactions",
+      { target_month: "2026-08-01" },
+    )
+    expect(injectedFrom).not.toHaveBeenCalledWith("transactions")
+  })
+
+  it("falls back to the transaction view for a non-month-aligned range", async () => {
+    const {
+      client,
+      from: injectedFrom,
+      queries,
+      rpc: injectedRpc,
+    } = createLoadClientDouble()
+    const repository = new SupabaseFinanceRepository(client)
+
+    await repository.load("user-1", {
+      transactionDateRange: {
+        start: "2026-08-10T00:00:00+09:00",
+        endExclusive: "2026-08-20T00:00:00+09:00",
+      },
+    })
+
+    expect(injectedRpc).not.toHaveBeenCalledWith(
+      "load_finance_month_transactions",
+      expect.anything(),
+    )
+    expect(injectedFrom).toHaveBeenCalledWith("transactions")
+    expect(queries.get("transactions")?.gte).toHaveBeenCalledWith(
+      "transaction_at",
+      "2026-08-10T00:00:00+09:00",
+    )
+  })
 })
 
 describe("loadTransactions", () => {
-  it("loads only transactions and their splits for the requested range", async () => {
-    const { client, from: injectedFrom, queries } = createLoadClientDouble()
+  it("loads a month through the indexed function and then loads its splits", async () => {
+    const {
+      client,
+      from: injectedFrom,
+      rpc: injectedRpc,
+    } = createLoadClientDouble()
     const repository = new SupabaseFinanceRepository(client)
 
     const data = await repository.loadTransactions({
@@ -221,13 +307,12 @@ describe("loadTransactions", () => {
       endExclusive: "2026-09-01T00:00:00+09:00",
     })
 
-    expect(injectedFrom).toHaveBeenCalledTimes(2)
-    expect(injectedFrom).toHaveBeenNthCalledWith(1, "transactions")
-    expect(injectedFrom).toHaveBeenNthCalledWith(2, "transaction_splits")
-    expect(queries.get("transactions")?.gte).toHaveBeenCalledWith(
-      "transaction_at",
-      "2026-08-01T00:00:00+09:00",
+    expect(injectedRpc).toHaveBeenCalledWith(
+      "load_finance_month_transactions",
+      { target_month: "2026-08-01" },
     )
+    expect(injectedFrom).toHaveBeenCalledOnce()
+    expect(injectedFrom).toHaveBeenCalledWith("transaction_splits")
     expect(data.transactions).toHaveLength(1)
     expect(data.transactionSplits).toHaveLength(1)
   })

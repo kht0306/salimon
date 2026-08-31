@@ -57,9 +57,11 @@ export function createChunkedAuthStorage(
       const generation = createGeneration()
       const chunks = splitByUtf8Bytes(value, MAX_CHUNK_BYTES)
 
-      for (const [index, chunk] of chunks.entries()) {
-        await driver.setItem(chunkKey(key, generation, index), chunk)
-      }
+      await Promise.all(
+        chunks.map((chunk, index) =>
+          driver.setItem(chunkKey(key, generation, index), chunk),
+        ),
+      )
       await driver.setItem(
         key,
         `${MANIFEST_PREFIX}${JSON.stringify({
@@ -166,7 +168,9 @@ async function removeChunks(
   key: string,
   manifest: ChunkManifest,
 ): Promise<void> {
-  for (let index = 0; index < manifest.count; index += 1) {
-    await driver.removeItem(chunkKey(key, manifest.generation, index))
-  }
+  await Promise.all(
+    Array.from({ length: manifest.count }, (_, index) =>
+      driver.removeItem(chunkKey(key, manifest.generation, index)),
+    ),
+  )
 }

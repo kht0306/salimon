@@ -138,6 +138,10 @@ export class AppStore {
     | "syncing-payment-methods" = "idle"
   private initializedProfileUserId: string | null = null
   private profileInitialization: Promise<void> | null = null
+  private authActivation:
+    | { userId: string; promise: Promise<boolean> }
+    | undefined
+  private activatedAuthUserId: string | null = null
   private monthRequestSequence = 0
   private readonly monthCache = new Map<string, MonthCacheEntry>()
   private readonly prefetchingMonths = new Set<string>()
@@ -418,15 +422,21 @@ export class AppStore {
     this.dataState = hadData ? "refreshing" : "loading"
     this.dataError = null
     try {
-      await this.repository.materializeMonth(this.selectedMonth)
-      const data = await this.repository.load(this.authUser.id)
+      const transactionDateRange = createKoreaMonthTransactionRange(
+        this.selectedMonth,
+      )
+      const data = await this.repository.loadMonth(
+        this.authUser.id,
+        this.selectedMonth,
+        { transactionDateRange },
+      )
       runInAction(() => {
         this.hydrate(data)
         this.invalidateMonthCache()
-        for (const offset of [-1, 0, 1] as const) {
-          const month = moveMonth(this.selectedMonth, offset)
-          this.setMonthCache(month, selectMonthData(data, month))
-        }
+        this.setMonthCache(
+          this.selectedMonth,
+          selectMonthData(data, this.selectedMonth),
+        )
         this.dataState = "ready"
       })
       this.scheduleAdjacentMonthPrefetch(this.selectedMonth)
@@ -500,7 +510,6 @@ export class AppStore {
     this.dataState = this.data.profile.id ? "refreshing" : "loading"
 
     try {
-      await this.repository.materializeMonth(month)
       const transactionData = await this.repository.loadTransactions(
         createKoreaMonthTransactionRange(month),
       )
@@ -560,7 +569,6 @@ export class AppStore {
     cacheGeneration: number,
   ): Promise<void> {
     try {
-      await this.repository.materializeMonth(month)
       const transactionData = await this.repository.loadTransactions(
         createKoreaMonthTransactionRange(month),
       )
@@ -703,6 +711,8 @@ export class AppStore {
       runInAction(() => {
         this.authUser = null
         this.authState = "anonymous"
+        this.authActivation = undefined
+        this.activatedAuthUserId = null
         this.initializedProfileUserId = null
         this.profileInitialization = null
         this.hydrate(createEmptyFinanceData())
@@ -2155,6 +2165,8 @@ export class AppStore {
     if (!session) {
       this.authUser = null
       this.authState = "anonymous"
+      this.authActivation = undefined
+      this.activatedAuthUserId = null
       this.initializedProfileUserId = null
       this.profileInitialization = null
       this.hydrate(createEmptyFinanceData())
@@ -2168,14 +2180,43 @@ export class AppStore {
     this.authState = "authenticated"
     this.authError = null
 
-    try {
-      await this.ensureProfile(session.user.id)
-    } catch (error) {
-      await this.rejectAuthSession(session.user.id, error)
+    if (this.authActivation?.userId === session.user.id) {
+      await this.authActivation.promise
+      return
+    }
+    if (
+      this.activatedAuthUserId === session.user.id &&
+      this.data.profile.id === session.user.id
+    ) {
       return
     }
 
-    await Promise.all([this.refreshFinanceData(), this.checkSupabase()])
+    const promise = this.finishAuthActivation(session.user.id)
+    this.authActivation = { userId: session.user.id, promise }
+    const activated = await promise
+    runInAction(() => {
+      if (activated && this.authUser?.id === session.user.id) {
+        this.activatedAuthUserId = session.user.id
+      }
+      if (this.authActivation?.promise === promise) {
+        this.authActivation = undefined
+      }
+    })
+  }
+
+  private async finishAuthActivation(userId: string): Promise<boolean> {
+    try {
+      await this.ensureProfile(userId)
+    } catch (error) {
+      await this.rejectAuthSession(userId, error)
+      return false
+    }
+
+    if (this.authUser?.id !== userId) return false
+    await this.refreshFinanceData()
+    if (this.authUser?.id !== userId) return false
+    void this.checkSupabase()
+    return true
   }
 
   private setAuthError(error: unknown): void {
@@ -2278,6 +2319,8 @@ export class AppStore {
       if (this.authUser && this.authUser.id !== userId) return
 
       this.authUser = null
+      this.authActivation = undefined
+      this.activatedAuthUserId = null
       this.initializedProfileUserId = null
       this.profileInitialization = null
       this.hydrate(createEmptyFinanceData())

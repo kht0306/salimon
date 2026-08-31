@@ -133,6 +133,7 @@ function createRepository(data = createReadyFinanceData()) {
     leaveSharedLedger: vi.fn(async () => undefined),
     importTransactions: vi.fn(async () => undefined),
     load: vi.fn(async () => data),
+    loadMonth: vi.fn(async () => data),
     loadTransactions: vi.fn(async (_range: TransactionDateRange) => ({
       transactions: data.transactions,
       transactionSplits: data.transactionSplits,
@@ -222,8 +223,7 @@ describe("MobileAppStore authentication", () => {
     expect(store.dataStatus).toBe("ready")
     expect(store.currentLedgerName).toBe("우리집")
     expect(gateway.ensureProfile).toHaveBeenCalledOnce()
-    expect(repository.materializeMonth).toHaveBeenCalledWith("2026-08")
-    expect(repository.load).toHaveBeenCalledWith("user-1", {
+    expect(repository.loadMonth).toHaveBeenCalledWith("user-1", "2026-08", {
       transactionDateRange: {
         start: "2026-08-01T00:00:00+09:00",
         endExclusive: "2026-09-01T00:00:00+09:00",
@@ -265,6 +265,34 @@ describe("MobileAppStore authentication", () => {
     expect(store.authErrorMessage).toBeUndefined()
   })
 
+  it("does not wait for native notification preparation before completing login", async () => {
+    let finishNotificationSetup: (() => void) | undefined
+    vi.mocked(setAuthenticatedNotificationCaptureUser).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishNotificationSetup = resolve
+        }),
+    )
+    const store = new MobileAppStore(
+      createRepository(),
+      createAuthGateway(),
+      new Date("2026-08-10T12:00:00+09:00"),
+    )
+
+    await store.initializeAuth()
+
+    expect(store.authState).toBe("authenticated")
+    expect(store.dataStatus).toBe("ready")
+    vi.mocked(getNotificationCaptureStatus).mockClear()
+    await Promise.resolve()
+    expect(getNotificationCaptureStatus).not.toHaveBeenCalled()
+
+    finishNotificationSetup?.()
+    await vi.waitFor(() =>
+      expect(getNotificationCaptureStatus).toHaveBeenCalledOnce(),
+    )
+  })
+
   it("keeps a restored session when an old callback is replayed", async () => {
     const gateway = createAuthGateway({
       completeCallbackUrl: vi.fn(async () => {
@@ -304,7 +332,7 @@ describe("MobileAppStore authentication", () => {
     emptyData.profile = createReadyFinanceData().profile
     const readyData = createReadyFinanceData()
     const repository = createRepository()
-    repository.load
+    repository.loadMonth
       .mockResolvedValueOnce(emptyData)
       .mockResolvedValueOnce(readyData)
     const store = new MobileAppStore(repository, createAuthGateway())
@@ -319,7 +347,7 @@ describe("MobileAppStore authentication", () => {
       paymentInstrumentIds: [],
       ledgerVisibleInstrumentIds: [],
     })
-    expect(repository.load).toHaveBeenCalledTimes(2)
+    expect(repository.loadMonth).toHaveBeenCalledTimes(2)
     expect(store.dataStatus).toBe("ready")
   })
 
@@ -381,7 +409,7 @@ describe("MobileAppStore authentication", () => {
     await store.initializeAuth()
     expect(store.requiresLegalConsent).toBe(true)
 
-    repository.load.mockResolvedValue(createReadyFinanceData())
+    repository.loadMonth.mockResolvedValue(createReadyFinanceData())
     await store.acceptLegalTerms()
 
     expect(repository.acceptLegalTerms).toHaveBeenCalledWith(
@@ -419,7 +447,7 @@ describe("MobileAppStore authentication", () => {
 
     await store.initializeAuth()
 
-    expect(store.notificationCandidateCount).toBe(1)
+    await vi.waitFor(() => expect(store.notificationCandidateCount).toBe(1))
     expect(store.notificationCandidates[0]?.maskedMessage).not.toContain(
       "(8*3*)",
     )
@@ -456,6 +484,7 @@ describe("MobileAppStore authentication", () => {
     )
     const store = new MobileAppStore(createRepository(), createAuthGateway())
     await store.initializeAuth()
+    await vi.waitFor(() => expect(store.notificationCandidateCount).toBe(2))
 
     await expect(
       store.deleteNotificationCandidates(["a".repeat(64)]),
@@ -477,6 +506,7 @@ describe("MobileAppStore authentication", () => {
     mockCapturedNotification()
     const store = new MobileAppStore(repository, createAuthGateway())
     await store.initializeAuth()
+    await vi.waitFor(() => expect(store.notificationCandidateCount).toBe(1))
 
     const result = await store.registerNotificationCandidate({
       amount: "45000",
@@ -534,6 +564,7 @@ describe("MobileAppStore authentication", () => {
     mockCapturedNotification()
     const store = new MobileAppStore(repository, createAuthGateway())
     await store.initializeAuth()
+    await vi.waitFor(() => expect(store.notificationCandidateCount).toBe(1))
     const draft = {
       amount: "45000",
       candidateId: "a".repeat(64),
@@ -581,6 +612,7 @@ describe("MobileAppStore authentication", () => {
     mockCapturedNotification()
     const store = new MobileAppStore(repository, createAuthGateway())
     await store.initializeAuth()
+    await vi.waitFor(() => expect(store.notificationCandidateCount).toBe(1))
 
     await expect(
       store.registerNotificationCandidate({
@@ -698,10 +730,10 @@ describe("MobileAppStore authentication", () => {
     await store.initializeAuth()
 
     await store.loadSelectedMonth()
-    expect(repository.load).toHaveBeenCalledOnce()
+    expect(repository.loadMonth).toHaveBeenCalledOnce()
 
     await store.refreshSelectedMonth()
-    expect(repository.load).toHaveBeenCalledOnce()
+    expect(repository.loadMonth).toHaveBeenCalledOnce()
     expect(repository.loadTransactions).toHaveBeenCalledOnce()
   })
 
@@ -883,7 +915,7 @@ describe("MobileAppStore authentication", () => {
     await vi.waitFor(() =>
       expect(repository.loadTransactions).toHaveBeenCalledOnce(),
     )
-    expect(repository.load).toHaveBeenCalledOnce()
+    expect(repository.loadMonth).toHaveBeenCalledOnce()
     expect(store.transactionMutationState).toBe("idle")
   })
 
@@ -1152,7 +1184,7 @@ describe("MobileAppStore authentication", () => {
       "expense-1",
       "user-1",
     )
-    expect(repository.load).toHaveBeenCalledOnce()
+    expect(repository.loadMonth).toHaveBeenCalledOnce()
     expect(repository.loadTransactions).toHaveBeenCalledOnce()
   })
 
