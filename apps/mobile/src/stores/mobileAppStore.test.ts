@@ -1038,7 +1038,11 @@ describe("MobileAppStore authentication", () => {
     repository.saveTransaction.mockRejectedValueOnce(
       new Error("network unavailable"),
     )
-    const store = new MobileAppStore(repository, createAuthGateway())
+    const store = new MobileAppStore(
+      repository,
+      createAuthGateway(),
+      new Date("2026-08-10T12:00:00+09:00"),
+    )
     await store.initializeAuth()
 
     const result = await store.saveGeneralTransaction({
@@ -1200,7 +1204,11 @@ describe("MobileAppStore authentication", () => {
       },
     ]
     const repository = createRepository(data)
-    const store = new MobileAppStore(repository, createAuthGateway())
+    const store = new MobileAppStore(
+      repository,
+      createAuthGateway(),
+      new Date("2026-08-10T12:00:00+09:00"),
+    )
     await store.initializeAuth()
 
     await expect(store.saveMonthNote("수정 메모")).resolves.toBe(true)
