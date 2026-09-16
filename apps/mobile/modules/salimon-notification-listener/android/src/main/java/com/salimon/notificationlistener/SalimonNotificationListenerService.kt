@@ -94,7 +94,7 @@ class SalimonNotificationListenerService : NotificationListenerService() {
         NotificationChannel(
           REVIEW_CHANNEL_ID,
           "결제 알림 후보",
-          NotificationManager.IMPORTANCE_DEFAULT,
+          NotificationManager.IMPORTANCE_HIGH,
         ).apply {
           description = "새 결제 알림 후보가 저장되었을 때 알려줍니다."
         },
@@ -127,7 +127,7 @@ class SalimonNotificationListenerService : NotificationListenerService() {
   }
 
   companion object {
-    private const val REVIEW_CHANNEL_ID = "salimon_candidate_review"
+    internal const val REVIEW_CHANNEL_ID = "salimon_candidate_review"
     private const val REVIEW_NOTIFICATION_ID = 9001
   }
 }

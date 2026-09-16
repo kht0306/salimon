@@ -44,6 +44,10 @@ export function NotificationDisclosureModal({
 
           <DisclosureList>
             <DisclosureItem>
+              새 후보가 도착하면 살림온 알림으로 알려드립니다. Android 알림 표시
+              권한을 요청하며, 설정에서 도착 알림만 끌 수 있습니다.
+            </DisclosureItem>
+            <DisclosureItem>
               롯데카드처럼 사용자가 선택한 지원 앱의 결제 형태 알림만
               감지합니다.
             </DisclosureItem>

@@ -10,6 +10,7 @@ import {
 import { transactionTypeLabel } from "./dashboardPresentation"
 
 interface TransactionRowProps {
+  amountsVisible: boolean
   categories: Category[]
   members: LedgerMember[]
   splitCount: number
@@ -18,12 +19,15 @@ interface TransactionRowProps {
 }
 
 export function TransactionRow({
+  amountsVisible,
   categories,
   members,
   splitCount,
   transaction,
   onPress,
 }: TransactionRowProps) {
+  const formatAmount = (amount: number): string =>
+    amountsVisible ? formatKrw(amount) : "••••••"
   const categoryLabel = getCategoryLabel(
     categories,
     transaction.categoryId,
@@ -46,7 +50,7 @@ export function TransactionRow({
       accessible
       accessibilityLabel={`${formatKoreanTime(
         transaction.transactionAt,
-      )}, ${title}, ${categoryLabel}, ${typeLabel} ${formatKrw(
+      )}, ${title}, ${categoryLabel}, ${typeLabel} ${formatAmount(
         transaction.amount,
       )}, 거래자 ${actor}, 등록자 ${registrant}${
         structureLabels.length > 0 ? `, ${structureLabels.join(", ")}` : ""
@@ -81,8 +85,8 @@ export function TransactionRow({
         ) : null}
       </TransactionCopy>
       <Amount $type={transaction.type}>
-        {amountPrefix}
-        {formatKrw(transaction.amount)}
+        {amountsVisible ? amountPrefix : ""}
+        {formatAmount(transaction.amount)}
       </Amount>
     </Row>
   )

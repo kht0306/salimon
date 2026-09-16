@@ -104,6 +104,7 @@ export const DashboardHome = observer(function DashboardHome() {
 
     return (
       <TransactionRow
+        amountsVisible={store.monthlySummaryVisible}
         categories={store.financeData.categories}
         members={currentMembers}
         splitCount={splitCountsByTransactionId.get(item.transaction.id) ?? 0}
@@ -123,6 +124,7 @@ export const DashboardHome = observer(function DashboardHome() {
       <List
         contentContainerStyle={listContentStyle}
         data={listItems}
+        extraData={store.monthlySummaryVisible}
         keyExtractor={(item) => item.key}
         ListEmptyComponent={
           <EmptyState>

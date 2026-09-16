@@ -5,6 +5,7 @@ import { mobileTheme } from "../../theme"
 import type { MonthDaySummary } from "./dashboardPresentation"
 
 interface DateSummaryStripProps {
+  amountsVisible: boolean
   days: MonthDaySummary[]
   onSelect: (date: string) => void
   selectedDate: string
@@ -14,11 +15,14 @@ interface DateSummaryStripProps {
 const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"]
 
 export function DateSummaryStrip({
+  amountsVisible,
   days,
   onSelect,
   selectedDate,
   selectedMonth,
 }: DateSummaryStripProps) {
+  const formatAmount = (amount: number): string =>
+    amountsVisible ? formatKrw(amount) : "••••••"
   const selectedDay = days.find((day) => day.date === selectedDate)
   const [year = 0, month = 1] = selectedMonth.split("-").map(Number)
   const leadingBlankCount = new Date(year, month - 1, 1).getDay()
@@ -66,7 +70,7 @@ export function DateSummaryStrip({
                 $lastColumn={lastColumn}
                 $lastRow={lastRow}
                 $selected={selected}
-                accessibilityLabel={`${day.dayOfMonth}일, 거래 ${day.count}건, 지출 ${formatKrw(day.expense)}, 수입 ${formatKrw(day.income)}, 저축 ${formatKrw(day.saving)}`}
+                accessibilityLabel={`${day.dayOfMonth}일, 거래 ${day.count}건, 지출 ${formatAmount(day.expense)}, 수입 ${formatAmount(day.income)}, 저축 ${formatAmount(day.saving)}`}
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
                 onPress={() => onSelect(day.date)}
@@ -92,13 +96,13 @@ export function DateSummaryStrip({
       {selectedDay && selectedDay.count > 0 ? (
         <SelectedSummary>
           <SelectedSummaryItem>
-            지출 {formatKrw(selectedDay.expense)}
+            지출 {formatAmount(selectedDay.expense)}
           </SelectedSummaryItem>
           <SelectedSummaryItem $tone="income">
-            수입 {formatKrw(selectedDay.income)}
+            수입 {formatAmount(selectedDay.income)}
           </SelectedSummaryItem>
           <SelectedSummaryItem>
-            저축 {formatKrw(selectedDay.saving)}
+            저축 {formatAmount(selectedDay.saving)}
           </SelectedSummaryItem>
         </SelectedSummary>
       ) : null}

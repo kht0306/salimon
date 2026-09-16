@@ -3,18 +3,14 @@ import { router, useFocusEffect } from "expo-router"
 import { Check } from "lucide-react-native"
 import { observer } from "mobx-react-lite"
 import { useCallback, useEffect, useState } from "react"
-import {
-  Alert,
-  PermissionsAndroid,
-  Platform,
-  ScrollView,
-  Switch,
-} from "react-native"
+import { Alert, ScrollView, Switch } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { AppButton } from "../../components/AppButton"
 import { AppText } from "../../components/AppText"
 import { NotificationDisclosureModal } from "../../features/notification-inbox/NotificationDisclosureModal"
 import { SUPPORTED_NOTIFICATION_APPS } from "../../features/notification-inbox/notificationInbox"
+import { requestReviewNotificationPermission } from "../../features/notification-inbox/reviewNotificationPermission"
+import { openReviewNotificationSettings } from "../../native/notificationListener"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
 
@@ -61,10 +57,12 @@ export default observer(function SettingsScreen() {
         ? selectedPackages
         : [SUPPORTED_NOTIFICATION_APPS[0].packageName]
     const ledgerId = targetLedgerId || store.defaultLedgerId
+    const reviewNotificationsEnabled =
+      await requestReviewNotificationPermission()
     const configured = await store.configureNotificationInbox({
       allowedPackageNames,
       enabled: true,
-      reviewNotificationsEnabled: false,
+      reviewNotificationsEnabled,
       targetLedgerId: ledgerId,
     })
     setDisclosureBusy(false)
@@ -98,22 +96,7 @@ export default observer(function SettingsScreen() {
       return
     }
 
-    if (
-      enabled &&
-      Platform.OS === "android" &&
-      Number(Platform.Version) >= 33
-    ) {
-      const result = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-      )
-      if (result !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert(
-          "알림 표시 권한이 꺼져 있어요.",
-          "후보는 계속 저장되며 후보함에서 직접 확인할 수 있습니다.",
-        )
-        return
-      }
-    }
+    if (enabled && !(await requestReviewNotificationPermission())) return
 
     await store.configureNotificationInbox({
       allowedPackageNames: selectedPackages,
@@ -343,7 +326,16 @@ export default observer(function SettingsScreen() {
                   <PermissionCopy>
                     <SecurityTitle>후보 도착 알림</SecurityTitle>
                     <Description>
-                      꺼도 후보함에는 정상적으로 저장됩니다.
+                      {!store.notificationCaptureStatus
+                        .reviewNotificationsEnabled
+                        ? "꺼져 있어 알림 없이 후보함에만 저장됩니다."
+                        : !store.notificationCaptureStatus
+                              .reviewNotificationsAllowed
+                          ? "Android에서 알림 표시가 차단되어 있습니다."
+                          : !store.notificationCaptureStatus
+                                .reviewNotificationHeadsUpEnabled
+                            ? "상단 배너를 받으려면 Android 알림 설정에서 팝업을 허용해 주세요."
+                            : "새 후보가 저장되면 살림온 알림을 표시합니다."}
                     </Description>
                   </PermissionCopy>
                   <Switch
@@ -360,6 +352,11 @@ export default observer(function SettingsScreen() {
                     }
                   />
                 </PermissionRow>
+
+                <AppButton
+                  label="Android 도착 알림 설정"
+                  onPress={() => void openReviewNotificationSettings()}
+                />
 
                 {store.notificationInboxErrorMessage ? (
                   <ErrorText

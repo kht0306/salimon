@@ -8,6 +8,8 @@ import SalimonNotificationListener, {
 const unsupportedStatus: NativeNotificationCaptureStatus = {
   allowedPackageNames: [],
   disclosureAcceptedAt: 0,
+  reviewNotificationsAllowed: false,
+  reviewNotificationHeadsUpEnabled: false,
   hasNotificationAccess: false,
   hasDisclosureConsent: false,
   isCollectionEnabled: false,
@@ -96,4 +98,8 @@ export async function deleteExpiredNotificationRecords(): Promise<number> {
 
 export async function deleteAllStoredNotificationRecords(): Promise<void> {
   await SalimonNotificationListener?.deleteAllRecords()
+}
+
+export async function openReviewNotificationSettings(): Promise<void> {
+  await SalimonNotificationListener?.openReviewNotificationSettings()
 }
