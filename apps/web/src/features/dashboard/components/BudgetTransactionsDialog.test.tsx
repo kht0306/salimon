@@ -1,6 +1,10 @@
+import { renderToStaticMarkup } from "react-dom/server"
 import type { Category, Transaction, TransactionSplit } from "@salimon/types"
 import { describe, expect, it } from "vitest"
-import { getBudgetTransactionRows } from "./BudgetTransactionsDialog"
+import {
+  BudgetTransactionsDialog,
+  getBudgetTransactionRows,
+} from "./BudgetTransactionsDialog"
 
 const categories: Category[] = [
   createCategory("food", "식비"),
@@ -97,3 +101,31 @@ function createTransaction(
     ...overrides,
   }
 }
+
+describe("budget amount privacy", () => {
+  it.each([true, false, true])(
+    "renders budget amounts only when visible=%s",
+    (amountsVisible) => {
+      const markup = renderToStaticMarkup(
+        <BudgetTransactionsDialog
+          amountsVisible={amountsVisible}
+          category={categories[0]!}
+          categories={categories}
+          transactions={transactions}
+          transactionSplits={transactionSplits}
+          paymentMethods={[]}
+          members={[]}
+          budgetAmount={50000}
+          selectedMonth="2026-09"
+          onClose={() => undefined}
+        />,
+      )
+      for (const amount of ["50,000", "22,000", "28,000", "12,000", "30,000"]) {
+        expect(markup.includes(amount)).toBe(amountsVisible)
+      }
+      expect(markup.includes('aria-valuemax="50000"')).toBe(amountsVisible)
+      expect(markup.includes('aria-valuenow="22000"')).toBe(amountsVisible)
+      expect(markup.includes("••••••")).toBe(!amountsVisible)
+    },
+  )
+})

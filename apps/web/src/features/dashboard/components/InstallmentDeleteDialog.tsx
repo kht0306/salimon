@@ -9,6 +9,7 @@ import { Button } from "../styles"
 interface InstallmentDeleteDialogProps {
   transaction: Transaction
   seriesTransactions: Transaction[]
+  amountsVisible?: boolean
   busy: boolean
   onClose: () => void
   onSelect: (scope: InstallmentDeleteScope) => void
@@ -25,10 +26,13 @@ interface DeleteOption {
 export function InstallmentDeleteDialog({
   transaction,
   seriesTransactions,
+  amountsVisible = true,
   busy,
   onClose,
   onSelect,
 }: InstallmentDeleteDialogProps) {
+  const formatAmount = (amount: number): string =>
+    amountsVisible ? formatKrw(amount) : "••••••"
   const installmentNumber = transaction.installmentNumber ?? 1
   const installmentTotal = transaction.installmentTotal ?? installmentNumber
   const activeTransactions = seriesTransactions.filter(
@@ -44,27 +48,27 @@ export function InstallmentDeleteDialog({
     {
       scope: "single",
       label: "이 회차만 삭제",
-      description: `${installmentNumber}/${installmentTotal}회차 ${formatKrw(transaction.amount)}만 삭제하고 이후 할부는 유지합니다.`,
+      description: `${installmentNumber}/${installmentTotal}회차 ${formatAmount(transaction.amount)}만 삭제하고 이후 할부는 유지합니다.`,
     },
     {
       scope: "future",
       label: "다음 회차부터 종료",
       description:
         futureTransactions.length > 0
-          ? `현재 회차는 유지하고 다음 ${futureTransactions.length}건, ${formatKrw(sumTransactions(futureTransactions))}을 제거합니다.`
+          ? `현재 회차는 유지하고 다음 ${futureTransactions.length}건, ${formatAmount(sumTransactions(futureTransactions))}을 제거합니다.`
           : "현재 회차가 마지막 회차입니다.",
       disabled: futureTransactions.length === 0,
     },
     {
       scope: "current_and_future",
       label: "이 회차부터 종료",
-      description: `${currentAndFutureTransactions.length}건, ${formatKrw(sumTransactions(currentAndFutureTransactions))}을 제거하고 이전 회차는 유지합니다.`,
+      description: `${currentAndFutureTransactions.length}건, ${formatAmount(sumTransactions(currentAndFutureTransactions))}을 제거하고 이전 회차는 유지합니다.`,
       danger: true,
     },
     {
       scope: "all",
       label: "할부 전체 삭제",
-      description: `활성 할부 ${activeTransactions.length}건, ${formatKrw(sumTransactions(activeTransactions))}을 모두 제거합니다.`,
+      description: `활성 할부 ${activeTransactions.length}건, ${formatAmount(sumTransactions(activeTransactions))}을 모두 제거합니다.`,
       danger: true,
     },
   ]

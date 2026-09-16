@@ -6,10 +6,16 @@ import type { MobileCategoryBudgetProgress } from "../../stores/mobileAppStore"
 import { mobileTheme } from "../../theme"
 
 interface BudgetOverviewProps {
+  amountsVisible: boolean
   budgets: MobileCategoryBudgetProgress[]
 }
 
-export function BudgetOverview({ budgets }: BudgetOverviewProps) {
+export function BudgetOverview({
+  budgets,
+  amountsVisible,
+}: BudgetOverviewProps) {
+  const formatAmount = (amount: number): string =>
+    amountsVisible ? formatKrw(amount) : "••••••"
   const [expanded, setExpanded] = useState(false)
   const visibleBudgets = expanded ? budgets : budgets.slice(0, 3)
 
@@ -44,9 +50,9 @@ export function BudgetOverview({ budgets }: BudgetOverviewProps) {
               <BudgetRow
                 key={category.id}
                 accessible
-                accessibilityLabel={`${category.name}, ${formatKrw(
+                accessibilityLabel={`${category.name}, ${formatAmount(
                   spent,
-                )} 사용, ${formatKrw(amount)} 예산${
+                )} 사용, ${formatAmount(amount)} 예산${
                   isOverBudget ? ", 예산 초과" : ""
                 }`}
               >
@@ -54,18 +60,22 @@ export function BudgetOverview({ budgets }: BudgetOverviewProps) {
                   <BudgetName>{category.name}</BudgetName>
                   <BudgetAmounts>
                     <BudgetSpent $over={isOverBudget}>
-                      {formatKrw(spent)}
+                      {formatAmount(spent)}
                     </BudgetSpent>
-                    <BudgetLimit> / {formatKrw(amount)}</BudgetLimit>
+                    <BudgetLimit> / {formatAmount(amount)}</BudgetLimit>
                   </BudgetAmounts>
                 </BudgetHeading>
                 <ProgressTrack
                   accessibilityRole="progressbar"
-                  accessibilityValue={{
-                    min: 0,
-                    max: amount,
-                    now: Math.min(spent, amount),
-                  }}
+                  accessibilityValue={
+                    amountsVisible
+                      ? {
+                          min: 0,
+                          max: amount,
+                          now: Math.min(spent, amount),
+                        }
+                      : { text: "금액 숨김" }
+                  }
                 >
                   <ProgressFill
                     style={{

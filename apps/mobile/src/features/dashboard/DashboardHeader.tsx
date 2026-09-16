@@ -101,11 +101,15 @@ export const DashboardHeader = observer(function DashboardHeader({
           />
         </OverviewColumn>
         <OverviewColumn>
-          <BudgetOverview budgets={store.selectedMonthBudgets} />
+          <BudgetOverview
+            amountsVisible={store.monthlySummaryVisible}
+            budgets={store.selectedMonthBudgets}
+          />
         </OverviewColumn>
       </OverviewColumns>
 
       <DateSummaryStrip
+        amountsVisible={store.monthlySummaryVisible}
         days={store.monthDaySummaries}
         selectedDate={store.selectedDate}
         selectedMonth={store.selectedMonth}

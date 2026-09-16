@@ -29,6 +29,8 @@ export const TransactionHistoryItem = observer(function TransactionHistoryItem({
   onOpenInstallmentDelete,
 }: TransactionHistoryItemProps) {
   const store = useAppStore()
+  const formatAmount = (amount: number): string =>
+    store.monthlySummaryVisible ? formatKrw(amount) : "••••••"
   const category = store.data.categories.find(
     (item) => item.id === transaction.categoryId,
   )
@@ -65,7 +67,7 @@ export const TransactionHistoryItem = observer(function TransactionHistoryItem({
           splitCategories={splitCategories}
         />
         <Amount $type={transaction.type}>
-          {formatKrw(transaction.amount)}
+          {formatAmount(transaction.amount)}
         </Amount>
       </TransactionTop>
       <TransactionBody>

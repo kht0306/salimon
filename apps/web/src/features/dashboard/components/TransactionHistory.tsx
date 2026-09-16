@@ -20,6 +20,8 @@ export const TransactionHistory = observer(function TransactionHistory({
   onEdit,
 }: TransactionHistoryProps) {
   const store = useAppStore()
+  const formatAmount = (amount: number): string =>
+    store.monthlySummaryVisible ? formatKrw(amount) : "••••••"
   const [deletingInstallment, setDeletingInstallment] =
     useState<Transaction | null>(null)
   const [isDeletingInstallment, setDeletingInstallmentBusy] = useState(false)
@@ -70,7 +72,7 @@ export const TransactionHistory = observer(function TransactionHistory({
         <SummaryRow>
           <span>지출 합계</span>
           <SummaryAmount $tone="expense">
-            {formatKrw(
+            {formatAmount(
               store.calendarSelectedDateTransactions
                 .filter(
                   (item) =>
@@ -83,7 +85,7 @@ export const TransactionHistory = observer(function TransactionHistory({
         <SummaryRow>
           <span>수입 합계</span>
           <SummaryAmount $tone="income">
-            {formatKrw(
+            {formatAmount(
               store.calendarSelectedDateTransactions
                 .filter(
                   (item) =>
@@ -96,7 +98,7 @@ export const TransactionHistory = observer(function TransactionHistory({
         <SummaryRow>
           <span>저축 합계</span>
           <SummaryAmount $tone="saving">
-            {formatKrw(
+            {formatAmount(
               store.calendarSelectedDateTransactions
                 .filter(
                   (item) =>
@@ -109,7 +111,7 @@ export const TransactionHistory = observer(function TransactionHistory({
         <SettlementRow>
           <span>정산 합계</span>
           <strong>
-            {formatKrw(
+            {formatAmount(
               store.calendarSelectedDateTransactions
                 .filter((item) => item.status === "confirmed")
                 .reduce(
@@ -129,6 +131,7 @@ export const TransactionHistory = observer(function TransactionHistory({
 
       {deletingInstallment?.recurringRuleId ? (
         <InstallmentDeleteDialog
+          amountsVisible={store.monthlySummaryVisible}
           transaction={deletingInstallment}
           seriesTransactions={deletingInstallmentSeries}
           busy={isDeletingInstallment}

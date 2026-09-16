@@ -8,6 +8,8 @@ export interface NativeNotificationCaptureConfiguration {
 }
 
 export interface NativeNotificationCaptureStatus {
+  reviewNotificationsAllowed: boolean
+  reviewNotificationHeadsUpEnabled: boolean
   allowedPackageNames: string[]
   disclosureAcceptedAt: number
   hasNotificationAccess: boolean
@@ -53,6 +55,7 @@ export interface SalimonNotificationListenerNativeModule {
   deleteRecord(id: string): Promise<boolean>
   getStatus(): Promise<NativeNotificationCaptureStatus>
   openNotificationAccessSettings(): Promise<void>
+  openReviewNotificationSettings(): Promise<void>
   readRecords(): Promise<NativeNotificationRecord[]>
   saveRegistrationState(
     id: string,

@@ -53,6 +53,8 @@ const emptyNotificationStatus = {
   allowedPackageNames: [],
   disclosureAcceptedAt: 0,
   hasDisclosureConsent: false,
+  reviewNotificationsAllowed: false,
+  reviewNotificationHeadsUpEnabled: false,
   hasNotificationAccess: false,
   isCollectionEnabled: false,
   retentionDays: 7,

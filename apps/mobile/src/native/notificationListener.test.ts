@@ -7,6 +7,7 @@ import {
   deleteExpiredNotificationRecords,
   deleteStoredNotificationRecord,
   getNotificationCaptureStatus,
+  openReviewNotificationSettings,
   readStoredNotificationRecords,
   revokeNotificationDisclosure,
   setAuthenticatedNotificationCaptureUser,
@@ -22,6 +23,7 @@ const nativeModule = vi.hoisted(() => ({
   deleteRecord: vi.fn(),
   getStatus: vi.fn(),
   openNotificationAccessSettings: vi.fn(async () => undefined),
+  openReviewNotificationSettings: vi.fn(async () => undefined),
   readRecords: vi.fn(),
   saveRegistrationState: vi.fn(),
   revokeDisclosureAndDeleteRecords: vi.fn(),
@@ -35,6 +37,8 @@ vi.mock("../../modules/salimon-notification-listener/src", () => ({
 const captureStatus = {
   allowedPackageNames: ["com.example.card"],
   disclosureAcceptedAt: 1_786_547_200_000,
+  reviewNotificationsAllowed: false,
+  reviewNotificationHeadsUpEnabled: false,
   hasNotificationAccess: true,
   hasDisclosureConsent: true,
   isCollectionEnabled: true,
@@ -45,6 +49,10 @@ const captureStatus = {
 }
 
 describe("notification listener bridge", () => {
+  it("opens Android candidate notification settings", async () => {
+    await openReviewNotificationSettings()
+    expect(nativeModule.openReviewNotificationSettings).toHaveBeenCalledOnce()
+  })
   beforeEach(() => {
     vi.clearAllMocks()
   })

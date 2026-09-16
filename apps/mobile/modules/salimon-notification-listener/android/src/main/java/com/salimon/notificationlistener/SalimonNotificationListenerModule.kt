@@ -1,5 +1,7 @@
 package com.salimon.notificationlistener
 
+import android.app.NotificationManager
+import android.os.Build
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
@@ -92,6 +94,24 @@ class SalimonNotificationListenerModule : Module() {
       )
     }
 
+    AsyncFunction("openReviewNotificationSettings") {
+      val context = requireApplicationContext()
+      val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      val channelId = SalimonNotificationListenerService.REVIEW_CHANNEL_ID
+      val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+        manager.areNotificationsEnabled() && manager.getNotificationChannel(channelId) != null
+      ) {
+        Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+          .putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
+      } else {
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+      }
+      context.startActivity(
+        intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+          .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+      )
+    }
+
     AsyncFunction("readRecords") {
       val context = requireApplicationContext()
       val preferences = NotificationCapturePreferences(context).snapshot()
@@ -163,7 +183,16 @@ class SalimonNotificationListenerModule : Module() {
   private fun getStatus(context: Context): Map<String, Any> {
     val preferences = NotificationCapturePreferences(context).snapshot()
     val store = EncryptedNotificationStore(context)
+    val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    val channel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      manager.getNotificationChannel(SalimonNotificationListenerService.REVIEW_CHANNEL_ID)
+    } else null
+    val notificationsAllowed = manager.areNotificationsEnabled() &&
+      channel?.importance != NotificationManager.IMPORTANCE_NONE
     return mapOf(
+      "reviewNotificationsAllowed" to notificationsAllowed,
+      "reviewNotificationHeadsUpEnabled" to (notificationsAllowed &&
+        (channel == null || channel.importance >= NotificationManager.IMPORTANCE_HIGH)),
       "hasNotificationAccess" to NotificationAccessState.hasAccess(context),
       "hasDisclosureConsent" to preferences.hasDisclosureConsent,
       "disclosureAcceptedAt" to preferences.disclosureAcceptedAt,

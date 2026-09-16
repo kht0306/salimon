@@ -31,6 +31,8 @@ import { BudgetTransactionsDialog } from "./BudgetTransactionsDialog"
 
 export const CalendarGrid = observer(function CalendarGrid() {
   const store = useAppStore()
+  const formatAmount = (amount: number): string =>
+    store.monthlySummaryVisible ? formatKrw(amount) : "••••••"
   const [selectedBudgetCategoryId, setSelectedBudgetCategoryId] = useState<
     string | null
   >(null)
@@ -153,9 +155,9 @@ export const CalendarGrid = observer(function CalendarGrid() {
                 </strong>
                 <BudgetAmounts>
                   <BudgetSpent $over={isOverBudget}>
-                    {formatKrw(spent)}
+                    {formatAmount(spent)}
                   </BudgetSpent>{" "}
-                  / {formatKrw(amount)}
+                  / {formatAmount(amount)}
                 </BudgetAmounts>
                 <Progress>
                   <i
@@ -283,10 +285,14 @@ export const CalendarGrid = observer(function CalendarGrid() {
                     </DayTop>
                     <DayAmounts>
                       {expense > 0 ? (
-                        <Expense>{formatKrw(expense)}</Expense>
+                        <Expense>{formatAmount(expense)}</Expense>
                       ) : null}
-                      {income > 0 ? <Income>{formatKrw(income)}</Income> : null}
-                      {saving > 0 ? <Saving>{formatKrw(saving)}</Saving> : null}
+                      {income > 0 ? (
+                        <Income>{formatAmount(income)}</Income>
+                      ) : null}
+                      {saving > 0 ? (
+                        <Saving>{formatAmount(saving)}</Saving>
+                      ) : null}
                     </DayAmounts>
                   </DayCell>
                 )
@@ -305,6 +311,7 @@ export const CalendarGrid = observer(function CalendarGrid() {
           transactionSplits={store.data.transactionSplits}
           paymentMethods={store.data.paymentMethods}
           members={store.currentMembers}
+          amountsVisible={store.monthlySummaryVisible}
           budgetAmount={selectedBudget.amount}
           selectedMonth={store.selectedMonth}
           onClose={() => setSelectedBudgetCategoryId(null)}

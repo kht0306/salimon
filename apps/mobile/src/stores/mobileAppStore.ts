@@ -2650,6 +2650,8 @@ function createEmptyNotificationCaptureStatus(): NotificationCaptureStatus {
     hasNotificationAccess: false,
     isCollectionEnabled: false,
     retentionDays: 7,
+    reviewNotificationsAllowed: false,
+    reviewNotificationHeadsUpEnabled: false,
     reviewNotificationsEnabled: false,
     storedRecordCount: 0,
     targetLedgerId: "",

@@ -29,6 +29,7 @@ interface BudgetTransactionsDialogProps {
   transactionSplits: TransactionSplit[]
   paymentMethods: PaymentMethod[]
   members: LedgerMember[]
+  amountsVisible?: boolean
   budgetAmount: number
   selectedMonth: string
   onClose: () => void
@@ -75,10 +76,13 @@ export function BudgetTransactionsDialog({
   transactionSplits,
   paymentMethods,
   members,
+  amountsVisible = true,
   budgetAmount,
   selectedMonth,
   onClose,
 }: BudgetTransactionsDialogProps) {
+  const formatAmount = (amount: number): string =>
+    amountsVisible ? formatKrw(amount) : "••••••"
   const dialogRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const rows = getBudgetTransactionRows({
@@ -178,17 +182,19 @@ export function BudgetTransactionsDialog({
           <SummaryTop>
             <span>예산 사용액</span>
             <SummaryAmount>
-              <strong>{formatKrw(spentAmount)}</strong>
-              <span>/ {formatKrw(budgetAmount)}</span>
+              <strong>{formatAmount(spentAmount)}</strong>
+              <span>/ {formatAmount(budgetAmount)}</span>
             </SummaryAmount>
           </SummaryTop>
           <Progress
             role="progressbar"
             aria-label={`${category.name} 예산 사용률`}
             aria-valuemin={0}
-            aria-valuemax={budgetAmount}
-            aria-valuenow={Math.min(spentAmount, budgetAmount)}
-            aria-valuetext={`${formatKrw(spentAmount)} 사용, ${formatKrw(budgetAmount)} 예산`}
+            aria-valuemax={amountsVisible ? budgetAmount : undefined}
+            aria-valuenow={
+              amountsVisible ? Math.min(spentAmount, budgetAmount) : undefined
+            }
+            aria-valuetext={`${formatAmount(spentAmount)} 사용, ${formatAmount(budgetAmount)} 예산`}
           >
             <i
               style={{
@@ -199,8 +205,8 @@ export function BudgetTransactionsDialog({
           </Progress>
           <Remaining $overBudget={remainingAmount < 0}>
             {remainingAmount < 0
-              ? `예산보다 ${formatKrw(Math.abs(remainingAmount))} 초과`
-              : `${formatKrw(remainingAmount)} 남음`}
+              ? `예산보다 ${formatAmount(Math.abs(remainingAmount))} 초과`
+              : `${formatAmount(remainingAmount)} 남음`}
           </Remaining>
         </BudgetSummary>
 
@@ -246,9 +252,9 @@ export function BudgetTransactionsDialog({
                   />
                   <IncludedAmount>
                     <span>예산 반영</span>
-                    <strong>{formatKrw(includedAmount)}</strong>
+                    <strong>{formatAmount(includedAmount)}</strong>
                     {includedAmount !== transaction.amount ? (
-                      <small>전체 {formatKrw(transaction.amount)}</small>
+                      <small>전체 {formatAmount(transaction.amount)}</small>
                     ) : null}
                   </IncludedAmount>
                 </TransactionTop>
