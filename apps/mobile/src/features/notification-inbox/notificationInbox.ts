@@ -127,7 +127,11 @@ export function createCandidateFromNotificationRecord(input: {
     id: input.record.id,
     userId: input.userId,
     targetLedgerId: registrationState?.targetLedgerId ?? input.targetLedgerId,
-    sourceHash: parsed.normalizedHash,
+    sourceHash: SUPPORTED_NOTIFICATION_APPS.find(
+      (app) => app.packageName === input.record.sourcePackageName,
+    )?.cardApprovalsOnly
+      ? `notification_${input.record.id}`
+      : parsed.normalizedHash,
     sourceApp: input.record.sourcePackageName,
     maskedMessage: parsed.rawTextMasked ?? maskSensitiveText(rawText),
     parsed: candidateParsed,

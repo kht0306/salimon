@@ -1,7 +1,7 @@
 # 살림온 0.3.8 비공개 테스트 업데이트
 
 - 기존 Play Console 앱: `com.salimon.app`
-- 표시 버전: `0.3.8`, versionCode: `12` (기존 최고 번호 11 이하 확인)
+- 표시 버전: `0.3.8`, versionCode: `13` (12번은 출시 전 교체한 번들)
 - 대상: Galaxy Z Fold5, Galaxy S25 Ultra
 - 이번 추가 범위: 국민카드 정상 승인 문자, 우리카드 정상 승인 알림톡
 - 국민·우리카드 전체취소·부분취소, 카드 형식이 다른 알림은 지원하지 않는다.
@@ -19,12 +19,12 @@ ANDROID_HOME="$HOME/Library/Android/sdk" \
 node apps/mobile/scripts/build-play-release.mjs
 ```
 
-`dist/mobile/play-0.3.8-12/`에 다음 파일이 생성된다.
+`dist/mobile/play-0.3.8-13/`에 다음 파일이 생성된다.
 
 | 파일                          | 용도                                   |
 | ----------------------------- | -------------------------------------- |
-| `salimon-0.3.8-12.aab`        | Play Console 비공개 테스트에 업로드    |
-| `salimon-0.3.8-12.aab.sha256` | AAB 파일 무결성 확인                   |
+| `salimon-0.3.8-13.aab`        | Play Console 비공개 테스트에 업로드    |
+| `salimon-0.3.8-13.aab.sha256` | AAB 파일 무결성 확인                   |
 | `release-notes-ko-KR.txt`     | 변경사항 입력란에 붙여 넣기            |
 | `release-manifest.json`       | 패키지·버전·업로드 인증서 SHA-256 확인 |
 | `UPLOAD-AND-TEST.md`          | 이 업로드·실사용 검증 안내             |
@@ -32,15 +32,15 @@ node apps/mobile/scripts/build-play-release.mjs
 체크섬 확인:
 
 ```bash
-cd dist/mobile/play-0.3.8-12
-shasum -a 256 -c salimon-0.3.8-12.aab.sha256
+cd dist/mobile/play-0.3.8-13
+shasum -a 256 -c salimon-0.3.8-13.aab.sha256
 ```
 
 ## 기존 비공개 테스트 업데이트
 
 1. Play Console에서 기존 **살림온** 앱을 연다.
 2. **테스트 및 출시 → 테스트 → 비공개 테스트**에서 기존 테스트 트랙을 연다.
-3. 버전 12가 아직 사용되지 않았는지 확인한다. 이미 사용됐다면 `app.json`의
+3. 버전 13이 아직 사용되지 않았는지 확인한다. 이미 사용됐다면 `app.json`의
    versionCode를 더 높이고 다시 빌드한다. 기존 파일의 이름만 바꾸면 안 된다.
 4. 새 버전에 AAB를 업로드한다. 서명 불일치 오류가 발생하면 기존 업로드 키 설정을
    확인한다. 임의로 앱 서명 키를 바꾸거나 새 앱을 만들지 않는다.
@@ -96,8 +96,9 @@ shasum -a 256 -c salimon-0.3.8-12.aab.sha256
 
 확인 기록에는 기종, Android/One UI 버전, 수신 앱 이름, 살림온 버전, 재현 순서,
 기대/실제 결과만 남긴다. 화면 공유 시 이름·카드번호 등은 가린다.
-현재 카드사가 제공하는 분 단위 일시만으로는 같은 카드·상점·금액으로 같은 분에
-반복 결제한 두 건을 완전히 구별할 수 없다. 이 경우 실제 결제 건수와 대조한다.
+국민·우리카드는 개별 알림의 식별값으로 등록 재시도 중복을 방지한다. 같은 분에
+같은 금액을 결제한 서로 다른 메시지는 별도 후보로 유지한다. 같은 결제가 서로
+다른 앱에서 도착하는 경우에는 자동으로 합치지 않으므로 기존 거래와 대조한다.
 
 ## 공식 참고 자료
 

@@ -41,6 +41,27 @@ describe("notification inbox candidate", () => {
       type: "expense",
     })
     expect(candidate.status).toBe("notified")
+    const repeated = createCandidateFromNotificationRecord({
+      record,
+      targetLedgerId: "ledger-1",
+      userId: "user-1",
+    })
+    const anotherApprovalInSameMinute = createCandidateFromNotificationRecord({
+      record: {
+        ...record,
+        id: "another-message",
+        receivedAt: record.receivedAt + 1000,
+      },
+      targetLedgerId: "ledger-1",
+      userId: "user-1",
+    })
+    expect(repeated.sourceHash).toBe(candidate.sourceHash)
+    expect(anotherApprovalInSameMinute.parsed.transactionAt).toBe(
+      candidate.parsed.transactionAt,
+    )
+    expect(anotherApprovalInSameMinute.sourceHash).not.toBe(
+      candidate.sourceHash,
+    )
     expect(isSupportedNotificationRecord({ ...record, title: "친구" })).toBe(
       false,
     )

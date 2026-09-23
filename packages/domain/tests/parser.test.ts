@@ -95,7 +95,7 @@ describe("KB and Woori approval formats", () => {
     },
   )
 
-  it("has a stable identity across notification titles and receipt channels, but preserves card identity", () => {
+  it("uses the same approval interpretation regardless of receipt channel", () => {
     const receivedAt = new Date(2026, 8, 23, 18, 16)
     const sms = parseCardSmsText(`KB국민카드\n${kbApproval}`, receivedAt, {
       sourceApp: "com.samsung.android.messaging",
@@ -105,15 +105,9 @@ describe("KB and Woori approval formats", () => {
       receivedAt,
       { sourceApp: "com.kakao.talk" },
     )
-    expect(sms.normalizedHash).toBe(chat.normalizedHash)
-    expect(
-      parseCardSmsText(kbApproval.replace("1234", "4321"), receivedAt)
-        .normalizedHash,
-    ).not.toBe(sms.normalizedHash)
-    expect(
-      parseCardSmsText(kbApproval.replace("18:15", "18:16"), receivedAt)
-        .normalizedHash,
-    ).not.toBe(sms.normalizedHash)
+    expect(sms.amount).toBe(chat.amount)
+    expect(sms.merchantName).toBe(chat.merchantName)
+    expect(sms.transactionAt).toBe(chat.transactionAt)
   })
 })
 

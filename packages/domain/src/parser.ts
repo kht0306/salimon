@@ -38,7 +38,6 @@ interface CardApprovalFields {
   amount: number
   merchantName?: string
   dateMatch: RegExpMatchArray | null
-  cardReference: string
 }
 
 function extractCardApprovalFields(
@@ -72,7 +71,6 @@ function extractCardApprovalFields(
     amount: amountMatch ? Number(amountMatch[1]!.replace(/,/g, "")) : 0,
     merchantName,
     dateMatch,
-    cardReference: header[0].replace(/\s+/g, ""),
   }
 }
 
@@ -135,24 +133,14 @@ export function parseCardSmsText(
     sourceApp: options.sourceApp,
     sourceSender: options.sourceSender,
     confidence,
-    normalizedHash: createNormalizedHash(
-      cardApproval && confidence >= 0.85
-        ? [
-            "card_approval_v1",
-            cardApproval.cardReference,
-            amount,
-            transactionAt.toISOString().slice(0, 16),
-            merchantName,
-          ]
-        : [
-            options.sourceApp,
-            options.sourceSender,
-            String(amount),
-            transactionAt.toISOString().slice(0, 16),
-            merchantName,
-            rawTextMasked,
-          ],
-    ),
+    normalizedHash: createNormalizedHash([
+      options.sourceApp,
+      options.sourceSender,
+      String(amount),
+      transactionAt.toISOString().slice(0, 16),
+      merchantName,
+      rawTextMasked,
+    ]),
     rawTextMasked,
   }
 }

@@ -8,7 +8,7 @@
     "scheme": "salimon",
     "android": {
       "package": "com.salimon.app",
-      "versionCode": 12,
+      "versionCode": 13,
       "permissions": ["android.permission.POST_NOTIFICATIONS"],
       "adaptiveIcon": {
         "backgroundColor": "#101c18",
