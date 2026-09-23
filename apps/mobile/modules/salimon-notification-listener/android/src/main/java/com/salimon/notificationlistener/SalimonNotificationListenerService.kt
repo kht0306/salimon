@@ -31,18 +31,24 @@ class SalimonNotificationListenerService : NotificationListenerService() {
     val notification = postedNotification.notification ?: return
     if (shouldIgnore(notification)) return
 
-    val text = extractNotificationText(notification)
-    if (!PaymentNotificationFilter.shouldStore(text)) return
-
     try {
-      val stored = EncryptedNotificationStore(applicationContext).capture(
-        sourcePackageName = packageName,
-        notificationKey = postedNotification.key,
-        receivedAt = postedNotification.postTime,
-        text = text,
-        sessionFingerprint = preferences.sessionFingerprint,
+      val messages = NotificationTextExtractor.extract(
+        notification, packageName, postedNotification.key, postedNotification.postTime,
       )
-      if (stored && preferences.reviewNotificationsEnabled) {
+      val store = EncryptedNotificationStore(applicationContext)
+      var storedAny = false
+      for (message in messages) {
+        if (!PaymentNotificationFilter.shouldStore(message.text, packageName)) continue
+        val stored = store.capture(
+          sourcePackageName = packageName,
+          notificationKey = message.messageKey,
+          receivedAt = message.receivedAt,
+          text = message.text,
+          sessionFingerprint = preferences.sessionFingerprint,
+        )
+        storedAny = storedAny || stored
+      }
+      if (storedAny && preferences.reviewNotificationsEnabled) {
         showCandidateReviewNotification()
       }
     } catch (_: Exception) {
@@ -57,25 +63,6 @@ class SalimonNotificationListenerService : NotificationListenerService() {
       notification.category == Notification.CATEGORY_PROGRESS ||
         notification.extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0) > 0
     return hasIgnoredFlag || isProgressNotification
-  }
-
-  private fun extractNotificationText(notification: Notification): NotificationText {
-    val extras = notification.extras
-    val lines = extras
-      .getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-      ?.joinToString("\n") { line -> line.toString() }
-      .orEmpty()
-    val expandedText = extras
-      .getCharSequence(Notification.EXTRA_BIG_TEXT)
-      ?.toString()
-      ?.ifBlank { lines }
-      ?: lines
-
-    return NotificationText(
-      title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty(),
-      text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty(),
-      expandedText = expandedText,
-    )
   }
 
   private fun showCandidateReviewNotification() {

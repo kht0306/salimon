@@ -1,5 +1,115 @@
 import { describe, expect, it } from "vitest"
-import { maskSensitiveText, parseCardSmsText } from "../src"
+import {
+  isSupportedCardApprovalText,
+  maskSensitiveText,
+  parseCardSmsText,
+} from "../src"
+
+const kbApproval = [
+  "[Web발신] KB국민카드1234",
+  "승인",
+  "26,700 원(일시불)",
+  "테스트몰(간편결제)",
+  "고객명 테*트님",
+  "승인시각 09/23 18:15",
+  "누적 5,460,232원",
+].join("\n")
+const wooriApproval = [
+  "[우리카드 이용 안내]",
+  "우리(5678)승인",
+  "테*트님",
+  "220,000원 일시불",
+  "07/20 09:58",
+  "(주)테스트 교육",
+].join("\n")
+
+describe("KB and Woori approval formats", () => {
+  it.each(["multiline", "singleline"])(
+    "parses KB %s without choosing customer or cumulative amount",
+    (format) => {
+      const parsed = parseCardSmsText(
+        format === "multiline" ? kbApproval : kbApproval.replaceAll("\n", " "),
+        new Date(2026, 8, 23, 18, 16),
+      )
+      expect(parsed).toMatchObject({
+        amount: 26700,
+        merchantName: "테스트몰(간편결제)",
+        type: "expense",
+        cardNotificationEvent: "approval",
+      })
+      expect(new Date(parsed.transactionAt).getHours()).toBe(18)
+      expect(new Date(parsed.transactionAt).getMinutes()).toBe(15)
+      expect(parsed.rawTextMasked).not.toContain("1234")
+    },
+  )
+
+  it.each(["multiline", "singleline"])(
+    "parses Woori %s and strips the Kakao template footer",
+    (format) => {
+      const text = `${wooriApproval}\n채널 추가하고 이 채널의 마케팅 메시지 등을 카카오톡으로 받기\n이용내역 확인하기`
+      const parsed = parseCardSmsText(
+        format === "multiline" ? text : text.replaceAll("\n", " "),
+        new Date(2026, 6, 20, 10),
+      )
+      expect(parsed).toMatchObject({
+        amount: 220000,
+        merchantName: "(주)테스트 교육",
+        type: "expense",
+        cardNotificationEvent: "approval",
+      })
+      expect(parsed.rawTextMasked).not.toContain("5678")
+    },
+  )
+
+  it("uses the approval body amount instead of an Alimtalk banner amount", () => {
+    const parsed = parseCardSmsText(
+      `카드승인금액 999,000원\n${wooriApproval}`,
+      new Date(2026, 6, 20),
+    )
+    expect(parsed.amount).toBe(220000)
+  })
+
+  it.each([
+    "[Web발신] 취소 [KB국민카드] 1234 테*트님 테스트몰 09/20 이용건 09/22 부분취소(-15,900원)",
+    kbApproval.replace("승인\n", "승인취소\n"),
+    wooriApproval.replace("승인", "승인 취소"),
+    wooriApproval.replace("승인", "승인거절"),
+    "테스트님: 10,000원 결제했어요",
+    `${kbApproval}\n${kbApproval}`,
+  ])("excludes unsupported events and combined transactions", (text) => {
+    expect(isSupportedCardApprovalText(text)).toBe(false)
+  })
+
+  it.each([
+    kbApproval.replace("26,700 원(일시불)", ""),
+    kbApproval.replace("테스트몰(간편결제)\n고객명", "테스트몰…\n고객명"),
+    wooriApproval.replace("\n(주)테스트 교육", ""),
+    kbApproval.replace("09/23 18:15", "02/30 18:15"),
+    kbApproval.replace("승인시각 09/23 18:15", ""),
+  ])(
+    "keeps incomplete approvals below the registration-ready threshold",
+    (text) => {
+      expect(
+        parseCardSmsText(text, new Date(2026, 8, 23)).confidence,
+      ).toBeLessThan(0.85)
+    },
+  )
+
+  it("uses the same approval interpretation regardless of receipt channel", () => {
+    const receivedAt = new Date(2026, 8, 23, 18, 16)
+    const sms = parseCardSmsText(`KB국민카드\n${kbApproval}`, receivedAt, {
+      sourceApp: "com.samsung.android.messaging",
+    })
+    const chat = parseCardSmsText(
+      kbApproval.replaceAll("\n", " "),
+      receivedAt,
+      { sourceApp: "com.kakao.talk" },
+    )
+    expect(sms.amount).toBe(chat.amount)
+    expect(sms.merchantName).toBe(chat.merchantName)
+    expect(sms.transactionAt).toBe(chat.transactionAt)
+  })
+})
 
 describe("parseCardSmsText", () => {
   it("parses amount, date, merchant and expense type", () => {

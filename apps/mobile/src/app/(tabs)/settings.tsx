@@ -222,7 +222,8 @@ export default observer(function SettingsScreen() {
             </SectionHeader>
             <Description>
               선택한 앱의 결제 알림만 기기에 최대 7일간 암호화 보관합니다.
-              원문과 미확정 후보는 서버로 전송하지 않습니다.
+              원문과 미확정 후보는 서버로 전송하지 않습니다. 국민·우리카드는
+              정상 승인만 지원하며 전체취소·부분취소는 제외합니다.
             </Description>
 
             {!store.notificationCaptureStatus.hasDisclosureConsent ? (
@@ -272,7 +273,7 @@ export default observer(function SettingsScreen() {
                         <SelectionCopy>
                           <SelectionTitle>{app.name}</SelectionTitle>
                           <SelectionDescription>
-                            실제 기기에서 확인한 지원 앱
+                            {app.description}
                           </SelectionDescription>
                         </SelectionCopy>
                       </SelectionButton>
