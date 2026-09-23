@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   candidateAmountLabel,
+  candidateCardLabel,
   candidateStatusLabel,
   cardNotificationEventLabel,
   createCandidateFromNotificationRecord,
@@ -39,7 +40,17 @@ describe("notification inbox candidate", () => {
       amount: 220000,
       merchantName: "(주)테스트 교육",
       type: "expense",
+      paymentMethodName: "우리카드",
+      paymentLast4: "5678",
     })
+    expect(candidateCardLabel(candidate)).toBe("우리카드")
+    expect(candidate.sourceApp).toBe("com.kakao.talk")
+    expect(
+      candidateCardLabel({
+        ...candidate,
+        parsed: { ...candidate.parsed, paymentMethodName: undefined },
+      }),
+    ).toBe("카카오톡")
     expect(candidate.status).toBe("notified")
     const repeated = createCandidateFromNotificationRecord({
       record,

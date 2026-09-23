@@ -186,6 +186,13 @@ export function notificationAppName(packageName?: string): string {
   )
 }
 
+export function candidateCardLabel(candidate: LocalSmsCandidate): string {
+  return (
+    candidate.parsed.paymentMethodName ??
+    notificationAppName(candidate.sourceApp)
+  )
+}
+
 function combineNotificationText(record: NotificationRecordInput): string {
   const body = record.expandedText.trim() || record.text.trim()
   return [...new Set([record.title.trim(), body].filter(Boolean))].join("\n")
