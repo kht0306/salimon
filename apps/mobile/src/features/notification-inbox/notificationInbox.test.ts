@@ -4,14 +4,58 @@ import {
   candidateStatusLabel,
   cardNotificationEventLabel,
   createCandidateFromNotificationRecord,
+  isSupportedNotificationRecord,
   SUPPORTED_NOTIFICATION_APPS,
 } from "./notificationInbox"
 
 describe("notification inbox candidate", () => {
-  it("targets the installed Lotte Card Android package", () => {
-    expect(SUPPORTED_NOTIFICATION_APPS).toEqual([
-      { name: "롯데카드", packageName: "com.lcacApp" },
+  it("offers card, SMS and Kakao notification sources", () => {
+    expect(SUPPORTED_NOTIFICATION_APPS.map((app) => app.packageName)).toEqual([
+      "com.lcacApp",
+      "com.samsung.android.messaging",
+      "com.google.android.apps.messaging",
+      "com.kakao.talk",
     ])
+  })
+
+  it("turns a Woori Kakao approval into the same editable expense candidate", () => {
+    const record = {
+      capturedAt: new Date(2026, 6, 20, 10).getTime(),
+      receivedAt: new Date(2026, 6, 20, 9, 58).getTime(),
+      expandedText:
+        "[우리카드 이용 안내]\n우리(5678)승인\n테*트님\n220,000원 일시불\n07/20 09:58\n(주)테스트 교육",
+      id: "woori-message",
+      sourcePackageName: "com.kakao.talk",
+      text: "새 메시지",
+      title: "우리카드",
+    }
+    expect(isSupportedNotificationRecord(record)).toBe(true)
+    const candidate = createCandidateFromNotificationRecord({
+      record,
+      targetLedgerId: "ledger-1",
+      userId: "user-1",
+    })
+    expect(candidate.parsed).toMatchObject({
+      amount: 220000,
+      merchantName: "(주)테스트 교육",
+      type: "expense",
+    })
+    expect(candidate.status).toBe("notified")
+    expect(isSupportedNotificationRecord({ ...record, title: "친구" })).toBe(
+      false,
+    )
+    expect(
+      isSupportedNotificationRecord({
+        ...record,
+        expandedText: record.expandedText.replace("승인", "승인취소"),
+      }),
+    ).toBe(false)
+    expect(
+      isSupportedNotificationRecord({
+        ...record,
+        expandedText: "10,000원 결제했어요",
+      }),
+    ).toBe(false)
   })
 
   it("keeps only masked text after parsing a native record", () => {

@@ -51,7 +51,10 @@ import {
   type MonthDaySummary,
   type TransactionTotals,
 } from "../features/dashboard/dashboardPresentation"
-import { createCandidateFromNotificationRecord } from "../features/notification-inbox/notificationInbox"
+import {
+  createCandidateFromNotificationRecord,
+  isSupportedNotificationRecord,
+} from "../features/notification-inbox/notificationInbox"
 import {
   isRetryableCandidateRegistrationError,
   validateCandidateRegistrationDraft,
@@ -2039,16 +2042,18 @@ export class MobileAppStore {
           .filter((candidate) => candidate.status === "deferred")
           .map((candidate) => candidate.id),
       )
-      const candidates = records.map((record) => {
-        const candidate = createCandidateFromNotificationRecord({
-          record,
-          targetLedgerId,
-          userId,
+      const candidates = records
+        .filter(isSupportedNotificationRecord)
+        .map((record) => {
+          const candidate = createCandidateFromNotificationRecord({
+            record,
+            targetLedgerId,
+            userId,
+          })
+          return deferredIds.has(candidate.id)
+            ? { ...candidate, status: "deferred" as const }
+            : candidate
         })
-        return deferredIds.has(candidate.id)
-          ? { ...candidate, status: "deferred" as const }
-          : candidate
-      })
 
       runInAction(() => {
         this.notificationCaptureStatus = {

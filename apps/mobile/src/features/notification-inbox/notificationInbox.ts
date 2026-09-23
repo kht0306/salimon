@@ -1,9 +1,43 @@
-import { maskSensitiveText, parseCardSmsText } from "@salimon/domain"
+import {
+  isSupportedCardApprovalText,
+  maskSensitiveText,
+  parseCardSmsText,
+} from "@salimon/domain"
 import type { LocalSmsCandidate } from "@salimon/types"
 
+interface SupportedNotificationApp {
+  name: string
+  packageName: string
+  description: string
+  cardApprovalsOnly: boolean
+}
+
 export const SUPPORTED_NOTIFICATION_APPS = [
-  { name: "롯데카드", packageName: "com.lcacApp" },
-] as const
+  {
+    name: "롯데카드",
+    packageName: "com.lcacApp",
+    description: "롯데카드 앱 결제 알림",
+    cardApprovalsOnly: false,
+  },
+  {
+    name: "삼성 메시지",
+    packageName: "com.samsung.android.messaging",
+    description: "국민·우리카드 정상 승인 문자",
+    cardApprovalsOnly: true,
+  },
+  {
+    name: "Google 메시지",
+    packageName: "com.google.android.apps.messaging",
+    description: "국민·우리카드 정상 승인 문자",
+    cardApprovalsOnly: true,
+  },
+  {
+    name: "카카오톡",
+    packageName: "com.kakao.talk",
+    description: "국민·우리카드 채널의 정상 승인 알림톡",
+    cardApprovalsOnly: true,
+  },
+] as const satisfies readonly SupportedNotificationApp[]
 
 const foreignAmountFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 4,
@@ -33,6 +67,23 @@ export interface NotificationRecordInput {
     transactionAt: string
     updatedAt: number
   }
+}
+
+export function isSupportedNotificationRecord(
+  record: NotificationRecordInput,
+): boolean {
+  if (
+    !SUPPORTED_NOTIFICATION_APPS.find(
+      (app) => app.packageName === record.sourcePackageName,
+    )?.cardApprovalsOnly
+  )
+    return true
+  const body = record.expandedText.trim() || record.text.trim()
+  return (
+    isSupportedCardApprovalText(body) &&
+    (record.sourcePackageName !== "com.kakao.talk" ||
+      /우리카드|KB\s*국민카드/.test(record.title))
+  )
 }
 
 export function createCandidateFromNotificationRecord(input: {

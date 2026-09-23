@@ -48,8 +48,8 @@ export function NotificationDisclosureModal({
               권한을 요청하며, 설정에서 도착 알림만 끌 수 있습니다.
             </DisclosureItem>
             <DisclosureItem>
-              롯데카드처럼 사용자가 선택한 지원 앱의 결제 형태 알림만
-              감지합니다.
+              선택한 롯데카드 앱, 문자 앱, 카카오톡의 지원 카드 결제 알림만
+              감지합니다. 국민·우리카드는 정상 승인만 지원합니다.
             </DisclosureItem>
             <DisclosureItem>
               원문은 Android 암호화 저장소에 최대 7일간 보관하며, 제외·전체
@@ -64,7 +64,8 @@ export function NotificationDisclosureModal({
             </DisclosureItem>
             <DisclosureItem>
               Android 알림 접근 권한 자체는 넓지만, 살림온은 선택한 앱·결제
-              문구·금액 조건을 모두 통과한 알림만 저장합니다.
+              문구·금액 조건을 모두 통과한 알림만 저장합니다. 카카오톡 일반
+              대화와 국민·우리카드 취소 알림은 저장하지 않습니다.
             </DisclosureItem>
           </DisclosureList>
 

@@ -15,6 +15,9 @@ const summaryAmountPattern =
   /(?:누적금액|누적|잔액)\s*(?:(?:[A-Z]{3}|₩)\s*)?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\s*(?:원|KRW)?/gi
 const datePattern =
   /(?:^|[^\d])((?:0?[1-9]|1[0-2]))[./-]((?:0?[1-9]|[12]\d|3[01]))(?:\s+([01]?\d|2[0-3]):([0-5]\d))?(?!\d)/
+const cardApprovalHeaderPattern =
+  /(?:KB\s*국민카드\s*\d{4}|우리\s*\(\d{4}\))\s*승인/
+const unsupportedCardEventPattern = /취소|환불|환급|거절|승인\s*실패/
 const sensitivePatterns = [
   /\b\d{2,4}-\d{3,4}-\d{4}\b/g,
   /\b\d{3,6}-\d{2,6}-\d{2,8}\b/g,
@@ -22,6 +25,56 @@ const sensitivePatterns = [
   /(승인번호|카드|계좌)\s*[:：]?\s*\d{4,}/gi,
   /\((?=[\d* -]{4,}\))[\d* -]*\d[\d* -]*\)/g,
 ]
+
+export function isSupportedCardApprovalText(rawText: string): boolean {
+  const text = normalizeWhitespace(rawText)
+  return (
+    text.split(cardApprovalHeaderPattern).length === 2 &&
+    !unsupportedCardEventPattern.test(text)
+  )
+}
+
+interface CardApprovalFields {
+  amount: number
+  merchantName?: string
+  dateMatch: RegExpMatchArray | null
+  cardReference: string
+}
+
+function extractCardApprovalFields(
+  text: string,
+): CardApprovalFields | undefined {
+  const header = text.match(cardApprovalHeaderPattern)
+  if (!header || !isSupportedCardApprovalText(text)) return undefined
+
+  const body = text.slice((header.index ?? 0) + header[0].length)
+  const dateMatch = body.match(datePattern)
+  const isKb = /^KB/.test(header[0])
+  const amountMatch = body.match(
+    isKb
+      ? /^\s*([\d,]+)\s*원\s*\((?:일시불|\d+\s*개월(?:\s*할부)?)\)/
+      : /^\s*\S+님\s+([\d,]+)\s*원\s*(?:일시불|\d+\s*개월(?:\s*할부)?)/,
+  )
+  let merchantName: string | undefined
+  if (amountMatch) {
+    const afterAmount = body.slice(amountMatch[0].length)
+    if (isKb) {
+      merchantName = afterAmount.match(/^\s*(.+?)\s+고객명\s+/)?.[1]
+    } else {
+      merchantName = afterAmount.match(
+        /^\s*\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2}\s+(.+?)(?=\s+(?:채널\s*추가|이용내역\s*확인|포인트\s*조회)|$)/,
+      )?.[1]
+    }
+  }
+  if (merchantName && /(?:…|\.\.\.)$/.test(merchantName))
+    merchantName = undefined
+  return {
+    amount: amountMatch ? Number(amountMatch[1]!.replace(/,/g, "")) : 0,
+    merchantName,
+    dateMatch,
+    cardReference: header[0].replace(/\s+/g, ""),
+  }
+}
 
 export function parseCardSmsText(
   rawText: string,
@@ -33,20 +86,41 @@ export function parseCardSmsText(
   } = {},
 ): ParsedTransaction {
   const text = normalizeWhitespace(rawText)
+  const cardApproval = extractCardApprovalFields(text)
   const transactionText = text.replace(summaryAmountPattern, " ")
-  const dateMatch = text.replace(allAmountPattern, " ").match(datePattern)
-  const originalCurrencyAmount = extractOriginalCurrencyAmount(transactionText)
-  const amount = originalCurrencyAmount ? 0 : extractKrwAmount(transactionText)
+  const dateMatch =
+    cardApproval?.dateMatch ??
+    text.replace(allAmountPattern, " ").match(datePattern)
+  const originalCurrencyAmount = cardApproval
+    ? undefined
+    : extractOriginalCurrencyAmount(transactionText)
+  const amount = cardApproval
+    ? cardApproval.amount
+    : originalCurrencyAmount
+      ? 0
+      : extractKrwAmount(transactionText)
   const transactionAt = parseTransactionDate(dateMatch, receivedAt)
-  const type = inferType(text)
+  const type = cardApproval ? "expense" : inferType(text)
   const cardNotificationEvent = inferCardNotificationEvent(text)
-  const merchantName = extractMerchantName(rawText, text)
-  const confidence = scoreConfidence({
+  const merchantName = cardApproval
+    ? cardApproval.merchantName
+    : extractMerchantName(rawText, text)
+  let confidence = scoreConfidence({
     hasAmount: amount > 0 || originalCurrencyAmount !== undefined,
     merchantName,
     hasDate: Boolean(dateMatch),
     type,
   })
+  if (
+    cardApproval &&
+    (!amount ||
+      !merchantName ||
+      !dateMatch?.[3] ||
+      transactionAt.getMonth() + 1 !== Number(dateMatch[1]) ||
+      transactionAt.getDate() !== Number(dateMatch[2]))
+  ) {
+    confidence = Math.min(confidence, 0.8)
+  }
   const rawTextMasked = maskSensitiveText(text)
 
   return {
@@ -61,14 +135,24 @@ export function parseCardSmsText(
     sourceApp: options.sourceApp,
     sourceSender: options.sourceSender,
     confidence,
-    normalizedHash: createNormalizedHash([
-      options.sourceApp,
-      options.sourceSender,
-      String(amount),
-      transactionAt.toISOString().slice(0, 16),
-      merchantName,
-      rawTextMasked,
-    ]),
+    normalizedHash: createNormalizedHash(
+      cardApproval && confidence >= 0.85
+        ? [
+            "card_approval_v1",
+            cardApproval.cardReference,
+            amount,
+            transactionAt.toISOString().slice(0, 16),
+            merchantName,
+          ]
+        : [
+            options.sourceApp,
+            options.sourceSender,
+            String(amount),
+            transactionAt.toISOString().slice(0, 16),
+            merchantName,
+            rawTextMasked,
+          ],
+    ),
     rawTextMasked,
   }
 }
@@ -165,6 +249,7 @@ function inferCardNotificationEvent(
   text: string,
 ): CardNotificationEvent | undefined {
   if (/승인\s*취소/.test(text)) return "approval_cancellation"
+  if (unsupportedCardEventPattern.test(text)) return undefined
   return /(?:해외\s*)?승인/.test(text) ? "approval" : undefined
 }
 
