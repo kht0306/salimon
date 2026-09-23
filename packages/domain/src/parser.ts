@@ -36,6 +36,8 @@ export function isSupportedCardApprovalText(rawText: string): boolean {
 
 interface CardApprovalFields {
   amount: number
+  paymentMethodName: string
+  paymentLast4: string
   merchantName?: string
   dateMatch: RegExpMatchArray | null
 }
@@ -69,6 +71,8 @@ function extractCardApprovalFields(
     merchantName = undefined
   return {
     amount: amountMatch ? Number(amountMatch[1]!.replace(/,/g, "")) : 0,
+    paymentMethodName: isKb ? "KB국민카드" : "우리카드",
+    paymentLast4: header[0].match(/\d{4}/)![0],
     merchantName,
     dateMatch,
   }
@@ -129,6 +133,8 @@ export function parseCardSmsText(
     originalCurrencyAmount,
     transactionAt: transactionAt.toISOString(),
     merchantName,
+    paymentMethodName: cardApproval?.paymentMethodName,
+    paymentLast4: cardApproval?.paymentLast4,
     targetLedgerId: options.targetLedgerId,
     sourceApp: options.sourceApp,
     sourceSender: options.sourceSender,

@@ -36,6 +36,8 @@ describe("KB and Woori approval formats", () => {
         merchantName: "테스트몰(간편결제)",
         type: "expense",
         cardNotificationEvent: "approval",
+        paymentMethodName: "KB국민카드",
+        paymentLast4: "1234",
       })
       expect(new Date(parsed.transactionAt).getHours()).toBe(18)
       expect(new Date(parsed.transactionAt).getMinutes()).toBe(15)
@@ -56,6 +58,8 @@ describe("KB and Woori approval formats", () => {
         merchantName: "(주)테스트 교육",
         type: "expense",
         cardNotificationEvent: "approval",
+        paymentMethodName: "우리카드",
+        paymentLast4: "5678",
       })
       expect(parsed.rawTextMasked).not.toContain("5678")
     },

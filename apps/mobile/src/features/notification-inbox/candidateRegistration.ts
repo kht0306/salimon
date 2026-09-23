@@ -59,7 +59,10 @@ export function createCandidateRegistrationDraft(
     ? registrationState.targetLedgerId
     : context.defaultLedgerId || candidate.targetLedgerId || ""
   const ledgerId = context.ledgers.some(
-    (ledger) => ledger.id === candidateLedgerId && !ledger.archivedAt,
+    (ledger) =>
+      ledger.id === candidateLedgerId &&
+      !ledger.archivedAt &&
+      (registrationState || ledger.role !== "viewer"),
   )
     ? candidateLedgerId
     : (context.ledgers.find(
@@ -101,8 +104,13 @@ export function createCandidateRegistrationDraft(
     merchantName:
       registrationState?.merchantName ?? candidate.parsed.merchantName ?? "",
     memo: registrationState?.memo ?? candidateRegistrationMemo(candidate),
-    paymentMethodId:
-      registrationState?.paymentMethodId ?? defaults.paymentMethodId,
+    paymentMethodId: registrationState
+      ? (registrationState.paymentMethodId ?? "")
+      : candidatePaymentMethodId(
+          candidate,
+          paymentMethods,
+          defaults.paymentMethodId,
+        ),
     tagsInput: registrationState?.tags?.join(", ") ?? "",
     time: dateTime.slice(0, 5),
   }
@@ -136,8 +144,41 @@ export function resetCandidateDraftForLedger(
     ...draft,
     categoryId: defaults.categoryId,
     ledgerId,
-    paymentMethodId: defaults.paymentMethodId,
+    paymentMethodId: candidatePaymentMethodId(
+      candidate,
+      paymentMethods,
+      defaults.paymentMethodId,
+    ),
   }
+}
+
+function candidatePaymentMethodId(
+  candidate: LocalSmsCandidate,
+  paymentMethods: PaymentMethod[],
+  fallbackId: string,
+): string {
+  const issuer = candidate.parsed.paymentMethodName
+  if (!issuer) return fallbackId
+  if (candidate.parsed.type === "income") return ""
+  const matches = paymentMethods.filter(
+    (method) =>
+      method.type === "card" &&
+      method.isActive &&
+      !method.isDeleted &&
+      normalizeCardIssuer(method.issuer ?? method.name) ===
+        normalizeCardIssuer(issuer) &&
+      (!candidate.parsed.paymentLast4 ||
+        method.last4 === candidate.parsed.paymentLast4),
+  )
+  return matches.length === 1 ? matches[0]!.id : ""
+}
+
+function normalizeCardIssuer(value: string): string {
+  return value.replace(/\s/g, "").replace(/^KB/i, "").replace(/카드$/, "")
+}
+
+export function formatCandidateAmountInput(value: string): string {
+  return value.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
 }
 
 export function validateCandidateRegistrationDraft(

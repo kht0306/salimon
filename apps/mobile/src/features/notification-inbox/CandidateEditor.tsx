@@ -25,14 +25,15 @@ import {
 import { CategoryPickerModal } from "../transactions/CategoryPickerModal"
 import {
   createCandidateRegistrationDraft,
+  formatCandidateAmountInput,
   resetCandidateDraftForLedger,
   validateCandidateRegistrationDraft,
   type CandidateRegistrationDraft,
 } from "./candidateRegistration"
 import {
   candidateAmountLabel,
+  candidateCardLabel,
   cardNotificationEventLabel,
-  notificationAppName,
 } from "./notificationInbox"
 
 interface CandidateEditorProps {
@@ -47,7 +48,45 @@ type PickerKind = "category" | "ledger" | "payment"
 const keyboardBehavior = Platform.OS === "ios" ? "padding" : "height"
 const safeAreaEdges = ["top", "bottom"] as const
 
-export const CandidateEditor = observer(function CandidateEditor({
+export const CandidateEditor = observer(function CandidateEditor(
+  props: CandidateEditorProps,
+) {
+  const store = useMobileAppStore()
+  if (!store.hasLoadedFinanceData) {
+    const hasError = store.dataStatus === "error"
+    return (
+      <Modal visible animationType="slide" onRequestClose={props.onClose}>
+        <Page edges={safeAreaEdges}>
+          <Content>
+            <IntroTitle accessibilityRole="header">
+              {hasError
+                ? "가계부 정보를 불러오지 못했어요."
+                : "가계부와 카드를 불러오고 있어요."}
+            </IntroTitle>
+            <IntroDescription accessibilityLiveRegion="polite">
+              {hasError
+                ? "연결 상태를 확인한 뒤 다시 시도해 주세요."
+                : "기본 가계부와 결제 카드를 확인한 뒤 등록 화면을 엽니다."}
+            </IntroDescription>
+            {hasError ? (
+              <AppButton
+                label="다시 불러오기"
+                tone="primary"
+                onPress={() =>
+                  void store.loadSelectedMonth(store.selectedMonth, true, true)
+                }
+              />
+            ) : null}
+            <AppButton label="닫기" onPress={props.onClose} />
+          </Content>
+        </Page>
+      </Modal>
+    )
+  }
+  return <CandidateEditorForm {...props} />
+})
+
+const CandidateEditorForm = observer(function CandidateEditorForm({
   candidate,
   onClose,
   onDefer,
@@ -307,7 +346,7 @@ export const CandidateEditor = observer(function CandidateEditor({
 
               <Intro>
                 <IntroMeta>
-                  <Eyebrow>{notificationAppName(candidate.sourceApp)}</Eyebrow>
+                  <Eyebrow>{candidateCardLabel(candidate)}</Eyebrow>
                   {eventLabel ? (
                     <EventBadge
                       $cancelled={
@@ -381,7 +420,7 @@ export const CandidateEditor = observer(function CandidateEditor({
                     keyboardType="number-pad"
                     placeholder={originalCurrencyAmount ? "원화 금액" : "0"}
                     placeholderTextColor={mobileTheme.colors.subtle}
-                    value={draft.amount}
+                    value={formatCandidateAmountInput(draft.amount)}
                     editable={!isPending}
                     onChangeText={(value) =>
                       updateDraft({
@@ -449,6 +488,18 @@ export const CandidateEditor = observer(function CandidateEditor({
                     disabled={isPending}
                     onPress={() => setPicker("payment")}
                   />
+                ) : null}
+                {candidate.parsed.type !== "income" &&
+                candidate.parsed.paymentMethodName &&
+                !draft.paymentMethodId ? (
+                  <IntroDescription>
+                    {candidate.parsed.paymentMethodName}
+                    {candidate.parsed.paymentLast4
+                      ? ` (${candidate.parsed.paymentLast4})`
+                      : ""}
+                    와 일치하는 카드를 하나로 확인하지 못했어요. 결제수단을
+                    확인해 주세요.
+                  </IntroDescription>
                 ) : null}
               </Section>
 

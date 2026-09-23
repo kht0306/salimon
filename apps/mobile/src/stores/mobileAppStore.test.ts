@@ -12,6 +12,7 @@ import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "@salimon/types"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { MobileAuthGateway } from "../features/auth/mobileAuth"
 import { QueryCache } from "../infrastructure/queryCache"
+import { createCandidateRegistrationDraft } from "../features/notification-inbox/candidateRegistration"
 import {
   acceptNotificationDisclosure,
   clearNotificationCaptureSession,
@@ -459,6 +460,53 @@ describe("MobileAppStore authentication", () => {
     ).resolves.toBe(true)
     expect(deleteStoredNotificationRecord).toHaveBeenCalledWith("a".repeat(64))
     expect(store.notificationCandidateCount).toBe(0)
+  })
+
+  it("waits for finance metadata before initializing a candidate opened during login", async () => {
+    const data = createReadyFinanceData()
+    const repository = createRepository(data)
+    let finishLoad: ((value: typeof data) => void) | undefined
+    repository.loadMonth.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishLoad = resolve
+        }),
+    )
+    vi.mocked(getNotificationCaptureStatus).mockResolvedValue({
+      ...emptyNotificationStatus,
+      hasDisclosureConsent: true,
+    })
+    vi.mocked(readStoredNotificationRecords).mockResolvedValue([
+      {
+        capturedAt: Date.now(),
+        expandedText:
+          "[우리카드 이용 안내]\n우리(5678)승인\n테*트님\n220,000원 일시불\n09/23 09:58\n테스트상점",
+        id: "loading-candidate",
+        receivedAt: Date.now(),
+        sourcePackageName: "com.kakao.talk",
+        text: "새 메시지",
+        title: "우리카드",
+      },
+    ])
+    const store = new MobileAppStore(repository, createAuthGateway())
+    const initializing = store.initializeAuth()
+    await vi.waitFor(() => expect(store.dataStatus).toBe("loading"))
+    await store.refreshNotificationInbox()
+    const earlyCandidate = store.notificationCandidates[0]!
+    expect(earlyCandidate.targetLedgerId).toBe("")
+    expect(store.hasLoadedFinanceData).toBe(false)
+
+    finishLoad?.(data)
+    await initializing
+
+    expect(store.hasLoadedFinanceData).toBe(true)
+    const draft = createCandidateRegistrationDraft(earlyCandidate, {
+      categories: store.financeData.categories,
+      defaultLedgerId: store.defaultLedgerId,
+      ledgers: store.selectableLedgers,
+      paymentMethods: store.financeData.paymentMethods,
+    })
+    expect(draft.ledgerId).toBe("ledger-1")
   })
 
   it("deletes only the selected notification candidates", async () => {

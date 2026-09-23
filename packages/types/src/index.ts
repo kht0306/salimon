@@ -248,6 +248,7 @@ export interface ParsedTransaction {
   transactionAt: string
   merchantName?: string
   paymentMethodName?: string
+  paymentLast4?: string
   targetLedgerId?: string
   sourceApp?: string
   sourceSender?: string

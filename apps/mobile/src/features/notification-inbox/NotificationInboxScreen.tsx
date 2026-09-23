@@ -13,6 +13,7 @@ import { mobileTheme } from "../../theme"
 import { CandidateEditor } from "./CandidateEditor"
 import {
   candidateAmountLabel,
+  candidateCardLabel,
   candidateStatusLabel,
   cardNotificationEventLabel,
   notificationAppName,
@@ -276,9 +277,7 @@ export const NotificationInboxScreen = observer(
                     onPress={() => setSelectedCandidate(item)}
                   >
                     <CardTop>
-                      <SourceLabel>
-                        {notificationAppName(item.sourceApp)}
-                      </SourceLabel>
+                      <SourceLabel>{candidateCardLabel(item)}</SourceLabel>
                       <BadgeGroup>
                         {eventLabel ? (
                           <EventBadge $cancelled={cancellation}>
@@ -304,9 +303,7 @@ export const NotificationInboxScreen = observer(
                       </ForeignAmountHint>
                     ) : null}
                     <ReceivedAt>
-                      {item.parsed.paymentMethodName
-                        ? `${item.parsed.paymentMethodName} · `
-                        : ""}
+                      {notificationAppName(item.sourceApp)} ·{" "}
                       {formatDateTime(item.parsed.transactionAt)}
                     </ReceivedAt>
                   </CandidateOpenButton>

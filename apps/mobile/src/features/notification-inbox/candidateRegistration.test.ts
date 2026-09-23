@@ -1,11 +1,14 @@
-import type { LocalSmsCandidate } from "@salimon/types"
+import type { LocalSmsCandidate, PaymentMethod } from "@salimon/types"
 import { describe, expect, it } from "vitest"
 import {
   createCandidateRegistrationDraft,
+  formatCandidateAmountInput,
   isRetryableCandidateRegistrationError,
+  resetCandidateDraftForLedger,
   validateCandidateRegistrationDraft,
   type CandidateRegistrationContext,
 } from "./candidateRegistration"
+import { normalizeAmountInput } from "../transactions/transactionDraft"
 
 const candidate: LocalSmsCandidate = {
   firstDetectedAt: "2026-08-13T05:00:00.000Z",
@@ -73,6 +76,150 @@ const context: CandidateRegistrationContext = {
 }
 
 describe("candidate registration", () => {
+  const wooriCandidate: LocalSmsCandidate = {
+    ...candidate,
+    parsed: {
+      ...candidate.parsed,
+      paymentMethodName: "우리카드",
+      paymentLast4: "5678",
+    },
+  }
+  const wooriCard: PaymentMethod = {
+    id: "woori-card",
+    instrumentId: "woori-instrument",
+    ledgerId: "ledger-1",
+    name: "생활비 카드",
+    issuer: "우리",
+    last4: "5678",
+    type: "card",
+    visibility: "ledger",
+    isActive: true,
+  }
+  const lotteCard: PaymentMethod = {
+    ...wooriCard,
+    id: "lotte-card",
+    issuer: "롯데카드",
+    isPrimary: true,
+  }
+
+  it("matches the issuer and last four digits instead of the primary card", () => {
+    const draft = createCandidateRegistrationDraft(wooriCandidate, {
+      ...context,
+      paymentMethods: [
+        lotteCard,
+        wooriCard,
+        { ...wooriCard, id: "other-woori", last4: "9999", isPrimary: true },
+      ],
+    })
+    expect(draft.paymentMethodId).toBe("woori-card")
+  })
+
+  it.each(["국민", "국민카드", "KB국민카드", "KB 국민 카드"])(
+    "matches KB issuer alias %s",
+    (issuer) => {
+      const draft = createCandidateRegistrationDraft(
+        {
+          ...wooriCandidate,
+          parsed: { ...wooriCandidate.parsed, paymentMethodName: "KB국민카드" },
+        },
+        {
+          ...context,
+          paymentMethods: [{ ...wooriCard, issuer }],
+        },
+      )
+      expect(draft.paymentMethodId).toBe("woori-card")
+    },
+  )
+
+  it.each([
+    { last4: "9999" },
+    { last4: undefined },
+    { isActive: false },
+    { isDeleted: true },
+    { ledgerId: "another-ledger" },
+    { type: "bank" as const },
+  ])(
+    "does not silently choose an unrelated card when the match is unavailable: %j",
+    (change) => {
+      expect(
+        createCandidateRegistrationDraft(wooriCandidate, {
+          ...context,
+          paymentMethods: [lotteCard, { ...wooriCard, ...change }],
+        }).paymentMethodId,
+      ).toBe("")
+    },
+  )
+
+  it("leaves an ambiguous match unselected even if one card is primary", () => {
+    expect(
+      createCandidateRegistrationDraft(wooriCandidate, {
+        ...context,
+        paymentMethods: [
+          wooriCard,
+          { ...wooriCard, id: "shared-card", isPrimary: true },
+        ],
+      }).paymentMethodId,
+    ).toBe("")
+  })
+
+  it("matches the card again within the newly selected ledger", () => {
+    const draft = createCandidateRegistrationDraft(wooriCandidate, {
+      ...context,
+      paymentMethods: [wooriCard],
+    })
+    const next = resetCandidateDraftForLedger(
+      draft,
+      wooriCandidate,
+      "ledger-2",
+      {
+        categories: [],
+        paymentMethods: [
+          wooriCard,
+          { ...wooriCard, id: "other-ledger-card", ledgerId: "ledger-2" },
+        ],
+      },
+    )
+    expect(next.paymentMethodId).toBe("other-ledger-card")
+    expect(next.ledgerId).toBe("ledger-2")
+  })
+
+  it("keeps the persisted card or explicit empty choice when retrying", () => {
+    for (const paymentMethodId of [undefined, "manual-card"]) {
+      const pendingCandidate: LocalSmsCandidate = {
+        ...wooriCandidate,
+        registrationState: {
+          amount: 45000,
+          categoryId: "category-1",
+          targetLedgerId: "ledger-1",
+          transactionAt: candidate.parsed.transactionAt,
+          updatedAt: candidate.firstDetectedAt,
+          paymentMethodId,
+        },
+      }
+      expect(
+        createCandidateRegistrationDraft(pendingCandidate, {
+          ...context,
+          paymentMethods: [wooriCard],
+        }).paymentMethodId,
+      ).toBe(paymentMethodId ?? "")
+    }
+  })
+
+  it.each([
+    ["", ""],
+    ["0", "0"],
+    ["999", "999"],
+    ["1000", "1,000"],
+    ["220000", "220,000"],
+    ["123456789", "123,456,789"],
+  ])(
+    "formats %s for display while preserving numeric input",
+    (raw, formatted) => {
+      expect(formatCandidateAmountInput(raw)).toBe(formatted)
+      expect(normalizeAmountInput(formatted)).toBe(raw)
+    },
+  )
+
   it("creates an editable draft and a notification transaction input", () => {
     const draft = createCandidateRegistrationDraft(candidate, context)
     const validation = validateCandidateRegistrationDraft(
