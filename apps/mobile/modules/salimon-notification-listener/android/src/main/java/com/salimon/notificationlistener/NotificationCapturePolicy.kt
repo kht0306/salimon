@@ -9,6 +9,7 @@ internal object PaymentNotificationFilter {
     "com.kakao.talk",
   )
   private val approvalHeader = Regex("""(?:KB\s*국민카드\s*\d{4}|우리\s*\(\d{4}\))\s*승인""")
+  private val wooriAppApprovalHeader = Regex("""\[일시불\s*[.·]\s*승인\s*\(\d{4}\)\s*\]""")
   private val excludedEvent = Regex("""취소|환불|환급|거절|승인\s*실패""")
   private val amountPattern = Regex(
     pattern = """(?i)(?:₩\s*)?\d{1,3}(?:,\d{3})+(?:\s*원)?|\d+\s*원|[A-Z]{3}\s*(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?""",
@@ -19,11 +20,15 @@ internal object PaymentNotificationFilter {
 
   fun isMessagingApp(packageName: String): Boolean = packageName in messagePackages
 
+  fun isApprovalOnlyApp(packageName: String): Boolean =
+    isMessagingApp(packageName) || packageName == "com.wooricard.smartapp"
+
   fun shouldStore(text: NotificationText, packageName: String = ""): Boolean {
     val combined = text.combined()
-    if (isMessagingApp(packageName)) {
+    if (isApprovalOnlyApp(packageName)) {
       val body = text.expandedText.ifBlank { text.text }
-      if (approvalHeader.findAll(body).count() != 1 || excludedEvent.containsMatchIn(combined)) {
+      val header = if (packageName == "com.wooricard.smartapp") wooriAppApprovalHeader else approvalHeader
+      if (header.findAll(body).count() != 1 || excludedEvent.containsMatchIn(combined)) {
         return false
       }
       if (packageName == "com.kakao.talk" &&

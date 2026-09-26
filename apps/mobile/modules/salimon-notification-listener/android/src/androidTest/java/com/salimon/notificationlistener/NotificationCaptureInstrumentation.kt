@@ -18,9 +18,10 @@ class NotificationCaptureInstrumentation : Instrumentation() {
     try {
       verifyDisclosureGating()
       verifyMessageExtraction()
+      verifyWooriAppNotifications()
       verifyEncryptedStorageLifecycle()
       finish(Activity.RESULT_OK, Bundle().apply {
-        putString("checksPassed", "disclosure,message-extraction,encrypted-storage")
+        putString("checksPassed", "disclosure,message-extraction,woori-app,encrypted-storage")
       })
     } catch (error: Throwable) {
       finish(
@@ -30,6 +31,36 @@ class NotificationCaptureInstrumentation : Instrumentation() {
         },
       )
       throw error
+    }
+  }
+
+  private fun verifyWooriAppNotifications() {
+    val context = targetContext.applicationContext
+    val source = "com.wooricard.smartapp"
+    val body = "[일시불.승인(5678)]09/26 17:19\n36,500원 / 누적:410,632원\n(주)테스트상점"
+    for (style in listOf("text", "bigText", "lines")) {
+      val builder = Notification.Builder(context, "test")
+        .setSmallIcon(android.R.drawable.ic_dialog_info)
+        .setContentTitle("승인내역")
+        .setWhen(1_790_410_000_000)
+      when (style) {
+        "text" -> builder.setContentText(body)
+        "bigText" -> builder.setContentText("승인내역").setStyle(Notification.BigTextStyle().bigText(body))
+        "lines" -> builder.setStyle(Notification.InboxStyle().apply { body.lines().forEach { addLine(it) } })
+      }
+      val notification = builder.build()
+      val message = NotificationTextExtractor.extract(notification, source, "woori-app", 1L).single()
+      check(PaymentNotificationFilter.shouldStore(message.text, source))
+      check(message.text.expandedText.ifBlank { message.text.text } == body)
+      check(message.receivedAt == 1_790_410_000_000)
+      val repeated = NotificationTextExtractor.extract(notification, source, "woori-app", 2L).single()
+      check(NotificationCaptureIdentity.recordId(source, message.messageKey, message.receivedAt, message.text) ==
+        NotificationCaptureIdentity.recordId(source, repeated.messageKey, repeated.receivedAt, repeated.text))
+      for (excluded in listOf(body.replace("승인(", "승인취소("), "$body 부분취소", "$body 전체취소", "$body\n$body", "결제 시 10,000원 혜택")) {
+        check(!PaymentNotificationFilter.shouldStore(NotificationText("승인내역", excluded, excluded), source))
+      }
+      notification.flags = notification.flags or Notification.FLAG_GROUP_SUMMARY
+      check(NotificationTextExtractor.extract(notification, source, "summary", 1L).isEmpty())
     }
   }
 

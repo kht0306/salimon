@@ -17,9 +17,10 @@ internal object NotificationTextExtractor {
   ): List<ExtractedNotificationMessage> {
     val extras = notification.extras
     val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+    // Group summaries repeat child messages and may combine different transactions.
+    if (PaymentNotificationFilter.isApprovalOnlyApp(packageName) &&
+      notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return emptyList()
     if (PaymentNotificationFilter.isMessagingApp(packageName)) {
-      // Group summaries repeat child messages and may combine different conversations.
-      if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return emptyList()
       val bundles = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
       val messages = bundles?.let(Notification.MessagingStyle.Message::getMessagesFromBundleArray)
       if (!messages.isNullOrEmpty()) {
