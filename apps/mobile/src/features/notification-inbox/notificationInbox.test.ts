@@ -8,16 +8,100 @@ import {
   isSupportedNotificationRecord,
   SUPPORTED_NOTIFICATION_APPS,
 } from "./notificationInbox"
+import { createCandidateRegistrationDraft } from "./candidateRegistration"
 
 describe("notification inbox candidate", () => {
   it("offers card, SMS and Kakao notification sources", () => {
     expect(SUPPORTED_NOTIFICATION_APPS.map((app) => app.packageName)).toEqual([
       "com.lcacApp",
+      "com.wooricard.smartapp",
       "com.samsung.android.messaging",
       "com.google.android.apps.messaging",
       "com.kakao.talk",
     ])
   })
+
+  it.each(["text", "expandedText"] as const)(
+    "registers a Woori app %s approval with the matching card",
+    (field) => {
+      const record = {
+        capturedAt: new Date(2026, 8, 26, 17, 20).getTime(),
+        receivedAt: new Date(2026, 8, 26, 17, 19).getTime(),
+        expandedText: "",
+        id: "woori-app-message",
+        sourcePackageName: "com.wooricard.smartapp",
+        text: "",
+        title: "승인내역",
+        [field]:
+          "[일시불.승인(5678)]09/26 17:19\n36,500원 / 누적:410,632원\n(주)테스트상점",
+      }
+      expect(isSupportedNotificationRecord(record)).toBe(true)
+      const candidate = createCandidateFromNotificationRecord({
+        record,
+        targetLedgerId: "ledger-1",
+        userId: "user-1",
+      })
+      expect(candidateCardLabel(candidate)).toBe("우리카드")
+      expect(candidate.parsed).toMatchObject({
+        amount: 36500,
+        paymentLast4: "5678",
+        merchantName: "(주)테스트상점",
+      })
+      expect(candidate.status).toBe("notified")
+      expect(candidate.maskedMessage).not.toContain("5678")
+      expect(candidate.sourceHash).toBe("notification_woori-app-message")
+      const draft = createCandidateRegistrationDraft(candidate, {
+        defaultLedgerId: "ledger-1",
+        ledgers: [
+          {
+            id: "ledger-1",
+            name: "테스트 가계부",
+            ownerId: "user-1",
+            type: "personal",
+            currency: "KRW",
+            role: "owner",
+          },
+        ],
+        categories: [],
+        paymentMethods: [
+          {
+            id: "woori-card",
+            instrumentId: "instrument-1",
+            ledgerId: "ledger-1",
+            name: "생활비",
+            type: "card",
+            issuer: "우리카드",
+            last4: "5678",
+            visibility: "ledger",
+            isActive: true,
+          },
+        ],
+      })
+      expect(draft).toMatchObject({
+        amount: "36500",
+        paymentMethodId: "woori-card",
+        ledgerId: "ledger-1",
+      })
+      expect(
+        isSupportedNotificationRecord({
+          ...record,
+          [field]: record[field].replace("승인(", "승인취소("),
+        }),
+      ).toBe(false)
+      expect(
+        isSupportedNotificationRecord({
+          ...record,
+          [field]: "결제 시 10,000원 혜택",
+        }),
+      ).toBe(false)
+      expect(
+        isSupportedNotificationRecord({
+          ...record,
+          [field]: `${record[field]}\n${record[field]}`,
+        }),
+      ).toBe(false)
+    },
+  )
 
   it("turns a Woori Kakao approval into the same editable expense candidate", () => {
     const record = {

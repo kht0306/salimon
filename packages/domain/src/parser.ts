@@ -17,6 +17,7 @@ const datePattern =
   /(?:^|[^\d])((?:0?[1-9]|1[0-2]))[./-]((?:0?[1-9]|[12]\d|3[01]))(?:\s+([01]?\d|2[0-3]):([0-5]\d))?(?!\d)/
 const cardApprovalHeaderPattern =
   /(?:KB\s*국민카드\s*\d{4}|우리\s*\(\d{4}\))\s*승인/
+const wooriAppApprovalHeaderPattern = /\[일시불\s*[.·]\s*승인\s*\(\d{4}\)\s*\]/
 const unsupportedCardEventPattern = /취소|환불|환급|거절|승인\s*실패/
 const sensitivePatterns = [
   /\b\d{2,4}-\d{3,4}-\d{4}\b/g,
@@ -26,10 +27,17 @@ const sensitivePatterns = [
   /\((?=[\d* -]{4,}\))[\d* -]*\d[\d* -]*\)/g,
 ]
 
-export function isSupportedCardApprovalText(rawText: string): boolean {
+export function isSupportedCardApprovalText(
+  rawText: string,
+  sourceApp?: string,
+): boolean {
   const text = normalizeWhitespace(rawText)
+  const headerPattern =
+    sourceApp === "com.wooricard.smartapp"
+      ? wooriAppApprovalHeaderPattern
+      : cardApprovalHeaderPattern
   return (
-    text.split(cardApprovalHeaderPattern).length === 2 &&
+    text.split(headerPattern).length === 2 &&
     !unsupportedCardEventPattern.test(text)
   )
 }
@@ -44,22 +52,30 @@ interface CardApprovalFields {
 
 function extractCardApprovalFields(
   text: string,
+  sourceApp?: string,
 ): CardApprovalFields | undefined {
-  const header = text.match(cardApprovalHeaderPattern)
-  if (!header || !isSupportedCardApprovalText(text)) return undefined
+  const isWooriApp = sourceApp === "com.wooricard.smartapp"
+  const header = text.match(
+    isWooriApp ? wooriAppApprovalHeaderPattern : cardApprovalHeaderPattern,
+  )
+  if (!header || !isSupportedCardApprovalText(text, sourceApp)) return undefined
 
   const body = text.slice((header.index ?? 0) + header[0].length)
   const dateMatch = body.match(datePattern)
   const isKb = /^KB/.test(header[0])
   const amountMatch = body.match(
-    isKb
-      ? /^\s*([\d,]+)\s*원\s*\((?:일시불|\d+\s*개월(?:\s*할부)?)\)/
-      : /^\s*\S+님\s+([\d,]+)\s*원\s*(?:일시불|\d+\s*개월(?:\s*할부)?)/,
+    isWooriApp
+      ? /^\s*\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2}\s+([\d,]+)\s*원\s*\/\s*누적\s*[:：]\s*[\d,]+\s*원(?:\s+(.+))?$/
+      : isKb
+        ? /^\s*([\d,]+)\s*원\s*\((?:일시불|\d+\s*개월(?:\s*할부)?)\)/
+        : /^\s*\S+님\s+([\d,]+)\s*원\s*(?:일시불|\d+\s*개월(?:\s*할부)?)/,
   )
   let merchantName: string | undefined
   if (amountMatch) {
     const afterAmount = body.slice(amountMatch[0].length)
-    if (isKb) {
+    if (isWooriApp) {
+      merchantName = amountMatch[2]
+    } else if (isKb) {
       merchantName = afterAmount.match(/^\s*(.+?)\s+고객명\s+/)?.[1]
     } else {
       merchantName = afterAmount.match(
@@ -88,7 +104,7 @@ export function parseCardSmsText(
   } = {},
 ): ParsedTransaction {
   const text = normalizeWhitespace(rawText)
-  const cardApproval = extractCardApprovalFields(text)
+  const cardApproval = extractCardApprovalFields(text, options.sourceApp)
   const transactionText = text.replace(summaryAmountPattern, " ")
   const dateMatch =
     cardApproval?.dateMatch ??

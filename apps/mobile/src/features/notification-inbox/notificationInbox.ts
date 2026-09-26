@@ -20,6 +20,12 @@ export const SUPPORTED_NOTIFICATION_APPS = [
     cardApprovalsOnly: false,
   },
   {
+    name: "우리카드",
+    packageName: "com.wooricard.smartapp",
+    description: "우리WON카드 앱 일시불 정상 승인 알림",
+    cardApprovalsOnly: true,
+  },
+  {
     name: "삼성 메시지",
     packageName: "com.samsung.android.messaging",
     description: "국민·우리카드 정상 승인 문자",
@@ -80,7 +86,7 @@ export function isSupportedNotificationRecord(
     return true
   const body = record.expandedText.trim() || record.text.trim()
   return (
-    isSupportedCardApprovalText(body) &&
+    isSupportedCardApprovalText(body, record.sourcePackageName) &&
     (record.sourcePackageName !== "com.kakao.talk" ||
       /우리카드|KB\s*국민카드/.test(record.title))
   )

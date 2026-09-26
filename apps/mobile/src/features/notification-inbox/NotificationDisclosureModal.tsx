@@ -48,8 +48,8 @@ export function NotificationDisclosureModal({
               권한을 요청하며, 설정에서 도착 알림만 끌 수 있습니다.
             </DisclosureItem>
             <DisclosureItem>
-              선택한 롯데카드 앱, 문자 앱, 카카오톡의 지원 카드 결제 알림만
-              감지합니다. 국민·우리카드는 정상 승인만 지원합니다.
+              선택한 롯데카드·우리카드 앱, 문자 앱, 카카오톡의 지원 카드 결제
+              알림만 감지합니다. 국민·우리카드는 정상 승인만 지원합니다.
             </DisclosureItem>
             <DisclosureItem>
               원문은 Android 암호화 저장소에 최대 7일간 보관하며, 제외·전체

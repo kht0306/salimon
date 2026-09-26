@@ -22,6 +22,75 @@ const wooriApproval = [
   "07/20 09:58",
   "(주)테스트 교육",
 ].join("\n")
+const wooriAppApproval = [
+  "승인내역",
+  "[일시불.승인(5678)]09/26 17:19",
+  "36,500원 / 누적:410,632원",
+  "(주)테스트상점",
+].join("\n")
+
+describe("Woori app approvals", () => {
+  const sourceApp = "com.wooricard.smartapp"
+  const receivedAt = new Date(2026, 8, 26, 17, 20)
+
+  it.each(["multiline", "singleline"])(
+    "parses a %s app notification without using cumulative spend",
+    (format) => {
+      const text =
+        format === "multiline"
+          ? wooriAppApproval
+          : wooriAppApproval.replaceAll("\n", " ")
+      const parsed = parseCardSmsText(text, receivedAt, { sourceApp })
+      expect(isSupportedCardApprovalText(text, sourceApp)).toBe(true)
+      expect(parsed).toMatchObject({
+        amount: 36500,
+        merchantName: "(주)테스트상점",
+        paymentMethodName: "우리카드",
+        paymentLast4: "5678",
+        type: "expense",
+        cardNotificationEvent: "approval",
+      })
+      expect(parsed.transactionAt).toBe(
+        new Date(2026, 8, 26, 17, 19).toISOString(),
+      )
+      expect(parsed.confidence).toBeGreaterThanOrEqual(0.85)
+      expect(parsed.rawTextMasked).not.toContain("5678")
+    },
+  )
+
+  it.each([
+    wooriAppApproval.replace("승인(5678)", "승인취소(5678)"),
+    `${wooriAppApproval} 부분취소`,
+    `${wooriAppApproval} 전체취소`,
+    `${wooriAppApproval} 승인 실패`,
+    `${wooriAppApproval}\n${wooriAppApproval}`,
+    "이번 달 10,000원 캐시백 혜택을 확인하세요",
+  ])("rejects cancellations, marketing, and combined approvals", (text) => {
+    expect(isSupportedCardApprovalText(text, sourceApp)).toBe(false)
+  })
+
+  it.each([
+    wooriAppApproval.replace("36,500원 / ", ""),
+    wooriAppApproval.replace("\n(주)테스트상점", ""),
+    wooriAppApproval.replace("(주)테스트상점", "(주)테스트…"),
+    wooriAppApproval.replace("09/26 17:19", "02/30 17:19"),
+    wooriAppApproval.replace("09/26 17:19", ""),
+  ])("requires review for incomplete app approval details", (text) => {
+    expect(
+      parseCardSmsText(text, receivedAt, { sourceApp }).confidence,
+    ).toBeLessThan(0.85)
+  })
+
+  it("does not recognize the app-only header from arbitrary message senders", () => {
+    for (const source of [
+      undefined,
+      "com.kakao.talk",
+      "com.samsung.android.messaging",
+    ]) {
+      expect(isSupportedCardApprovalText(wooriAppApproval, source)).toBe(false)
+    }
+  })
+})
 
 describe("KB and Woori approval formats", () => {
   it.each(["multiline", "singleline"])(
