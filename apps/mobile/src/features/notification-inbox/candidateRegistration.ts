@@ -11,6 +11,7 @@ import type {
 import {
   changeMobileTransactionType,
   createNewMobileTransactionDraft,
+  formatAmountInput,
   validateMobileTransactionDraft,
   type MobileTransactionDraft,
 } from "../transactions/transactionDraft"
@@ -178,7 +179,7 @@ function normalizeCardIssuer(value: string): string {
 }
 
 export function formatCandidateAmountInput(value: string): string {
-  return value.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  return formatAmountInput(value)
 }
 
 export function validateCandidateRegistrationDraft(

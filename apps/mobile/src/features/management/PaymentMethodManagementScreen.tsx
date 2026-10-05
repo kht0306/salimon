@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import type { PaymentInstrument } from "@salimon/types"
 import { observer } from "mobx-react-lite"
 import { useEffect, useState } from "react"
@@ -8,7 +9,6 @@ import type {
   MobileAccountInput,
   MobileCardInput,
 } from "../../stores/mobileAppStore"
-import { mobileTheme } from "../../theme"
 import {
   ChoiceButton,
   ChoiceLabel,
@@ -45,6 +45,7 @@ const initialAccount: MobileAccountInput = { bank: "", name: "" }
 
 export const PaymentMethodManagementScreen = observer(
   function PaymentMethodManagementScreen() {
+    const theme = useTheme()
     const store = useMobileAppStore()
     const [mode, setMode] = useState<InstrumentMode>("card")
     const [editingId, setEditingId] = useState<string>()
@@ -278,8 +279,8 @@ export const PaymentMethodManagementScreen = observer(
                 <Switch
                   accessibilityLabel="체크카드 여부"
                   trackColor={{
-                    false: mobileTheme.colors.borderStrong,
-                    true: mobileTheme.colors.teal,
+                    false: theme.colors.borderStrong,
+                    true: theme.colors.teal,
                   }}
                   value={card.isDebit}
                   onValueChange={(isDebit) => setCard({ ...card, isDebit })}

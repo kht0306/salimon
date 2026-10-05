@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { useFonts } from "expo-font"
 import { Stack } from "expo-router"
@@ -14,6 +15,7 @@ import {
   type MobileAppStore,
 } from "../stores/mobileAppStore"
 import { mobileTheme } from "../theme"
+import { MobileThemeProvider } from "../theme/MobileThemeProvider"
 
 export { ErrorBoundary } from "expo-router"
 
@@ -27,6 +29,15 @@ type StoreCreationResult =
   | { store?: never; error: string }
 
 export default function RootLayout() {
+  return (
+    <MobileThemeProvider>
+      <RootContent />
+    </MobileThemeProvider>
+  )
+}
+
+function RootContent() {
+  const theme = useTheme()
   const [fontsLoaded, fontError] = useFonts({
     Pretendard: require("pretendard/dist/public/variable/PretendardVariable.ttf"),
   })
@@ -60,7 +71,7 @@ export default function RootLayout() {
       ) : (
         <ConfigurationErrorScreen message={storeResult.error} />
       )}
-      <StatusBar style="dark" />
+      <StatusBar style={theme.isDark ? "light" : "dark"} />
     </SafeAreaProvider>
   )
 }
@@ -72,6 +83,7 @@ interface MobileRuntimeProps {
 const MobileRuntime = observer(function MobileRuntime({
   store,
 }: MobileRuntimeProps) {
+  const theme = useTheme()
   const isSaving = store.transactionMutationState === "saving"
 
   useEffect(() => {
@@ -116,7 +128,7 @@ const MobileRuntime = observer(function MobileRuntime({
             accessibilityViewIsModal
           >
             <SavingCard>
-              <ActivityIndicator color={mobileTheme.colors.teal} size="small" />
+              <ActivityIndicator color={theme.colors.teal} size="small" />
               <SavingTitle>거래를 안전하게 저장하고 있어요.</SavingTitle>
               <SavingDescription>
                 완료될 때까지 잠시만 기다려 주세요.
@@ -155,12 +167,14 @@ function ConfigurationErrorScreen({ message }: ConfigurationErrorScreenProps) {
 const ConfigurationPage = styled(SafeAreaView)`
   flex: 1;
   justify-content: center;
-  background-color: ${mobileTheme.colors.canvas};
+  background-color: ${({ theme }: { theme: typeof mobileTheme }) =>
+    theme.colors.canvas};
   padding: ${mobileTheme.spacing[4]}px;
 `
 
 const AppFrame = styled.View`
   flex: 1;
+  background-color: ${({ theme }) => theme.colors.canvas};
 `
 
 const SavingOverlay = styled.View`
@@ -172,7 +186,7 @@ const SavingOverlay = styled.View`
   z-index: 1000;
   align-items: center;
   justify-content: center;
-  background-color: rgba(247, 248, 248, 0.86);
+  background-color: ${({ theme }) => theme.colors.overlay};
   padding: ${mobileTheme.spacing[5]}px;
 `
 
@@ -182,21 +196,21 @@ const SavingCard = styled.View`
   align-items: center;
   gap: ${mobileTheme.spacing[2]}px;
   border-width: 1px;
-  border-color: ${mobileTheme.colors.border};
+  border-color: ${({ theme }) => theme.colors.border};
   border-radius: ${mobileTheme.radii.md}px;
-  background-color: ${mobileTheme.colors.panel};
+  background-color: ${({ theme }) => theme.colors.panel};
   padding: ${mobileTheme.spacing[5]}px;
 `
 
 const SavingTitle = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 15px;
   font-weight: 700;
   text-align: center;
 `
 
 const SavingDescription = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 12px;
   text-align: center;
 `
@@ -207,33 +221,33 @@ const ConfigurationCard = styled.View`
   align-self: center;
   gap: ${mobileTheme.spacing[3]}px;
   border-width: 1px;
-  border-color: ${mobileTheme.colors.border};
+  border-color: ${({ theme }) => theme.colors.border};
   border-radius: ${mobileTheme.radii.md}px;
-  background-color: ${mobileTheme.colors.panel};
+  background-color: ${({ theme }) => theme.colors.panel};
   padding: ${mobileTheme.spacing[6]}px;
 `
 
 const ConfigurationLabel = styled(AppText)`
-  color: ${mobileTheme.colors.coral};
+  color: ${({ theme }) => theme.colors.coral};
   font-size: 12px;
   font-weight: 700;
 `
 
 const ConfigurationTitle = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 22px;
   font-weight: 700;
   line-height: 29px;
 `
 
 const ConfigurationDescription = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 14px;
   line-height: 21px;
 `
 
 const ConfigurationHint = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 12px;
   line-height: 19px;
 `

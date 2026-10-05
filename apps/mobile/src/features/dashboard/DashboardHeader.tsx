@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { router } from "expo-router"
 import { Plus, RefreshCw } from "lucide-react-native"
@@ -24,6 +25,7 @@ interface DashboardHeaderProps {
 export const DashboardHeader = observer(function DashboardHeader({
   isWide,
 }: DashboardHeaderProps) {
+  const theme = useTheme()
   const store = useMobileAppStore()
   const isRefreshing = store.dataStatus === "refreshing"
 
@@ -51,11 +53,7 @@ export const DashboardHeader = observer(function DashboardHeader({
               accessibilityRole="button"
               onPress={() => router.push("/transactions/new")}
             >
-              <Plus
-                color={mobileTheme.colors.panel}
-                size={17}
-                strokeWidth={2}
-              />
+              <Plus color={theme.colors.onAccent} size={17} strokeWidth={2} />
               <CreateButtonLabel>거래</CreateButtonLabel>
             </CreateButton>
           ) : null}
@@ -66,11 +64,7 @@ export const DashboardHeader = observer(function DashboardHeader({
             disabled={isRefreshing}
             onPress={() => void store.refreshSelectedMonth()}
           >
-            <RefreshCw
-              color={mobileTheme.colors.muted}
-              size={18}
-              strokeWidth={1.8}
-            />
+            <RefreshCw color={theme.colors.muted} size={18} strokeWidth={1.8} />
           </RefreshButton>
         </AppBarActions>
       </AppBar>
@@ -166,7 +160,7 @@ const HeaderContent = styled.View({
   padding: mobileTheme.spacing[4],
 })
 
-const AppBar = styled.View({
+const AppBar = styled.View(({ theme }) => ({
   minHeight: 60,
   flexDirection: "row",
   alignItems: "center",
@@ -175,11 +169,11 @@ const AppBar = styled.View({
   marginTop: -mobileTheme.spacing[4],
   marginHorizontal: -mobileTheme.spacing[4],
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
-  backgroundColor: mobileTheme.colors.panel,
+  borderBottomColor: theme.colors.border,
+  backgroundColor: theme.colors.panel,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[4],
-})
+}))
 
 const BrandLockup = styled.View({
   minWidth: 0,
@@ -189,17 +183,17 @@ const BrandLockup = styled.View({
   gap: mobileTheme.spacing[2],
 })
 
-const BrandMark = styled.View({
+const BrandMark = styled.View(({ theme }) => ({
   width: 36,
   height: 36,
   alignItems: "center",
   justifyContent: "center",
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.teal,
-})
+  backgroundColor: theme.colors.teal,
+}))
 
 const BrandInitial = styled(AppText)`
-  color: ${mobileTheme.colors.panel};
+  color: ${({ theme }) => theme.colors.onAccent};
   font-size: 13px;
   font-weight: 700;
 `
@@ -219,63 +213,63 @@ const BrandName = styled(AppText)`
   font-size: ${mobileTheme.typography.label.fontSize}px;
   font-weight: ${mobileTheme.typography.label.fontWeight};
   line-height: ${mobileTheme.typography.label.lineHeight}px;
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
 `
 
 const BrandContext = styled(AppText)`
   margin-top: 1px;
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 10px;
   font-weight: 600;
 `
 
 const RefreshButton = styled(Pressable)<{ disabled?: boolean }>(
-  ({ disabled }) => ({
+  ({ theme, disabled }) => ({
     width: mobileTheme.controls.touch,
     minHeight: mobileTheme.controls.touch,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: mobileTheme.colors.borderStrong,
+    borderColor: theme.colors.borderStrong,
     borderRadius: mobileTheme.radii.sm,
-    backgroundColor: mobileTheme.colors.panel,
+    backgroundColor: theme.colors.panel,
     opacity: disabled ? 0.5 : 1,
   }),
 )
 
-const CreateButton = styled(Pressable)({
+const CreateButton = styled(Pressable)(({ theme }) => ({
   minHeight: mobileTheme.controls.touch,
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
   gap: mobileTheme.spacing[1],
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.teal,
+  backgroundColor: theme.colors.teal,
   paddingHorizontal: mobileTheme.spacing[3],
-})
+}))
 
-const CreateButtonLabel = styled(AppText)({
-  color: mobileTheme.colors.panel,
+const CreateButtonLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.onAccent,
   ...mobileTheme.typography.label,
-})
+}))
 
-const OfflineNotice = styled.View({
+const OfflineNotice = styled.View(({ theme }) => ({
   borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.coral,
-  backgroundColor: mobileTheme.colors.coralSoft,
+  borderLeftColor: theme.colors.coral,
+  backgroundColor: theme.colors.coralSoft,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[4],
-})
+}))
 
 const OfflineTitle = styled(AppText)`
-  color: ${mobileTheme.colors.coral};
+  color: ${({ theme }) => theme.colors.coral};
   font-size: 12px;
   font-weight: 700;
 `
 
 const OfflineDescription = styled(AppText)`
   margin-top: ${mobileTheme.spacing[1]}px;
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 12px;
   line-height: 18px;
 `
@@ -298,14 +292,14 @@ const SelectedDateHeading = styled.View({
 
 const SelectedDateTitle = styled(AppText)`
   flex-shrink: 1;
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: ${mobileTheme.typography.section.fontSize}px;
   font-weight: ${mobileTheme.typography.section.fontWeight};
   line-height: ${mobileTheme.typography.section.lineHeight}px;
 `
 
 const SelectedDateCount = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 12px;
   font-weight: 600;
 `
@@ -313,7 +307,7 @@ const SelectedDateCount = styled(AppText)`
 const GroupingControl = styled.View({ gap: mobileTheme.spacing[2] })
 
 const GroupingLabel = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 10px;
   font-weight: 600;
 `
@@ -325,26 +319,22 @@ const GroupingOptions = styled.View({
 })
 
 const GroupingOption = styled(Pressable)<{ $selected: boolean }>(
-  ({ $selected }) => ({
+  ({ theme, $selected }) => ({
     minHeight: mobileTheme.controls.touch,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: $selected
-      ? mobileTheme.colors.teal
-      : mobileTheme.colors.borderStrong,
+    borderColor: $selected ? theme.colors.teal : theme.colors.borderStrong,
     borderRadius: mobileTheme.radii.sm,
-    backgroundColor: $selected
-      ? mobileTheme.colors.tealSoft
-      : mobileTheme.colors.panel,
+    backgroundColor: $selected ? theme.colors.tealSoft : theme.colors.panel,
     paddingHorizontal: mobileTheme.spacing[2],
   }),
 )
 
 const GroupingOptionLabel = styled(AppText)<{ $selected: boolean }>`
-  color: ${({ $selected }) =>
-    $selected ? mobileTheme.colors.teal : mobileTheme.colors.muted};
+  color: ${({ theme, $selected }) =>
+    $selected ? theme.colors.teal : theme.colors.muted};
   font-size: 11px;
   font-weight: 700;
 `

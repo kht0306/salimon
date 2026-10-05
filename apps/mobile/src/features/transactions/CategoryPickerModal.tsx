@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import {
   buildCategoryTree,
@@ -37,6 +38,7 @@ export function CategoryPickerModal({
   onClose,
   onSelect,
 }: CategoryPickerModalProps) {
+  const theme = useTheme()
   const [query, setQuery] = useState("")
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     () =>
@@ -105,7 +107,7 @@ export function CategoryPickerModal({
             accessibilityLabel={`${title} 검색`}
             autoCorrect={false}
             placeholder="카테고리 검색"
-            placeholderTextColor={mobileTheme.colors.subtle}
+            placeholderTextColor={theme.colors.subtle}
             returnKeyType="search"
             value={query}
             onChangeText={setQuery}
@@ -150,7 +152,7 @@ export function CategoryPickerModal({
                       onPress={() => toggleExpanded(item.category.id)}
                     >
                       <ChevronRight
-                        color={mobileTheme.colors.muted}
+                        color={theme.colors.muted}
                         size={19}
                         strokeWidth={1.9}
                         style={{
@@ -214,11 +216,11 @@ const styles = StyleSheet.create({
   listContent: { paddingBottom: mobileTheme.spacing[4] },
 })
 
-const ModalRoot = styled.View({
+const ModalRoot = styled.View(({ theme }) => ({
   flex: 1,
   justifyContent: "flex-end",
-  backgroundColor: "rgba(24, 24, 27, 0.38)",
-})
+  backgroundColor: theme.colors.scrim,
+}))
 
 const Backdrop = styled.Pressable({
   position: "absolute",
@@ -228,23 +230,25 @@ const Backdrop = styled.Pressable({
   left: 0,
 })
 
-const Sheet = styled(SafeAreaView)({
-  width: "100%",
-  height: "78%",
-  borderTopLeftRadius: 20,
-  borderTopRightRadius: 20,
-  backgroundColor: mobileTheme.colors.panel,
-  paddingTop: mobileTheme.spacing[2],
-  paddingHorizontal: mobileTheme.spacing[4],
-})
+const Sheet = styled(SafeAreaView)(
+  ({ theme }: { theme: typeof mobileTheme }) => ({
+    width: "100%",
+    height: "78%",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: theme.colors.panel,
+    paddingTop: mobileTheme.spacing[2],
+    paddingHorizontal: mobileTheme.spacing[4],
+  }),
+)
 
-const SheetHandle = styled.View({
+const SheetHandle = styled.View(({ theme }) => ({
   width: 36,
   height: 4,
   alignSelf: "center",
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.borderStrong,
-})
+  backgroundColor: theme.colors.borderStrong,
+}))
 
 const SheetHeader = styled.View({
   minHeight: 60,
@@ -254,11 +258,11 @@ const SheetHeader = styled.View({
   gap: mobileTheme.spacing[3],
 })
 
-const SheetTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const SheetTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 20,
   fontWeight: "700",
-})
+}))
 
 const CloseButton = styled.Pressable({
   minWidth: 52,
@@ -267,44 +271,44 @@ const CloseButton = styled.Pressable({
   justifyContent: "center",
 })
 
-const CloseButtonLabel = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const CloseButtonLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 13,
   fontWeight: "600",
-})
+}))
 
-const PickerGuide = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const PickerGuide = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
   marginBottom: mobileTheme.spacing[3],
-})
+}))
 
-const SearchInput = styled.TextInput({
+const SearchInput = styled.TextInput(({ theme }) => ({
   minHeight: 48,
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panelSubtle,
-  color: mobileTheme.colors.ink,
+  backgroundColor: theme.colors.panelSubtle,
+  color: theme.colors.ink,
   fontFamily: "Pretendard",
   fontSize: 14,
   paddingHorizontal: mobileTheme.spacing[4],
   marginBottom: mobileTheme.spacing[3],
-})
+}))
 
 const CategoryList = styled(FlatList<VisibleCategoryItem>)({ flex: 1 })
 
-const CategoryRow = styled.View<{ $selected: boolean }>(({ $selected }) => ({
-  minHeight: 60,
-  flexDirection: "row",
-  alignItems: "stretch",
-  borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
-  backgroundColor: $selected
-    ? mobileTheme.colors.tealSoft
-    : mobileTheme.colors.panel,
-}))
+const CategoryRow = styled.View<{ $selected: boolean }>(
+  ({ theme, $selected }) => ({
+    minHeight: 60,
+    flexDirection: "row",
+    alignItems: "stretch",
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: $selected ? theme.colors.tealSoft : theme.colors.panel,
+  }),
+)
 
 const CategorySelectButton = styled.Pressable<{ $depth: number }>(
   ({ $depth }) => ({
@@ -329,35 +333,35 @@ const CategoryMarker = styled.View({
 const CategoryCopy = styled.View({ minWidth: 0, flex: 1, gap: 2 })
 
 const CategoryName = styled(AppText)<{ $selected: boolean }>(
-  ({ $selected }) => ({
-    color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+  ({ theme, $selected }) => ({
+    color: $selected ? theme.colors.teal : theme.colors.ink,
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 20,
   }),
 )
 
-const SelectedMark = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const SelectedMark = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 10,
   fontWeight: "600",
-})
+}))
 
-const ExpandButton = styled.Pressable({
+const ExpandButton = styled.Pressable(({ theme }) => ({
   width: mobileTheme.controls.touch,
   minHeight: mobileTheme.controls.touch,
   alignItems: "center",
   justifyContent: "center",
   borderLeftWidth: 1,
-  borderLeftColor: mobileTheme.colors.border,
-})
+  borderLeftColor: theme.colors.border,
+}))
 
 const ExpandSpacer = styled.View({ width: mobileTheme.controls.touch })
 
-const EmptyMessage = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const EmptyMessage = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 13,
   lineHeight: 20,
   textAlign: "center",
   paddingVertical: mobileTheme.spacing[8],
-})
+}))

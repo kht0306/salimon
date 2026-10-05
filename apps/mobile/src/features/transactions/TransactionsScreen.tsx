@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { formatKrw } from "@salimon/domain"
 import type {
@@ -38,6 +39,7 @@ import {
 const safeAreaEdges = ["top"] as const
 
 export const TransactionsScreen = observer(function TransactionsScreen() {
+  const theme = useTheme()
   const store = useMobileAppStore()
   const [filters, setFilters] = useState<MobileTransactionFilters>(() => ({
     ...defaultTransactionFilters,
@@ -252,12 +254,12 @@ export const TransactionsScreen = observer(function TransactionsScreen() {
         maxToRenderPerBatch={20}
         refreshControl={
           <RefreshControl
-            colors={[mobileTheme.colors.teal]}
+            colors={[theme.colors.teal]}
             refreshing={
               store.dataStatus === "refreshing" ||
               store.transactionSearchStatus === "loading"
             }
-            tintColor={mobileTheme.colors.teal}
+            tintColor={theme.colors.teal}
             onRefresh={() => {
               if (customRangeValid) {
                 void store.loadTransactionSearchRange(
@@ -333,6 +335,7 @@ function TransactionListHeader({
   onKeywordChange,
   onToggleFilters,
 }: TransactionListHeaderProps) {
+  const theme = useTheme()
   const { fontScale, width } = useWindowDimensions()
   const stackTotals = fontScale >= 1.3 || width < 360
 
@@ -348,11 +351,7 @@ function TransactionListHeader({
           <ResultCount>{resultCount}건</ResultCount>
           {canCreate ? (
             <CreateButton accessibilityRole="button" onPress={onCreate}>
-              <Plus
-                color={mobileTheme.colors.panel}
-                size={16}
-                strokeWidth={2}
-              />
+              <Plus color={theme.colors.onAccent} size={16} strokeWidth={2} />
               <CreateButtonLabel>거래 추가</CreateButtonLabel>
             </CreateButton>
           ) : null}
@@ -379,17 +378,13 @@ function TransactionListHeader({
 
       <SearchRow>
         <SearchField>
-          <Search
-            color={mobileTheme.colors.muted}
-            size={17}
-            strokeWidth={1.8}
-          />
+          <Search color={theme.colors.muted} size={17} strokeWidth={1.8} />
           <SearchInput
             accessibilityLabel="가맹점 메모 태그 검색"
             autoCapitalize="none"
             autoCorrect={false}
             placeholder="가맹점, 메모, 태그 검색"
-            placeholderTextColor={mobileTheme.colors.subtle}
+            placeholderTextColor={theme.colors.subtle}
             returnKeyType="search"
             value={keyword}
             onChangeText={onKeywordChange}
@@ -404,8 +399,8 @@ function TransactionListHeader({
           <SlidersHorizontal
             color={
               filtersOpen || activeFilterCount > 0
-                ? mobileTheme.colors.teal
-                : mobileTheme.colors.ink
+                ? theme.colors.teal
+                : theme.colors.ink
             }
             size={16}
             strokeWidth={1.8}
@@ -506,10 +501,12 @@ const styles = StyleSheet.create({
   listContent: { paddingBottom: mobileTheme.spacing[6] },
 })
 
-const Page = styled(SafeAreaView)({
-  flex: 1,
-  backgroundColor: mobileTheme.colors.canvas,
-})
+const Page = styled(SafeAreaView)(
+  ({ theme }: { theme: typeof mobileTheme }) => ({
+    flex: 1,
+    backgroundColor: theme.colors.canvas,
+  }),
+)
 
 const StateContent = styled.View({
   width: "100%",
@@ -521,12 +518,12 @@ const StateContent = styled.View({
   padding: mobileTheme.spacing[4],
 })
 
-const StateMessage = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const StateMessage = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 15,
   lineHeight: 23,
   textAlign: "center",
-})
+}))
 
 const Header = styled.View({
   gap: mobileTheme.spacing[4],
@@ -546,82 +543,82 @@ const HeadingCopy = styled.View({
   gap: mobileTheme.spacing[1],
 })
 
-const Eyebrow = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const Eyebrow = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
-const Title = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const Title = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   ...mobileTheme.typography.title,
-})
+}))
 
-const Subtitle = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const Subtitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 12,
   lineHeight: 18,
-})
+}))
 
-const ResultCount = styled(AppText)({
+const ResultCount = styled(AppText)(({ theme }) => ({
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.panel,
-  color: mobileTheme.colors.muted,
+  backgroundColor: theme.colors.panel,
+  color: theme.colors.muted,
   fontSize: 11,
   fontWeight: "600",
   paddingVertical: mobileTheme.spacing[2],
   paddingHorizontal: mobileTheme.spacing[3],
-})
+}))
 
 const HeadingActions = styled.View({
   alignItems: "flex-end",
   gap: mobileTheme.spacing[2],
 })
 
-const CreateButton = styled.Pressable({
+const CreateButton = styled.Pressable(({ theme }) => ({
   minHeight: mobileTheme.controls.touch,
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
   gap: mobileTheme.spacing[1],
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.teal,
+  backgroundColor: theme.colors.teal,
   paddingHorizontal: mobileTheme.spacing[3],
-})
+}))
 
-const CreateButtonLabel = styled(AppText)({
-  color: mobileTheme.colors.panel,
+const CreateButtonLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.onAccent,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
-const StaleNotice = styled(AppText)({
+const StaleNotice = styled(AppText)(({ theme }) => ({
   borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.amber,
-  backgroundColor: mobileTheme.colors.amberSoft,
-  color: mobileTheme.colors.muted,
+  borderLeftColor: theme.colors.amber,
+  backgroundColor: theme.colors.amberSoft,
+  color: theme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[4],
-})
+}))
 
-const SearchNotice = styled(AppText)({
+const SearchNotice = styled(AppText)(({ theme }) => ({
   borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.teal,
-  backgroundColor: mobileTheme.colors.tealSoft,
-  color: mobileTheme.colors.muted,
+  borderLeftColor: theme.colors.teal,
+  backgroundColor: theme.colors.tealSoft,
+  color: theme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[4],
-})
+}))
 
-const SearchError = styled(SearchNotice)({
-  borderLeftColor: mobileTheme.colors.coral,
-  backgroundColor: mobileTheme.colors.coralSoft,
-  color: mobileTheme.colors.coral,
-})
+const SearchError = styled(SearchNotice)(({ theme }) => ({
+  borderLeftColor: theme.colors.coral,
+  backgroundColor: theme.colors.coralSoft,
+  color: theme.colors.coral,
+}))
 
 const SearchRow = styled.View({
   flexDirection: "row",
@@ -629,7 +626,7 @@ const SearchRow = styled.View({
   gap: mobileTheme.spacing[2],
 })
 
-const SearchField = styled.View({
+const SearchField = styled.View(({ theme }) => ({
   minWidth: 0,
   minHeight: 46,
   flex: 1,
@@ -637,57 +634,59 @@ const SearchField = styled.View({
   alignItems: "center",
   gap: mobileTheme.spacing[2],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
-  paddingHorizontal: mobileTheme.spacing[3],
-})
-
-const SearchInput = styled.TextInput({
-  minWidth: 0,
-  minHeight: 44,
-  flex: 1,
-  color: mobileTheme.colors.ink,
-  fontFamily: "Pretendard",
-  fontSize: 13,
-  paddingVertical: 0,
-})
-
-const FilterButton = styled.Pressable<{ $active: boolean }>(({ $active }) => ({
-  minWidth: 76,
-  minHeight: 46,
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: mobileTheme.spacing[1],
-  borderWidth: 1,
-  borderColor: $active ? mobileTheme.colors.teal : mobileTheme.colors.border,
-  borderRadius: mobileTheme.radii.md,
-  backgroundColor: $active
-    ? mobileTheme.colors.tealSoft
-    : mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   paddingHorizontal: mobileTheme.spacing[3],
 }))
 
+const SearchInput = styled.TextInput(({ theme }) => ({
+  minWidth: 0,
+  minHeight: 44,
+  flex: 1,
+  color: theme.colors.ink,
+  fontFamily: "Pretendard",
+  fontSize: 13,
+  paddingVertical: 0,
+}))
+
+const FilterButton = styled.Pressable<{ $active: boolean }>(
+  ({ theme, $active }) => ({
+    minWidth: 76,
+    minHeight: 46,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: mobileTheme.spacing[1],
+    borderWidth: 1,
+    borderColor: $active ? theme.colors.teal : theme.colors.border,
+    borderRadius: mobileTheme.radii.md,
+    backgroundColor: $active ? theme.colors.tealSoft : theme.colors.panel,
+    paddingHorizontal: mobileTheme.spacing[3],
+  }),
+)
+
 const FilterButtonLabel = styled(AppText)<{ $active: boolean }>(
-  ({ $active }) => ({
-    color: $active ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+  ({ theme, $active }) => ({
+    color: $active ? theme.colors.teal : theme.colors.ink,
     fontSize: 12,
     fontWeight: "600",
   }),
 )
 
-const TotalsCard = styled.View<{ $stacked: boolean }>(({ $stacked }) => ({
-  flexDirection: $stacked ? "column" : "row",
-  borderTopWidth: 1,
-  borderTopColor: mobileTheme.colors.border,
-  borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
-  backgroundColor: mobileTheme.colors.panel,
-}))
+const TotalsCard = styled.View<{ $stacked: boolean }>(
+  ({ theme, $stacked }) => ({
+    flexDirection: $stacked ? "column" : "row",
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.panel,
+  }),
+)
 
 const TotalItem = styled.View<{ $divided: boolean; $stacked: boolean }>(
-  ({ $divided, $stacked }) => ({
+  ({ theme, $divided, $stacked }) => ({
     minWidth: 0,
     flex: $stacked ? undefined : 1,
     flexDirection: $stacked ? "row" : "column",
@@ -695,40 +694,40 @@ const TotalItem = styled.View<{ $divided: boolean; $stacked: boolean }>(
     justifyContent: $stacked ? "space-between" : "flex-start",
     gap: mobileTheme.spacing[1],
     borderTopWidth: $stacked && $divided ? 1 : 0,
-    borderTopColor: mobileTheme.colors.border,
+    borderTopColor: theme.colors.border,
     borderLeftWidth: !$stacked && $divided ? 1 : 0,
-    borderLeftColor: mobileTheme.colors.border,
+    borderLeftColor: theme.colors.border,
     paddingVertical: mobileTheme.spacing[3],
     paddingHorizontal: mobileTheme.spacing[2],
   }),
 )
 
-const TotalLabel = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const TotalLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 9,
   fontWeight: "700",
-})
+}))
 
 const TotalValue = styled(AppText)<{
   $tone: "expense" | "income" | "saving"
-}>(({ $tone }) => ({
-  color: $tone === "income" ? mobileTheme.colors.green : mobileTheme.colors.ink,
+}>(({ theme, $tone }) => ({
+  color: $tone === "income" ? theme.colors.green : theme.colors.ink,
   fontSize: 12,
   fontWeight: "600",
   lineHeight: 17,
 }))
 
-const DateHeader = styled.View({
+const DateHeader = styled.View(({ theme }) => ({
   minHeight: 48,
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
   gap: mobileTheme.spacing[3],
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
-  backgroundColor: mobileTheme.colors.canvas,
+  borderBottomColor: theme.colors.border,
+  backgroundColor: theme.colors.canvas,
   paddingHorizontal: mobileTheme.spacing[4],
-})
+}))
 
 const DateHeaderCopy = styled.View({
   flexDirection: "row",
@@ -736,44 +735,44 @@ const DateHeaderCopy = styled.View({
   gap: mobileTheme.spacing[2],
 })
 
-const DateTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const DateTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 14,
   fontWeight: "600",
-})
+}))
 
-const DateCount = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const DateCount = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 10,
   fontWeight: "600",
-})
+}))
 
-const DateExpense = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const DateExpense = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
-const EmptyState = styled.View({
+const EmptyState = styled.View(({ theme }) => ({
   alignItems: "center",
   gap: mobileTheme.spacing[2],
   marginHorizontal: mobileTheme.spacing[4],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[6],
-})
+}))
 
-const EmptyTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const EmptyTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 14,
   fontWeight: "600",
-})
+}))
 
-const EmptyDescription = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const EmptyDescription = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
   textAlign: "center",
-})
+}))

@@ -84,25 +84,25 @@ export function ReceiptImportPanel({
   )
 }
 
-const Panel = styled.View({
+const Panel = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[3],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.teal,
-  backgroundColor: mobileTheme.colors.tealSoft,
+  borderColor: theme.colors.teal,
+  backgroundColor: theme.colors.tealSoft,
   padding: mobileTheme.spacing[4],
-})
+}))
 
-const Title = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const Title = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 14,
   fontWeight: "700",
-})
+}))
 
-const Description = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const Description = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
-})
+}))
 
 const ConsentRow = styled.View({
   flexDirection: "row",
@@ -110,13 +110,13 @@ const ConsentRow = styled.View({
   gap: mobileTheme.spacing[3],
 })
 
-const ConsentCopy = styled(AppText)({
+const ConsentCopy = styled(AppText)(({ theme }) => ({
   minWidth: 0,
   flex: 1,
-  color: mobileTheme.colors.muted,
+  color: theme.colors.muted,
   fontSize: 9,
   lineHeight: 14,
-})
+}))
 
 const ButtonRow = styled.View({
   flexDirection: "row",
@@ -126,8 +126,8 @@ const ButtonRow = styled.View({
 
 const ButtonCell = styled.View({ minWidth: 150, flex: 1 })
 
-const ErrorText = styled(AppText)({
-  color: mobileTheme.colors.coral,
+const ErrorText = styled(AppText)(({ theme }) => ({
+  color: theme.colors.coral,
   fontSize: 10,
   lineHeight: 15,
-})
+}))

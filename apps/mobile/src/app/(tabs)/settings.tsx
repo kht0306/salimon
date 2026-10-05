@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { router, useFocusEffect } from "expo-router"
 import { Check } from "lucide-react-native"
@@ -13,11 +14,15 @@ import { requestReviewNotificationPermission } from "../../features/notification
 import { openReviewNotificationSettings } from "../../native/notificationListener"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
+import { useThemePreference } from "../../theme/MobileThemeProvider"
 
 const safeAreaEdges = ["top"] as const
 const scrollContentStyle = { flexGrow: 1 } as const
 
 export default observer(function SettingsScreen() {
+  const theme = useTheme()
+  const { mode: themeMode, setMode: setThemeMode } = useThemePreference()
+  const [themeBusy, setThemeBusy] = useState(false)
   const store = useMobileAppStore()
   const [disclosureOpen, setDisclosureOpen] = useState(false)
   const [disclosureBusy, setDisclosureBusy] = useState(false)
@@ -72,6 +77,20 @@ export default observer(function SettingsScreen() {
     setTargetLedgerId(ledgerId)
     setDisclosureOpen(false)
     await store.openNotificationPermissionSettings()
+  }
+
+  async function changeTheme(mode: "system" | "light" | "dark"): Promise<void> {
+    setThemeBusy(true)
+    try {
+      await setThemeMode(mode)
+    } catch {
+      Alert.alert(
+        "화면 모드 설정을 저장하지 못했습니다.",
+        "다시 시도해 주세요.",
+      )
+    } finally {
+      setThemeBusy(false)
+    }
   }
 
   async function saveNotificationSettings(): Promise<void> {
@@ -170,6 +189,35 @@ export default observer(function SettingsScreen() {
           </ProfileCard>
 
           <Section>
+            <SectionTitle>화면 모드</SectionTitle>
+            <LedgerOptions accessibilityRole="radiogroup">
+              {(
+                [
+                  { value: "system", label: "기기 설정" },
+                  { value: "light", label: "밝게" },
+                  { value: "dark", label: "어둡게" },
+                ] as const
+              ).map((option) => (
+                <LedgerButton
+                  key={option.value}
+                  $selected={themeMode === option.value}
+                  accessibilityRole="radio"
+                  accessibilityState={{
+                    checked: themeMode === option.value,
+                    disabled: themeBusy,
+                  }}
+                  disabled={themeBusy}
+                  onPress={() => void changeTheme(option.value)}
+                >
+                  <LedgerLabel $selected={themeMode === option.value}>
+                    {option.label}
+                  </LedgerLabel>
+                </LedgerButton>
+              ))}
+            </LedgerOptions>
+          </Section>
+
+          <Section>
             <SectionTitle>가계부</SectionTitle>
             <SettingRow>
               <SettingLabel>현재 선택</SettingLabel>
@@ -264,7 +312,7 @@ export default observer(function SettingsScreen() {
                         >
                           {selected ? (
                             <Check
-                              color={mobileTheme.colors.panel}
+                              color={theme.colors.onAccent}
                               size={16}
                               strokeWidth={2.2}
                             />
@@ -342,8 +390,8 @@ export default observer(function SettingsScreen() {
                   <Switch
                     accessibilityLabel="후보 도착 알림"
                     trackColor={{
-                      false: mobileTheme.colors.borderStrong,
-                      true: mobileTheme.colors.teal,
+                      false: theme.colors.borderStrong,
+                      true: theme.colors.teal,
                     }}
                     value={
                       store.notificationCaptureStatus.reviewNotificationsEnabled
@@ -438,7 +486,8 @@ export default observer(function SettingsScreen() {
 
 const Page = styled(SafeAreaView)`
   flex: 1;
-  background-color: ${mobileTheme.colors.canvas};
+  background-color: ${({ theme }: { theme: typeof mobileTheme }) =>
+    theme.colors.canvas};
 `
 
 const Content = styled.View({
@@ -459,56 +508,56 @@ const ScreenHeader = styled.View({
 const HeaderCopy = styled.View({ gap: mobileTheme.spacing[1] })
 
 const Eyebrow = styled(AppText)`
-  color: ${mobileTheme.colors.teal};
+  color: ${({ theme }) => theme.colors.teal};
   font-size: 12px;
   font-weight: 700;
 `
 
 const Title = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: ${mobileTheme.typography.title.fontSize}px;
   font-weight: ${mobileTheme.typography.title.fontWeight};
   line-height: ${mobileTheme.typography.title.lineHeight}px;
 `
 
-const BrandMark = styled.View({
+const BrandMark = styled.View(({ theme }) => ({
   width: 38,
   height: 38,
   alignItems: "center",
   justifyContent: "center",
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.teal,
-})
+  backgroundColor: theme.colors.teal,
+}))
 
 const BrandInitial = styled(AppText)`
-  color: ${mobileTheme.colors.panel};
+  color: ${({ theme }) => theme.colors.onAccent};
   font-size: 17px;
   font-weight: 700;
 `
 
-const ProfileCard = styled.View({
+const ProfileCard = styled.View(({ theme }) => ({
   minHeight: 84,
   flexDirection: "row",
   alignItems: "center",
   gap: mobileTheme.spacing[3],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[4],
-})
+}))
 
-const Avatar = styled.View({
+const Avatar = styled.View(({ theme }) => ({
   width: 48,
   height: 48,
   alignItems: "center",
   justifyContent: "center",
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.tealSoft,
-})
+  backgroundColor: theme.colors.tealSoft,
+}))
 
 const AvatarText = styled(AppText)`
-  color: ${mobileTheme.colors.teal};
+  color: ${({ theme }) => theme.colors.teal};
   font-size: 18px;
   font-weight: 600;
 `
@@ -520,36 +569,36 @@ const ProfileCopy = styled.View({
 })
 
 const ProfileName = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 16px;
   font-weight: 600;
 `
 
 const ProfileProvider = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 11px;
 `
 
-const ConnectedBadge = styled(AppText)({
+const ConnectedBadge = styled(AppText)(({ theme }) => ({
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.tealSoft,
-  color: mobileTheme.colors.teal,
+  backgroundColor: theme.colors.tealSoft,
+  color: theme.colors.teal,
   fontSize: 10,
   fontWeight: "600",
   paddingVertical: mobileTheme.spacing[1],
   paddingHorizontal: mobileTheme.spacing[2],
-})
+}))
 
-const Section = styled.View({
+const Section = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[3],
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
-  backgroundColor: mobileTheme.colors.panel,
+  borderBottomColor: theme.colors.border,
+  backgroundColor: theme.colors.panel,
   paddingVertical: mobileTheme.spacing[4],
-})
+}))
 
 const SectionTitle = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: ${mobileTheme.typography.section.fontSize}px;
   font-weight: ${mobileTheme.typography.section.fontWeight};
   line-height: ${mobileTheme.typography.section.lineHeight}px;
@@ -564,68 +613,64 @@ const SectionHeader = styled.View({
 
 const StatusText = styled(AppText)<{
   $tone: "active" | "inactive" | "warning"
-}>(({ $tone }) => ({
+}>(({ theme, $tone }) => ({
   color:
     $tone === "active"
-      ? mobileTheme.colors.teal
+      ? theme.colors.teal
       : $tone === "warning"
-        ? mobileTheme.colors.amber
-        : mobileTheme.colors.muted,
+        ? theme.colors.amber
+        : theme.colors.muted,
   fontSize: 11,
   fontWeight: "600",
 }))
 
 const SettingGroup = styled.View({ gap: mobileTheme.spacing[2] })
 
-const SettingGroupLabel = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const SettingGroupLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   fontWeight: "700",
-})
+}))
 
 const SelectionButton = styled.Pressable<{ $selected: boolean }>(
-  ({ $selected }) => ({
+  ({ theme, $selected }) => ({
     minHeight: 60,
     flexDirection: "row",
     alignItems: "center",
     gap: mobileTheme.spacing[3],
     borderWidth: 1,
-    borderColor: $selected
-      ? mobileTheme.colors.teal
-      : mobileTheme.colors.border,
+    borderColor: $selected ? theme.colors.teal : theme.colors.border,
     borderRadius: mobileTheme.radii.md,
     backgroundColor: $selected
-      ? mobileTheme.colors.tealSoft
-      : mobileTheme.colors.panelSubtle,
+      ? theme.colors.tealSoft
+      : theme.colors.panelSubtle,
     padding: mobileTheme.spacing[3],
   }),
 )
 
-const SelectionMark = styled.View<{ $selected: boolean }>(({ $selected }) => ({
-  width: 24,
-  height: 24,
-  borderWidth: 2,
-  borderColor: $selected
-    ? mobileTheme.colors.teal
-    : mobileTheme.colors.borderStrong,
-  borderRadius: mobileTheme.radii.sm,
-  backgroundColor: $selected
-    ? mobileTheme.colors.teal
-    : mobileTheme.colors.panel,
-  alignItems: "center",
-  justifyContent: "center",
-}))
+const SelectionMark = styled.View<{ $selected: boolean }>(
+  ({ theme, $selected }) => ({
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: $selected ? theme.colors.teal : theme.colors.borderStrong,
+    borderRadius: mobileTheme.radii.sm,
+    backgroundColor: $selected ? theme.colors.teal : theme.colors.panel,
+    alignItems: "center",
+    justifyContent: "center",
+  }),
+)
 
 const SelectionCopy = styled.View({ flex: 1, gap: 2 })
-const SelectionTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const SelectionTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 14,
   fontWeight: "600",
-})
-const SelectionDescription = styled(AppText)({
-  color: mobileTheme.colors.muted,
+}))
+const SelectionDescription = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 10,
-})
+}))
 
 const LedgerOptions = styled.View({
   flexDirection: "row",
@@ -633,23 +678,19 @@ const LedgerOptions = styled.View({
   gap: mobileTheme.spacing[2],
 })
 const LedgerButton = styled.Pressable<{ $selected: boolean }>(
-  ({ $selected }) => ({
+  ({ theme, $selected }) => ({
     minHeight: mobileTheme.controls.touch,
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: $selected
-      ? mobileTheme.colors.teal
-      : mobileTheme.colors.border,
+    borderColor: $selected ? theme.colors.teal : theme.colors.border,
     borderRadius: mobileTheme.radii.sm,
-    backgroundColor: $selected
-      ? mobileTheme.colors.tealSoft
-      : mobileTheme.colors.panel,
+    backgroundColor: $selected ? theme.colors.tealSoft : theme.colors.panel,
     paddingHorizontal: mobileTheme.spacing[3],
   }),
 )
 const LedgerLabel = styled(AppText)<{ $selected: boolean }>(
-  ({ $selected }) => ({
-    color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+  ({ theme, $selected }) => ({
+    color: $selected ? theme.colors.teal : theme.colors.ink,
     fontSize: 12,
     fontWeight: "600",
   }),
@@ -663,36 +704,36 @@ const PermissionRow = styled.View({
   gap: mobileTheme.spacing[3],
 })
 const PermissionCopy = styled.View({ minWidth: 0, flex: 1, gap: 2 })
-const InlineButton = styled.Pressable({
+const InlineButton = styled.Pressable(({ theme }) => ({
   minHeight: mobileTheme.controls.touch,
   justifyContent: "center",
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.tealSoft,
+  backgroundColor: theme.colors.tealSoft,
   paddingHorizontal: mobileTheme.spacing[3],
-})
-const InlineButtonLabel = styled(AppText)({
-  color: mobileTheme.colors.teal,
+}))
+const InlineButtonLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 11,
   fontWeight: "600",
-})
-const ErrorText = styled(AppText)({
+}))
+const ErrorText = styled(AppText)(({ theme }) => ({
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.coralSoft,
-  color: mobileTheme.colors.coral,
+  backgroundColor: theme.colors.coralSoft,
+  color: theme.colors.coral,
   fontSize: 11,
   lineHeight: 18,
   padding: mobileTheme.spacing[3],
-})
+}))
 const TextAction = styled.Pressable({
   minHeight: mobileTheme.controls.touch,
   alignItems: "center",
   justifyContent: "center",
 })
-const TextActionLabel = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const TextActionLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   textDecorationLine: "underline",
-})
+}))
 
 const SettingRow = styled.View({
   minHeight: 32,
@@ -703,14 +744,14 @@ const SettingRow = styled.View({
 })
 
 const SettingLabel = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 13px;
   line-height: 20px;
 `
 
 const SettingValue = styled(AppText)`
   flex-shrink: 1;
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 13px;
   font-weight: 600;
   line-height: 20px;
@@ -718,7 +759,7 @@ const SettingValue = styled(AppText)`
 `
 
 const Description = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 13px;
   line-height: 20px;
 `
@@ -729,13 +770,13 @@ const SecurityRow = styled.View({
   gap: mobileTheme.spacing[3],
 })
 
-const SecurityMark = styled.View({
+const SecurityMark = styled.View(({ theme }) => ({
   width: 8,
   height: 8,
   marginTop: 5,
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.teal,
-})
+  backgroundColor: theme.colors.teal,
+}))
 
 const SecurityCopy = styled.View({
   minWidth: 0,
@@ -744,15 +785,15 @@ const SecurityCopy = styled.View({
 })
 
 const SecurityTitle = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 13px;
   font-weight: 700;
 `
 
-const Divider = styled.View({
+const Divider = styled.View(({ theme }) => ({
   height: 1,
-  backgroundColor: mobileTheme.colors.border,
-})
+  backgroundColor: theme.colors.border,
+}))
 
 const LogoutArea = styled.View({
   gap: mobileTheme.spacing[3],
@@ -760,7 +801,7 @@ const LogoutArea = styled.View({
 })
 
 const VersionText = styled(AppText)`
-  color: ${mobileTheme.colors.subtle};
+  color: ${({ theme }) => theme.colors.subtle};
   font-size: 10px;
   text-align: center;
 `

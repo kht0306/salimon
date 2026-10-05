@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { formatKrw } from "@salimon/domain"
 import { router } from "expo-router"
@@ -28,6 +29,7 @@ import {
 const safeAreaEdges = ["top"] as const
 
 export const SettlementScreen = observer(function SettlementScreen() {
+  const theme = useTheme()
   const store = useMobileAppStore()
   const persistedMonthNote = store.selectedMonthNote?.note ?? ""
   const [monthNote, setMonthNote] = useState(persistedMonthNote)
@@ -166,9 +168,9 @@ export const SettlementScreen = observer(function SettlementScreen() {
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
-            colors={[mobileTheme.colors.teal]}
+            colors={[theme.colors.teal]}
             refreshing={isRefreshing}
-            tintColor={mobileTheme.colors.teal}
+            tintColor={theme.colors.teal}
             onRefresh={() => void store.refreshSelectedMonth()}
           />
         }
@@ -335,10 +337,12 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: mobileTheme.spacing[6] },
 })
 
-const Page = styled(SafeAreaView)({
-  flex: 1,
-  backgroundColor: mobileTheme.colors.canvas,
-})
+const Page = styled(SafeAreaView)(
+  ({ theme }: { theme: typeof mobileTheme }) => ({
+    flex: 1,
+    backgroundColor: theme.colors.canvas,
+  }),
+)
 
 const Content = styled.View({
   width: "100%",
@@ -357,115 +361,115 @@ const HeadingRow = styled.View({
 
 const HeadingCopy = styled.View({ minWidth: 0, flex: 1, gap: 4 })
 
-const Eyebrow = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const Eyebrow = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
-const Title = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const Title = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   ...mobileTheme.typography.title,
-})
+}))
 
-const Subtitle = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const Subtitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 12,
   lineHeight: 18,
-})
+}))
 
-const RoleStatus = styled.View<{ $viewer: boolean }>(({ $viewer }) => ({
+const RoleStatus = styled.View<{ $viewer: boolean }>(({ theme, $viewer }) => ({
   alignItems: "flex-end",
   gap: 2,
   borderLeftWidth: 3,
-  borderLeftColor: $viewer ? mobileTheme.colors.amber : mobileTheme.colors.teal,
+  borderLeftColor: $viewer ? theme.colors.amber : theme.colors.teal,
   paddingLeft: mobileTheme.spacing[2],
 }))
 
 const RoleStatusLabel = styled(AppText)<{ $viewer: boolean }>(
-  ({ $viewer }) => ({
-    color: $viewer ? mobileTheme.colors.amber : mobileTheme.colors.teal,
+  ({ theme, $viewer }) => ({
+    color: $viewer ? theme.colors.amber : theme.colors.teal,
     fontSize: 11,
     fontWeight: "600",
   }),
 )
 
-const RoleStatusHint = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const RoleStatusHint = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 9,
   fontWeight: "600",
-})
-
-const StaleNotice = styled(AppText)({
-  borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.amber,
-  backgroundColor: mobileTheme.colors.amberSoft,
-  color: mobileTheme.colors.muted,
-  fontSize: 11,
-  lineHeight: 17,
-  paddingVertical: mobileTheme.spacing[3],
-  paddingHorizontal: mobileTheme.spacing[4],
-})
-
-const FeedbackNotice = styled(AppText)<{ $error: boolean }>(({ $error }) => ({
-  borderLeftWidth: 3,
-  borderLeftColor: $error ? mobileTheme.colors.coral : mobileTheme.colors.teal,
-  backgroundColor: $error
-    ? mobileTheme.colors.coralSoft
-    : mobileTheme.colors.tealSoft,
-  color: $error ? mobileTheme.colors.coral : mobileTheme.colors.teal,
-  padding: mobileTheme.spacing[3],
-  fontSize: 11,
-  lineHeight: 17,
 }))
 
-const RuleNotice = styled.View({
-  gap: mobileTheme.spacing[1],
+const StaleNotice = styled(AppText)(({ theme }) => ({
   borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.teal,
-  backgroundColor: mobileTheme.colors.tealSoft,
+  borderLeftColor: theme.colors.amber,
+  backgroundColor: theme.colors.amberSoft,
+  color: theme.colors.muted,
+  fontSize: 11,
+  lineHeight: 17,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[4],
-})
+}))
 
-const RuleTitle = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const FeedbackNotice = styled(AppText)<{ $error: boolean }>(
+  ({ theme, $error }) => ({
+    borderLeftWidth: 3,
+    borderLeftColor: $error ? theme.colors.coral : theme.colors.teal,
+    backgroundColor: $error ? theme.colors.coralSoft : theme.colors.tealSoft,
+    color: $error ? theme.colors.coral : theme.colors.teal,
+    padding: mobileTheme.spacing[3],
+    fontSize: 11,
+    lineHeight: 17,
+  }),
+)
+
+const RuleNotice = styled.View(({ theme }) => ({
+  gap: mobileTheme.spacing[1],
+  borderLeftWidth: 3,
+  borderLeftColor: theme.colors.teal,
+  backgroundColor: theme.colors.tealSoft,
+  paddingVertical: mobileTheme.spacing[3],
+  paddingHorizontal: mobileTheme.spacing[4],
+}))
+
+const RuleTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
-const RuleDescription = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const RuleDescription = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 10,
   lineHeight: 16,
-})
+}))
 
-const PrimaryCard = styled.View({
+const PrimaryCard = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[3],
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
-  backgroundColor: mobileTheme.colors.panel,
+  borderBottomColor: theme.colors.border,
+  backgroundColor: theme.colors.panel,
   paddingTop: mobileTheme.spacing[1],
   paddingBottom: mobileTheme.spacing[5],
-})
+}))
 
-const PrimaryLabel = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const PrimaryLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
-const PrimaryAmount = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const PrimaryAmount = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   ...mobileTheme.typography.display,
   letterSpacing: -0.8,
   lineHeight: 40,
-})
+}))
 
-const PrimaryDivider = styled.View({
+const PrimaryDivider = styled.View(({ theme }) => ({
   height: 1,
-  backgroundColor: mobileTheme.colors.border,
-})
+  backgroundColor: theme.colors.border,
+}))
 
 const PrimaryMetrics = styled.View({
   flexDirection: "row",
@@ -474,16 +478,16 @@ const PrimaryMetrics = styled.View({
 
 const PrimaryMetric = styled.View({ minWidth: 0, flex: 1, gap: 4 })
 
-const PrimaryMetricLabel = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const PrimaryMetricLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 10,
   fontWeight: "700",
-})
+}))
 
 const PrimaryMetricValue = styled(AppText)<{
   $tone: "income" | "saving"
-}>(({ $tone }) => ({
-  color: $tone === "income" ? mobileTheme.colors.green : mobileTheme.colors.ink,
+}>(({ theme, $tone }) => ({
+  color: $tone === "income" ? theme.colors.green : theme.colors.ink,
   fontSize: 15,
   fontWeight: "600",
   lineHeight: 21,
@@ -494,35 +498,35 @@ const MetricGrid = styled.View({
   gap: mobileTheme.spacing[2],
 })
 
-const MetricCard = styled.View({
+const MetricCard = styled.View(({ theme }) => ({
   minWidth: 0,
   flex: 1,
   gap: 4,
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[3],
-})
+}))
 
-const MetricLabel = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const MetricLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 9,
   fontWeight: "700",
-})
+}))
 
-const MetricValue = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const MetricValue = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 13,
   fontWeight: "600",
   lineHeight: 19,
-})
+}))
 
-const MetricHint = styled(AppText)({
-  color: mobileTheme.colors.subtle,
+const MetricHint = styled(AppText)(({ theme }) => ({
+  color: theme.colors.subtle,
   fontSize: 8,
   lineHeight: 12,
-})
+}))
 
 const StateContent = styled.View({
   width: "100%",
@@ -534,9 +538,9 @@ const StateContent = styled.View({
   padding: mobileTheme.spacing[4],
 })
 
-const StateMessage = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const StateMessage = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 14,
   lineHeight: 21,
   textAlign: "center",
-})
+}))

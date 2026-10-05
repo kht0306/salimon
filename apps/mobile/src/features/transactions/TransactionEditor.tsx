@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { createTransactionRequestId } from "@salimon/api-client"
 import {
@@ -40,6 +41,7 @@ import {
   createCopiedMobileTransactionDraft,
   createEditingMobileTransactionDraft,
   createNewMobileTransactionDraft,
+  formatAmountInput,
   normalizeAmountInput,
   validateMobileTransactionDraft,
   type MobileGeneralTransactionInput,
@@ -204,6 +206,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
   sourceSplits,
   transaction,
 }: TransactionEditorFormProps) {
+  const theme = useTheme()
   const store = useMobileAppStore()
   const [draft, setDraft] = useState<MobileTransactionDraft>(() =>
     transaction
@@ -691,7 +694,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                       keyboardType="number-pad"
                       maxLength={3}
                       placeholder="2"
-                      placeholderTextColor={mobileTheme.colors.subtle}
+                      placeholderTextColor={theme.colors.subtle}
                       value={draft.installmentMonths}
                       onChangeText={(installmentMonths) =>
                         updateDraft({
@@ -784,8 +787,8 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                   accessibilityLabel="거래 금액"
                   keyboardType="number-pad"
                   placeholder="0"
-                  placeholderTextColor={mobileTheme.colors.subtle}
-                  value={draft.amount}
+                  placeholderTextColor={theme.colors.subtle}
+                  value={formatAmountInput(draft.amount)}
                   onChangeText={(value) =>
                     updateDraft({
                       ...draft,
@@ -805,7 +808,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                     maxLength={10}
                     editable={!transaction?.recurringType}
                     placeholder="YYYY-MM-DD"
-                    placeholderTextColor={mobileTheme.colors.subtle}
+                    placeholderTextColor={theme.colors.subtle}
                     value={draft.date}
                     onChangeText={(date) => updateDraft({ ...draft, date })}
                   />
@@ -819,7 +822,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                     maxLength={5}
                     editable={!transaction?.recurringType}
                     placeholder="HH:mm"
-                    placeholderTextColor={mobileTheme.colors.subtle}
+                    placeholderTextColor={theme.colors.subtle}
                     value={draft.time}
                     onChangeText={(time) => updateDraft({ ...draft, time })}
                   />
@@ -891,8 +894,8 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                             accessibilityLabel={`분할 항목 ${index + 1} 금액`}
                             keyboardType="number-pad"
                             placeholder="0"
-                            placeholderTextColor={mobileTheme.colors.subtle}
-                            value={split.amount}
+                            placeholderTextColor={theme.colors.subtle}
+                            value={formatAmountInput(split.amount)}
                             onChangeText={(value) =>
                               updateSplit(index, {
                                 ...split,
@@ -961,7 +964,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                 <Input
                   accessibilityLabel="가맹점"
                   placeholder="예: 동네마트"
-                  placeholderTextColor={mobileTheme.colors.subtle}
+                  placeholderTextColor={theme.colors.subtle}
                   value={draft.merchantName}
                   onChangeText={(merchantName) =>
                     updateDraft({ ...draft, merchantName })
@@ -974,7 +977,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                   accessibilityLabel="거래 메모"
                   multiline
                   placeholder="기억할 내용을 입력해 주세요."
-                  placeholderTextColor={mobileTheme.colors.subtle}
+                  placeholderTextColor={theme.colors.subtle}
                   textAlignVertical="top"
                   value={draft.memo}
                   onChangeText={(memo) => updateDraft({ ...draft, memo })}
@@ -986,7 +989,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                   accessibilityLabel="거래 태그"
                   autoCapitalize="none"
                   placeholder="여행, 가족 · 쉼표로 구분"
-                  placeholderTextColor={mobileTheme.colors.subtle}
+                  placeholderTextColor={theme.colors.subtle}
                   value={draft.tagsInput}
                   onChangeText={(tagsInput) =>
                     updateDraft({ ...draft, tagsInput })
@@ -1169,10 +1172,12 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: mobileTheme.spacing[8] },
 })
 
-const Page = styled(SafeAreaView)({
-  flex: 1,
-  backgroundColor: mobileTheme.colors.canvas,
-})
+const Page = styled(SafeAreaView)(
+  ({ theme }: { theme: typeof mobileTheme }) => ({
+    flex: 1,
+    backgroundColor: theme.colors.canvas,
+  }),
+)
 
 const Content = styled.View({
   width: "100%",
@@ -1195,65 +1200,65 @@ const BackButton = styled.Pressable({
   justifyContent: "center",
 })
 
-const BackLabel = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const BackLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 13,
   fontWeight: "600",
-})
+}))
 
-const ScreenLabel = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const ScreenLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 15,
   fontWeight: "600",
-})
+}))
 
 const TopBarSpacer = styled.View({ width: 56 })
 
 const Intro = styled.View({ gap: mobileTheme.spacing[1] })
 
-const IntroEyebrow = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const IntroEyebrow = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
-const IntroTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const IntroTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   ...mobileTheme.typography.title,
-})
+}))
 
-const IntroDescription = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const IntroDescription = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 12,
   lineHeight: 18,
-})
+}))
 
-const ErrorNotice = styled(AppText)({
+const ErrorNotice = styled(AppText)(({ theme }) => ({
   borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.coral,
-  backgroundColor: mobileTheme.colors.coralSoft,
-  color: mobileTheme.colors.coral,
+  borderLeftColor: theme.colors.coral,
+  backgroundColor: theme.colors.coralSoft,
+  color: theme.colors.coral,
   fontSize: 12,
   fontWeight: "700",
   lineHeight: 18,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[4],
-})
+}))
 
-const Section = styled.View({
+const Section = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[3],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[4],
-})
+}))
 
-const SectionTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const SectionTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 14,
   fontWeight: "600",
-})
+}))
 
 const SegmentedRow = styled.View({
   flexDirection: "row",
@@ -1261,81 +1266,77 @@ const SegmentedRow = styled.View({
 })
 
 const SegmentButton = styled.Pressable<{ $selected: boolean }>(
-  ({ $selected }) => ({
+  ({ theme, $selected }) => ({
     minHeight: 44,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: $selected
-      ? mobileTheme.colors.teal
-      : mobileTheme.colors.border,
+    borderColor: $selected ? theme.colors.teal : theme.colors.border,
     borderRadius: mobileTheme.radii.sm,
-    backgroundColor: $selected
-      ? mobileTheme.colors.tealSoft
-      : mobileTheme.colors.panel,
+    backgroundColor: $selected ? theme.colors.tealSoft : theme.colors.panel,
     paddingHorizontal: mobileTheme.spacing[2],
   }),
 )
 
 const SegmentLabel = styled(AppText)<{ $selected: boolean }>(
-  ({ $selected }) => ({
-    color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.muted,
+  ({ theme, $selected }) => ({
+    color: $selected ? theme.colors.teal : theme.colors.muted,
     fontSize: 12,
     fontWeight: "600",
   }),
 )
 
-const InlineNotice = styled(AppText)({
+const InlineNotice = styled(AppText)(({ theme }) => ({
   borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.teal,
-  backgroundColor: mobileTheme.colors.tealSoft,
-  color: mobileTheme.colors.muted,
+  borderLeftColor: theme.colors.teal,
+  backgroundColor: theme.colors.tealSoft,
+  color: theme.colors.muted,
   fontSize: 10,
   lineHeight: 16,
   paddingVertical: mobileTheme.spacing[2],
   paddingHorizontal: mobileTheme.spacing[3],
-})
+}))
 
-const ScopeRow = styled.View({
+const ScopeRow = styled.View(({ theme }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: mobileTheme.spacing[3],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.panelSubtle,
+  backgroundColor: theme.colors.panelSubtle,
   padding: mobileTheme.spacing[3],
-})
+}))
 
 const ScopeText = styled.View({ minWidth: 0, flex: 1, gap: 4 })
 
-const ScopeTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const ScopeTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
 const Field = styled.View({ gap: mobileTheme.spacing[2] })
 
-const FieldLabel = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const FieldLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
-const Input = styled.TextInput({
+const Input = styled.TextInput(({ theme }) => ({
   minHeight: 46,
   borderWidth: 1,
-  borderColor: mobileTheme.colors.borderStrong,
+  borderColor: theme.colors.borderStrong,
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.panel,
-  color: mobileTheme.colors.ink,
+  backgroundColor: theme.colors.panel,
+  color: theme.colors.ink,
   fontFamily: "Pretendard",
   fontSize: 13,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[3],
-})
+}))
 
 const AmountInput = styled(Input)({
   minHeight: 56,
@@ -1344,12 +1345,12 @@ const AmountInput = styled(Input)({
   textAlign: "right",
 })
 
-const AmountPreview = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const AmountPreview = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 11,
   fontWeight: "600",
   textAlign: "right",
-})
+}))
 
 const DateTimeRow = styled.View({
   flexDirection: "row",
@@ -1358,63 +1359,63 @@ const DateTimeRow = styled.View({
 
 const DateTimeField = styled.View({ minWidth: 0, flex: 1, gap: 8 })
 
-const QuickDateButton = styled.Pressable({
+const QuickDateButton = styled.Pressable(({ theme }) => ({
   minHeight: mobileTheme.controls.touch,
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.panelSubtle,
-})
+  backgroundColor: theme.colors.panelSubtle,
+}))
 
-const QuickDateLabel = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const QuickDateLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
-const SelectionButton = styled.Pressable({
+const SelectionButton = styled.Pressable(({ theme }) => ({
   minHeight: 50,
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
   gap: mobileTheme.spacing[3],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.borderStrong,
+  borderColor: theme.colors.borderStrong,
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[3],
-})
+}))
 
 const SelectionValue = styled(AppText)<{ $placeholder: boolean }>(
-  ({ $placeholder }) => ({
+  ({ theme, $placeholder }) => ({
     minWidth: 0,
     flex: 1,
-    color: $placeholder ? mobileTheme.colors.subtle : mobileTheme.colors.ink,
+    color: $placeholder ? theme.colors.subtle : theme.colors.ink,
     fontSize: 12,
     fontWeight: $placeholder ? "400" : "600",
     lineHeight: 18,
   }),
 )
 
-const SelectionAction = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const SelectionAction = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
 const SplitList = styled.View({ gap: mobileTheme.spacing[3] })
 
-const SplitItem = styled.View({
+const SplitItem = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[3],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.panelSubtle,
+  backgroundColor: theme.colors.panelSubtle,
   padding: mobileTheme.spacing[3],
-})
+}))
 
 const SplitItemHeader = styled.View({
   flexDirection: "row",
@@ -1428,35 +1429,37 @@ const RemoveSplitButton = styled.Pressable({
   paddingHorizontal: mobileTheme.spacing[2],
 })
 
-const RemoveSplitLabel = styled(AppText)({
-  color: mobileTheme.colors.coral,
+const RemoveSplitLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.coral,
   fontSize: 10,
   fontWeight: "600",
-})
-
-const SplitSummary = styled(AppText)<{ $valid: boolean }>(({ $valid }) => ({
-  color: $valid ? mobileTheme.colors.teal : mobileTheme.colors.coral,
-  fontSize: 11,
-  fontWeight: "600",
-  textAlign: "right",
 }))
+
+const SplitSummary = styled(AppText)<{ $valid: boolean }>(
+  ({ theme, $valid }) => ({
+    color: $valid ? theme.colors.teal : theme.colors.coral,
+    fontSize: 11,
+    fontWeight: "600",
+    textAlign: "right",
+  }),
+)
 
 const MemoInput = styled(Input)({ minHeight: 96 })
 
-const FieldHint = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const FieldHint = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 10,
   lineHeight: 16,
-})
+}))
 
 const SubmitArea = styled.View({ gap: mobileTheme.spacing[2] })
 
-const SubmitHint = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const SubmitHint = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 10,
   lineHeight: 16,
   textAlign: "center",
-})
+}))
 
 const StateContent = styled.View({
   width: "100%",
@@ -1468,9 +1471,9 @@ const StateContent = styled.View({
   padding: mobileTheme.spacing[4],
 })
 
-const StateMessage = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const StateMessage = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 14,
   lineHeight: 21,
   textAlign: "center",
-})
+}))

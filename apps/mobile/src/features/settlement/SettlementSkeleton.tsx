@@ -28,10 +28,12 @@ export function SettlementSkeleton() {
   )
 }
 
-const Page = styled(SafeAreaView)({
-  flex: 1,
-  backgroundColor: mobileTheme.colors.canvas,
-})
+const Page = styled(SafeAreaView)(
+  ({ theme }: { theme: typeof mobileTheme }) => ({
+    flex: 1,
+    backgroundColor: theme.colors.canvas,
+  }),
+)
 
 const Content = styled.View({
   width: "100%",
@@ -44,20 +46,22 @@ const Content = styled.View({
 const SkeletonLine = styled.View<{
   $height?: number
   $width: `${number}%`
-}>(({ $height = 12, $width }) => ({
+}>(({ theme, $height = 12, $width }) => ({
   width: $width,
   height: $height,
   borderRadius: mobileTheme.radii.xs,
-  backgroundColor: mobileTheme.colors.border,
+  backgroundColor: theme.colors.border,
 }))
 
-const SkeletonPanel = styled.View<{ $height: number }>(({ $height }) => ({
-  minWidth: 0,
-  flex: 1,
-  height: $height,
-  borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.border,
-}))
+const SkeletonPanel = styled.View<{ $height: number }>(
+  ({ theme, $height }) => ({
+    minWidth: 0,
+    flex: 1,
+    height: $height,
+    borderRadius: mobileTheme.radii.md,
+    backgroundColor: theme.colors.border,
+  }),
+)
 
 const MetricRow = styled.View({
   flexDirection: "row",

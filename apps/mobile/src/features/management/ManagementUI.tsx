@@ -97,13 +97,13 @@ function ManagementState({
   )
 }
 
-export const SectionCard = styled.View({
+export const SectionCard = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[3],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
-  backgroundColor: mobileTheme.colors.panel,
+  borderColor: theme.colors.border,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[4],
-})
+}))
 
 export const SectionHeading = styled.View({
   flexDirection: "row",
@@ -112,36 +112,36 @@ export const SectionHeading = styled.View({
   gap: mobileTheme.spacing[3],
 })
 
-export const SectionTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+export const SectionTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 15,
   fontWeight: "700",
-})
+}))
 
-export const SectionDescription = styled(AppText)({
-  color: mobileTheme.colors.muted,
+export const SectionDescription = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
-})
+}))
 
 export const Field = styled.View({ gap: mobileTheme.spacing[1] })
 
-export const FieldLabel = styled(AppText)({
-  color: mobileTheme.colors.muted,
+export const FieldLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
-export const Input = styled.TextInput({
+export const Input = styled.TextInput(({ theme }) => ({
   minHeight: 44,
   borderWidth: 1,
-  borderColor: mobileTheme.colors.borderStrong,
-  backgroundColor: mobileTheme.colors.panel,
-  color: mobileTheme.colors.ink,
+  borderColor: theme.colors.borderStrong,
+  backgroundColor: theme.colors.panel,
+  color: theme.colors.ink,
   paddingHorizontal: mobileTheme.spacing[3],
   fontFamily: "Pretendard",
   fontSize: 14,
-})
+}))
 
 export const InlineRow = styled.View({
   flexDirection: "row",
@@ -150,89 +150,83 @@ export const InlineRow = styled.View({
 })
 
 export const ChoiceButton = styled.Pressable<{ $selected: boolean }>(
-  ({ $selected }) => ({
+  ({ theme, $selected }) => ({
     minHeight: 38,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: $selected
-      ? mobileTheme.colors.teal
-      : mobileTheme.colors.borderStrong,
-    backgroundColor: $selected
-      ? mobileTheme.colors.tealSoft
-      : mobileTheme.colors.panel,
+    borderColor: $selected ? theme.colors.teal : theme.colors.borderStrong,
+    backgroundColor: $selected ? theme.colors.tealSoft : theme.colors.panel,
     paddingHorizontal: mobileTheme.spacing[3],
   }),
 )
 
 export const ChoiceLabel = styled(AppText)<{ $selected: boolean }>(
-  ({ $selected }) => ({
-    color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.muted,
+  ({ theme, $selected }) => ({
+    color: $selected ? theme.colors.teal : theme.colors.muted,
     fontSize: 12,
     fontWeight: "700",
   }),
 )
 
-export const ItemCard = styled.View({
+export const ItemCard = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[2],
   borderTopWidth: 1,
-  borderTopColor: mobileTheme.colors.border,
+  borderTopColor: theme.colors.border,
   paddingTop: mobileTheme.spacing[3],
-})
+}))
 
-export const ItemTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+export const ItemTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 14,
   fontWeight: "700",
-})
+}))
 
-export const ItemMeta = styled(AppText)({
-  color: mobileTheme.colors.muted,
+export const ItemMeta = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
-})
+}))
 
 export const TextButton = styled.Pressable<{ $danger?: boolean }>(
-  ({ $danger = false, disabled }) => ({
+  ({ theme, $danger = false, disabled }) => ({
     minHeight: 38,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: $danger
-      ? mobileTheme.colors.coral
-      : mobileTheme.colors.borderStrong,
+    borderColor: $danger ? theme.colors.coral : theme.colors.borderStrong,
     opacity: disabled ? 0.45 : 1,
     paddingHorizontal: mobileTheme.spacing[3],
   }),
 )
 
 export const TextButtonLabel = styled(AppText)<{ $danger?: boolean }>(
-  ({ $danger = false }) => ({
-    color: $danger ? mobileTheme.colors.coral : mobileTheme.colors.ink,
+  ({ theme, $danger = false }) => ({
+    color: $danger ? theme.colors.coral : theme.colors.ink,
     fontSize: 12,
     fontWeight: "700",
   }),
 )
 
-export const ErrorText = styled(AppText)({
+export const ErrorText = styled(AppText)(({ theme }) => ({
   borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.coral,
-  backgroundColor: mobileTheme.colors.coralSoft,
-  color: mobileTheme.colors.coral,
+  borderLeftColor: theme.colors.coral,
+  backgroundColor: theme.colors.coralSoft,
+  color: theme.colors.coral,
   padding: mobileTheme.spacing[3],
   fontSize: 11,
   lineHeight: 17,
-})
+}))
 
-export const NoticeText = styled(AppText)({
+export const NoticeText = styled(AppText)(({ theme }) => ({
   borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.teal,
-  backgroundColor: mobileTheme.colors.tealSoft,
-  color: mobileTheme.colors.teal,
+  borderLeftColor: theme.colors.teal,
+  backgroundColor: theme.colors.tealSoft,
+  color: theme.colors.teal,
   padding: mobileTheme.spacing[3],
   fontSize: 11,
   lineHeight: 17,
-})
+}))
 
 const styles = StyleSheet.create({
   content: {
@@ -245,10 +239,12 @@ const styles = StyleSheet.create({
   },
 })
 
-const Page = styled(SafeAreaView)({
-  flex: 1,
-  backgroundColor: mobileTheme.colors.canvas,
-})
+const Page = styled(SafeAreaView)(
+  ({ theme }: { theme: typeof mobileTheme }) => ({
+    flex: 1,
+    backgroundColor: theme.colors.canvas,
+  }),
+)
 
 const StateContent = styled.View({
   width: "100%",
@@ -260,12 +256,12 @@ const StateContent = styled.View({
   padding: mobileTheme.spacing[4],
 })
 
-const StateMessage = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const StateMessage = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 14,
   lineHeight: 21,
   textAlign: "center",
-})
+}))
 
 const TopBar = styled.View({
   flexDirection: "row",
@@ -274,24 +270,24 @@ const TopBar = styled.View({
 })
 
 const BackButton = styled.Pressable({ minHeight: 44, justifyContent: "center" })
-const BackLabel = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const BackLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 13,
   fontWeight: "700",
-})
-const TopTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+}))
+const TopTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 13,
   fontWeight: "700",
-})
+}))
 const TopSpacer = styled.View({ width: 44 })
 const Intro = styled.View({ gap: mobileTheme.spacing[1] })
-const Title = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const Title = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   ...mobileTheme.typography.title,
-})
-const Description = styled(AppText)({
-  color: mobileTheme.colors.muted,
+}))
+const Description = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 12,
   lineHeight: 19,
-})
+}))

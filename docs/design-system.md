@@ -24,7 +24,7 @@ Salimon uses a quiet, high-density B2B dashboard language inspired by mature fin
 ## Mobile application rules
 
 - Pretendard is the Android interface typeface. Display, title, section, body, label, and caption roles come from the shared native typography tokens.
-- The canvas uses a quiet light gray while primary content sits on white panels. Black hero cards, decorative gradients, and competing category colors are not used for hierarchy.
+- The canvas uses a quiet light gray while primary content sits on white panels in light mode. Dark mode uses zinc surfaces with light text. The app follows the device appearance by default; settings can select and persist light or dark mode. Black hero cards, decorative gradients, and competing category colors are not used for hierarchy.
 - Deep teal is the only product accent for primary actions and selection. Green is limited to income or success; amber indicates review; red indicates exceeded budgets, cancellation, deletion, or failure.
 - Lucide icons are used at a consistent 1.8-2.2 stroke width. Text glyphs and hand-drawn view shapes are not used as interface icons.
 - Bottom navigation remains flat. The active destination is communicated by teal icon and label color rather than a filled tile.

@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { router } from "expo-router"
 import { ChevronDown } from "lucide-react-native"
@@ -24,6 +25,7 @@ const safeAreaEdges = ["top"] as const
 const listContentStyle = { paddingBottom: 24 } as const
 
 export const DashboardHome = observer(function DashboardHome() {
+  const theme = useTheme()
   const store = useMobileAppStore()
   const { width } = useWindowDimensions()
 
@@ -78,7 +80,7 @@ export const DashboardHome = observer(function DashboardHome() {
           <GroupHeaderMeta>
             <GroupCount>{item.count}건</GroupCount>
             <ChevronDown
-              color={mobileTheme.colors.muted}
+              color={theme.colors.muted}
               size={16}
               strokeWidth={1.8}
               style={{
@@ -137,9 +139,9 @@ export const DashboardHome = observer(function DashboardHome() {
         ListHeaderComponent={<DashboardHeader isWide={width >= 720} />}
         refreshControl={
           <RefreshControl
-            colors={[mobileTheme.colors.teal]}
+            colors={[theme.colors.teal]}
             refreshing={isRefreshing}
-            tintColor={mobileTheme.colors.teal}
+            tintColor={theme.colors.teal}
             onRefresh={() => void store.refreshSelectedMonth()}
           />
         }
@@ -193,7 +195,8 @@ function DashboardState({
 
 const Page = styled(SafeAreaView)`
   flex: 1;
-  background-color: ${mobileTheme.colors.canvas};
+  background-color: ${({ theme }: { theme: typeof mobileTheme }) =>
+    theme.colors.canvas};
 `
 
 const List = styled(FlatList<DashboardListItem>)`
@@ -203,25 +206,25 @@ const List = styled(FlatList<DashboardListItem>)`
 `
 
 const RecurrenceGroupHeader = styled.Pressable<{ $recurring: boolean }>(
-  ({ $recurring }) => ({
+  ({ theme, $recurring }) => ({
     minHeight: mobileTheme.controls.touch,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: mobileTheme.spacing[2],
     borderBottomWidth: 1,
-    borderBottomColor: mobileTheme.colors.borderStrong,
+    borderBottomColor: theme.colors.borderStrong,
     backgroundColor: $recurring
-      ? mobileTheme.colors.tealSoft
-      : mobileTheme.colors.panelSubtle,
+      ? theme.colors.tealSoft
+      : theme.colors.panelSubtle,
     paddingVertical: mobileTheme.spacing[2],
     paddingHorizontal: mobileTheme.spacing[4],
   }),
 )
 
 const RecurrenceGroupLabel = styled(AppText)<{ $recurring: boolean }>`
-  color: ${({ $recurring }) =>
-    $recurring ? mobileTheme.colors.teal : mobileTheme.colors.ink};
+  color: ${({ theme, $recurring }) =>
+    $recurring ? theme.colors.teal : theme.colors.ink};
   font-size: 12px;
   font-weight: 700;
 `
@@ -233,26 +236,26 @@ const GroupHeaderMeta = styled.View({
 })
 
 const GroupCount = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 10px;
   font-weight: 600;
 `
 
-const MemberGroupHeader = styled.View({
+const MemberGroupHeader = styled.View(({ theme }) => ({
   minHeight: 36,
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
   gap: mobileTheme.spacing[2],
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.borderStrong,
-  backgroundColor: mobileTheme.colors.panel,
+  borderBottomColor: theme.colors.borderStrong,
+  backgroundColor: theme.colors.panel,
   paddingVertical: mobileTheme.spacing[2],
   paddingHorizontal: mobileTheme.spacing[4],
-})
+}))
 
 const MemberGroupLabel = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 11px;
   font-weight: 700;
 `
@@ -268,30 +271,30 @@ const StateContent = styled.View({
 })
 
 const StateText = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 15px;
   line-height: 23px;
   text-align: center;
 `
 
-const EmptyState = styled.View({
+const EmptyState = styled.View(({ theme }) => ({
   marginHorizontal: mobileTheme.spacing[4],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[5],
-})
+}))
 
 const EmptyTitle = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 14px;
   font-weight: 600;
 `
 
 const EmptyDescription = styled(AppText)`
   margin-top: ${mobileTheme.spacing[2]}px;
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 12px;
   line-height: 18px;
 `
@@ -313,9 +316,9 @@ const LoadingTopRow = styled.View({
 const LoadingBlock = styled.View<{
   $height: number
   $width: DimensionValue
-}>(({ $height, $width }) => ({
+}>(({ theme, $height, $width }) => ({
   width: $width,
   height: $height,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.border,
+  backgroundColor: theme.colors.border,
 }))

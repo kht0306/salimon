@@ -11,6 +11,10 @@ import { AppButton } from "../../components/AppButton"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import type { MobileCategoryInput } from "../../stores/mobileAppStore"
 import {
+  formatAmountInput,
+  normalizeAmountInput,
+} from "../transactions/transactionDraft"
+import {
   ChoiceButton,
   ChoiceLabel,
   ErrorText,
@@ -251,8 +255,8 @@ export const CategoryManagementScreen = observer(
                 accessibilityLabel="카테고리 월 예산"
                 keyboardType="number-pad"
                 placeholder="0"
-                value={budget}
-                onChangeText={(value) => setBudget(value.replace(/\D/g, ""))}
+                value={formatAmountInput(budget)}
+                onChangeText={(value) => setBudget(normalizeAmountInput(value))}
               />
             </Field>
           ) : null}

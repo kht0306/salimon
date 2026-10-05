@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from "vitest"
 import { BudgetOverview } from "./BudgetOverview"
 import { DateSummaryStrip } from "./DateSummaryStrip"
 import { TransactionRow } from "./TransactionRow"
+import { mobileTheme } from "../../theme"
+
+vi.mock("@emotion/react", () => ({ useTheme: () => mobileTheme }))
 
 vi.mock("@emotion/native", () => ({
   default: new Proxy(() => () => "div", { get: () => () => "div" }),

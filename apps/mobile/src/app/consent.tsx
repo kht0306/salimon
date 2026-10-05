@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "@salimon/types"
 import { Redirect } from "expo-router"
@@ -15,6 +16,7 @@ const safeAreaEdges = ["top", "bottom"] as const
 const scrollContentStyle = { flexGrow: 1 } as const
 
 export default observer(function LegalConsentScreen() {
+  const theme = useTheme()
   const store = useMobileAppStore()
   const [termsChecked, setTermsChecked] = useState(false)
   const [privacyChecked, setPrivacyChecked] = useState(false)
@@ -62,7 +64,7 @@ export default observer(function LegalConsentScreen() {
             >
               <Checkbox $checked={termsChecked}>
                 {termsChecked ? (
-                  <Check color={mobileTheme.colors.panel} size={15} />
+                  <Check color={theme.colors.onAccent} size={15} />
                 ) : null}
               </Checkbox>
               <ConsentCopy>
@@ -88,7 +90,7 @@ export default observer(function LegalConsentScreen() {
             >
               <Checkbox $checked={privacyChecked}>
                 {privacyChecked ? (
-                  <Check color={mobileTheme.colors.panel} size={15} />
+                  <Check color={theme.colors.onAccent} size={15} />
                 ) : null}
               </Checkbox>
               <ConsentCopy>
@@ -137,7 +139,8 @@ export default observer(function LegalConsentScreen() {
 
 const Page = styled(SafeAreaView)`
   flex: 1;
-  background-color: ${mobileTheme.colors.canvas};
+  background-color: ${({ theme }: { theme: typeof mobileTheme }) =>
+    theme.colors.canvas};
 `
 
 const PageScroll = styled.ScrollView`
@@ -156,13 +159,13 @@ const Content = styled.View({
 })
 
 const Eyebrow = styled(AppText)`
-  color: ${mobileTheme.colors.teal};
+  color: ${({ theme }) => theme.colors.teal};
   font-size: 12px;
   font-weight: 700;
 `
 
 const Title = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: ${mobileTheme.typography.title.fontSize}px;
   font-weight: ${mobileTheme.typography.title.fontWeight};
   line-height: ${mobileTheme.typography.title.lineHeight}px;
@@ -170,20 +173,20 @@ const Title = styled(AppText)`
 
 const Description = styled(AppText)`
   margin-bottom: ${mobileTheme.spacing[2]}px;
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: ${mobileTheme.typography.body.fontSize}px;
   font-weight: ${mobileTheme.typography.body.fontWeight};
   line-height: ${mobileTheme.typography.body.lineHeight}px;
 `
 
-const ConsentCard = styled.View({
+const ConsentCard = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[2],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[4],
-})
+}))
 
 const ConsentOption = styled.Pressable({
   minHeight: 44,
@@ -192,19 +195,15 @@ const ConsentOption = styled.Pressable({
   gap: mobileTheme.spacing[3],
 })
 
-const Checkbox = styled.View<{ $checked: boolean }>(({ $checked }) => ({
+const Checkbox = styled.View<{ $checked: boolean }>(({ theme, $checked }) => ({
   width: 22,
   height: 22,
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 1,
-  borderColor: $checked
-    ? mobileTheme.colors.teal
-    : mobileTheme.colors.borderStrong,
+  borderColor: $checked ? theme.colors.teal : theme.colors.borderStrong,
   borderRadius: mobileTheme.radii.xs,
-  backgroundColor: $checked
-    ? mobileTheme.colors.teal
-    : mobileTheme.colors.panel,
+  backgroundColor: $checked ? theme.colors.teal : theme.colors.panel,
 }))
 
 const ConsentCopy = styled.View`
@@ -212,7 +211,7 @@ const ConsentCopy = styled.View`
 `
 
 const ConsentTitle = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
@@ -220,33 +219,33 @@ const ConsentTitle = styled(AppText)`
 
 const ConsentDescription = styled(AppText)`
   margin-top: 2px;
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 12px;
   line-height: 18px;
 `
 
 const DocumentLink = styled(AppText)`
   min-height: ${mobileTheme.controls.touch}px;
-  color: ${mobileTheme.colors.teal};
+  color: ${({ theme }) => theme.colors.teal};
   font-size: 12px;
   font-weight: 600;
   line-height: ${mobileTheme.controls.touch}px;
 `
 
 const Notice = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 11px;
   line-height: 17px;
 `
 
-const ErrorText = styled(AppText)({
+const ErrorText = styled(AppText)(({ theme }) => ({
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.coralSoft,
-  color: mobileTheme.colors.coral,
+  backgroundColor: theme.colors.coralSoft,
+  color: theme.colors.coral,
   fontSize: 12,
   lineHeight: 18,
   padding: mobileTheme.spacing[3],
-})
+}))
 
 const Actions = styled.View({
   gap: mobileTheme.spacing[2],

@@ -9,6 +9,8 @@ import {
   changeMobileTransactionType,
   createEditingMobileTransactionDraft,
   createNewMobileTransactionDraft,
+  formatAmountInput,
+  normalizeAmountInput,
   isGeneralMobileTransaction,
   validateMobileTransactionDraft,
 } from "./transactionDraft"
@@ -115,6 +117,26 @@ const paymentMethods: PaymentMethod[] = [
 ]
 
 describe("mobile transaction draft", () => {
+  it.each([
+    ["", "", ""],
+    ["0", "0", "0"],
+    ["999", "999", "999"],
+    ["1000", "1,000", "1000"],
+    ["1234567", "1,234,567", "1234567"],
+    ["1,234,567", "1,234,567", "1234567"],
+    ["0001000", "1,000", "1000"],
+    ["₩ 12,345원", "12,345", "12345"],
+    ["123,45", "12,345", "12345"],
+    ["12,34,567", "1,234,567", "1234567"],
+  ])(
+    "formats amount input %s without changing its numeric value",
+    (input, display, raw) => {
+      expect(formatAmountInput(input)).toBe(display)
+      expect(normalizeAmountInput(display)).toBe(raw)
+      expect(Number(normalizeAmountInput(display))).toBe(Number(raw))
+    },
+  )
+
   it("creates an expense draft with the active defaults", () => {
     const draft = createNewMobileTransactionDraft({
       actorUserId: "user-1",

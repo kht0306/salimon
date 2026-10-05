@@ -449,6 +449,10 @@ export function normalizeAmountInput(value: string): string {
   return value.replace(/\D/g, "").replace(/^0+(?=\d)/, "")
 }
 
+export function formatAmountInput(value: string): string {
+  return normalizeAmountInput(value).replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+}
+
 function preferredCategory(
   categories: Category[],
   type: TransactionType,

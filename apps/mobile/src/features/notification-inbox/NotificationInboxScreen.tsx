@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import type { LocalSmsCandidate } from "@salimon/types"
 import { useFocusEffect, useRouter } from "expo-router"
@@ -29,6 +30,7 @@ const candidateListContentStyle = {
 
 export const NotificationInboxScreen = observer(
   function NotificationInboxScreen() {
+    const theme = useTheme()
     const router = useRouter()
     const store = useMobileAppStore()
     const [selectedCandidate, setSelectedCandidate] =
@@ -132,7 +134,7 @@ export const NotificationInboxScreen = observer(
           refreshControl={
             <RefreshControl
               refreshing={store.notificationInboxStatus === "loading"}
-              tintColor={mobileTheme.colors.teal}
+              tintColor={theme.colors.teal}
               onRefresh={() => void store.refreshNotificationInbox()}
             />
           }
@@ -150,7 +152,7 @@ export const NotificationInboxScreen = observer(
                   onPress={() => router.push("/(tabs)/settings")}
                 >
                   <Settings2
-                    color={mobileTheme.colors.muted}
+                    color={theme.colors.muted}
                     size={19}
                     strokeWidth={1.8}
                   />
@@ -173,9 +175,9 @@ export const NotificationInboxScreen = observer(
                   >
                     <CheckboxVisual $checked={selectedIds.length > 0}>
                       {allSelected ? (
-                        <Check color={mobileTheme.colors.panel} size={16} />
+                        <Check color={theme.colors.onAccent} size={16} />
                       ) : selectedIds.length > 0 ? (
-                        <Minus color={mobileTheme.colors.panel} size={16} />
+                        <Minus color={theme.colors.onAccent} size={16} />
                       ) : null}
                     </CheckboxVisual>
                     <SelectAllLabel>전체 선택</SelectAllLabel>
@@ -263,7 +265,7 @@ export const NotificationInboxScreen = observer(
                   <CandidateCheckboxVisual $checked={selected}>
                     {selected ? (
                       <Check
-                        color={mobileTheme.colors.panel}
+                        color={theme.colors.onAccent}
                         size={16}
                         strokeWidth={2.2}
                       />
@@ -359,7 +361,8 @@ function candidateStatusTone(
 
 const Page = styled(SafeAreaView)`
   flex: 1;
-  background-color: ${mobileTheme.colors.canvas};
+  background-color: ${({ theme }: { theme: typeof mobileTheme }) =>
+    theme.colors.canvas};
 `
 const CandidateList = styled(FlatList<LocalSmsCandidate>)({ flex: 1 })
 const Header = styled.View({ gap: mobileTheme.spacing[3] })
@@ -369,25 +372,25 @@ const HeaderTop = styled.View({
   justifyContent: "space-between",
 })
 const HeaderCopy = styled.View({ gap: mobileTheme.spacing[1] })
-const Eyebrow = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const Eyebrow = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 12,
   fontWeight: "600",
-})
-const Title = styled(AppText)({
-  color: mobileTheme.colors.ink,
+}))
+const Title = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   ...mobileTheme.typography.title,
-})
-const HeaderSettingsButton = styled.Pressable({
+}))
+const HeaderSettingsButton = styled.Pressable(({ theme }) => ({
   width: mobileTheme.controls.touch,
   minHeight: mobileTheme.controls.touch,
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 1,
-  borderColor: mobileTheme.colors.borderStrong,
+  borderColor: theme.colors.borderStrong,
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.panel,
-})
+  backgroundColor: theme.colors.panel,
+}))
 const SelectionToolbar = styled.View({
   minHeight: 48,
   flexDirection: "row",
@@ -401,25 +404,23 @@ const SelectAllButton = styled.Pressable({
   alignItems: "center",
   gap: mobileTheme.spacing[2],
 })
-const CheckboxVisual = styled.View<{ $checked: boolean }>(({ $checked }) => ({
-  width: 24,
-  height: 24,
-  alignItems: "center",
-  justifyContent: "center",
-  borderWidth: 2,
-  borderColor: $checked
-    ? mobileTheme.colors.teal
-    : mobileTheme.colors.borderStrong,
-  borderRadius: mobileTheme.radii.xs,
-  backgroundColor: $checked
-    ? mobileTheme.colors.teal
-    : mobileTheme.colors.panel,
-}))
-const SelectAllLabel = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const CheckboxVisual = styled.View<{ $checked: boolean }>(
+  ({ theme, $checked }) => ({
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: $checked ? theme.colors.teal : theme.colors.borderStrong,
+    borderRadius: mobileTheme.radii.xs,
+    backgroundColor: $checked ? theme.colors.teal : theme.colors.panel,
+  }),
+)
+const SelectAllLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 13,
   fontWeight: "600",
-})
+}))
 const DeleteSelectionButton = styled.Pressable(({ disabled }) => ({
   minHeight: 44,
   justifyContent: "center",
@@ -427,61 +428,61 @@ const DeleteSelectionButton = styled.Pressable(({ disabled }) => ({
   opacity: disabled ? 0.55 : 1,
 }))
 const DeleteSelectionLabel = styled(AppText)<{ $disabled: boolean }>(
-  ({ $disabled }) => ({
-    color: $disabled ? mobileTheme.colors.muted : mobileTheme.colors.coral,
+  ({ theme, $disabled }) => ({
+    color: $disabled ? theme.colors.muted : theme.colors.coral,
     fontSize: 12,
     fontWeight: "600",
   }),
 )
-const PrivacyNotice = styled(AppText)({
+const PrivacyNotice = styled(AppText)(({ theme }) => ({
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.tealSoft,
-  color: mobileTheme.colors.teal,
+  backgroundColor: theme.colors.tealSoft,
+  color: theme.colors.teal,
   fontSize: 12,
   lineHeight: 19,
   padding: mobileTheme.spacing[3],
-})
-const ErrorNotice = styled(AppText)({
+}))
+const ErrorNotice = styled(AppText)(({ theme }) => ({
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.coralSoft,
-  color: mobileTheme.colors.coral,
+  backgroundColor: theme.colors.coralSoft,
+  color: theme.colors.coral,
   fontSize: 12,
   lineHeight: 19,
   padding: mobileTheme.spacing[3],
-})
-const InfoNotice = styled(AppText)({
+}))
+const InfoNotice = styled(AppText)(({ theme }) => ({
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.amberSoft,
-  color: mobileTheme.colors.amber,
+  backgroundColor: theme.colors.amberSoft,
+  color: theme.colors.amber,
   fontSize: 12,
   lineHeight: 19,
   padding: mobileTheme.spacing[3],
-})
+}))
 const LoadingCards = styled.View({ gap: mobileTheme.spacing[3] })
-const SkeletonCard = styled.View({
+const SkeletonCard = styled.View(({ theme }) => ({
   height: 152,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.border,
+  backgroundColor: theme.colors.border,
   opacity: 0.55,
-})
-const EmptyCard = styled.View({
+}))
+const EmptyCard = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[3],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[5],
-})
-const EmptyTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+}))
+const EmptyTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 18,
   fontWeight: "600",
-})
-const EmptyDescription = styled(AppText)({
-  color: mobileTheme.colors.muted,
+}))
+const EmptyDescription = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 13,
   lineHeight: 20,
-})
+}))
 const CandidateRow = styled.View({
   flexDirection: "row",
   alignItems: "flex-start",
@@ -495,31 +496,27 @@ const CandidateCheckbox = styled.Pressable({
   marginTop: mobileTheme.spacing[2],
 })
 const CandidateCheckboxVisual = styled.View<{ $checked: boolean }>(
-  ({ $checked }) => ({
+  ({ theme, $checked }) => ({
     width: 24,
     height: 24,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: $checked
-      ? mobileTheme.colors.teal
-      : mobileTheme.colors.borderStrong,
+    borderColor: $checked ? theme.colors.teal : theme.colors.borderStrong,
     borderRadius: mobileTheme.radii.xs,
-    backgroundColor: $checked
-      ? mobileTheme.colors.teal
-      : mobileTheme.colors.panel,
+    backgroundColor: $checked ? theme.colors.teal : theme.colors.panel,
   }),
 )
-const CandidateCard = styled.View({
+const CandidateCard = styled.View(({ theme }) => ({
   minWidth: 0,
   flex: 1,
   gap: mobileTheme.spacing[2],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[4],
-})
+}))
 const CandidateOpenButton = styled.Pressable({
   gap: mobileTheme.spacing[2],
 })
@@ -529,11 +526,11 @@ const CardTop = styled.View({
   justifyContent: "space-between",
   gap: mobileTheme.spacing[2],
 })
-const SourceLabel = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const SourceLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   fontWeight: "700",
-})
+}))
 const BadgeGroup = styled.View({
   flexDirection: "row",
   alignItems: "center",
@@ -541,79 +538,76 @@ const BadgeGroup = styled.View({
   flexWrap: "wrap",
   gap: mobileTheme.spacing[1],
 })
-const EventBadge = styled.View<{ $cancelled: boolean }>(({ $cancelled }) => ({
-  borderRadius: mobileTheme.radii.round,
-  backgroundColor: $cancelled
-    ? mobileTheme.colors.coralSoft
-    : mobileTheme.colors.panelSubtle,
-  paddingVertical: mobileTheme.spacing[1],
-  paddingHorizontal: mobileTheme.spacing[2],
-}))
+const EventBadge = styled.View<{ $cancelled: boolean }>(
+  ({ theme, $cancelled }) => ({
+    borderRadius: mobileTheme.radii.round,
+    backgroundColor: $cancelled
+      ? theme.colors.coralSoft
+      : theme.colors.panelSubtle,
+    paddingVertical: mobileTheme.spacing[1],
+    paddingHorizontal: mobileTheme.spacing[2],
+  }),
+)
 const EventLabel = styled(AppText)<{ $cancelled: boolean }>(
-  ({ $cancelled }) => ({
-    color: $cancelled ? mobileTheme.colors.coral : mobileTheme.colors.muted,
+  ({ theme, $cancelled }) => ({
+    color: $cancelled ? theme.colors.coral : theme.colors.muted,
     fontSize: 10,
     fontWeight: "600",
   }),
 )
 const StatusBadge = styled.View<{ $tone: CandidateStatusTone }>(
-  ({ $tone }) => ({
+  ({ theme, $tone }) => ({
     borderRadius: mobileTheme.radii.round,
     backgroundColor:
-      $tone === "ready"
-        ? mobileTheme.colors.tealSoft
-        : mobileTheme.colors.amberSoft,
+      $tone === "ready" ? theme.colors.tealSoft : theme.colors.amberSoft,
     paddingVertical: mobileTheme.spacing[1],
     paddingHorizontal: mobileTheme.spacing[2],
   }),
 )
 const StatusLabel = styled(AppText)<{ $tone: CandidateStatusTone }>(
-  ({ $tone }) => ({
-    color:
-      $tone === "ready" ? mobileTheme.colors.teal : mobileTheme.colors.amber,
+  ({ theme, $tone }) => ({
+    color: $tone === "ready" ? theme.colors.teal : theme.colors.amber,
     fontSize: 10,
     fontWeight: "600",
   }),
 )
-const Merchant = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const Merchant = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 16,
   fontWeight: "600",
-})
-const Amount = styled(AppText)({
-  color: mobileTheme.colors.ink,
+}))
+const Amount = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 24,
   fontWeight: "700",
-})
-const ForeignAmountHint = styled(AppText)({
-  color: mobileTheme.colors.teal,
+}))
+const ForeignAmountHint = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 11,
   fontWeight: "600",
-})
-const ReceivedAt = styled(AppText)({
-  color: mobileTheme.colors.muted,
+}))
+const ReceivedAt = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
-})
+}))
 const CandidateAction = styled.Pressable<{ $primary: boolean }>(
-  ({ $primary }) => ({
+  ({ theme, $primary }) => ({
     minHeight: mobileTheme.controls.touch,
     alignItems: "center",
     justifyContent: "center",
     marginTop: mobileTheme.spacing[1],
     borderWidth: 1,
-    borderColor: $primary
-      ? mobileTheme.colors.teal
-      : mobileTheme.colors.borderStrong,
+    borderColor: $primary ? theme.colors.teal : theme.colors.borderStrong,
     borderRadius: mobileTheme.radii.sm,
     backgroundColor: $primary
-      ? mobileTheme.colors.tealSoft
-      : mobileTheme.colors.panelSubtle,
+      ? theme.colors.tealSoft
+      : theme.colors.panelSubtle,
     paddingHorizontal: mobileTheme.spacing[3],
   }),
 )
 const CandidateActionLabel = styled(AppText)<{ $primary: boolean }>(
-  ({ $primary }) => ({
-    color: $primary ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+  ({ theme, $primary }) => ({
+    color: $primary ? theme.colors.teal : theme.colors.ink,
     ...mobileTheme.typography.label,
   }),
 )

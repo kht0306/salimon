@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { formatKoreanTime, formatKrw, getCategoryLabel } from "@salimon/domain"
 import type { Category, LedgerMember, Transaction } from "@salimon/types"
@@ -26,6 +27,7 @@ export function TransactionRow({
   transaction,
   onPress,
 }: TransactionRowProps) {
+  const theme = useTheme()
   const formatAmount = (amount: number): string =>
     amountsVisible ? formatKrw(amount) : "••••••"
   const categoryLabel = getCategoryLabel(
@@ -63,7 +65,7 @@ export function TransactionRow({
         <MetadataRow>
           <CategoryChip
             style={{
-              borderLeftColor: category?.color ?? mobileTheme.colors.subtle,
+              borderLeftColor: category?.color ?? theme.colors.subtle,
             }}
           >
             <CategoryLabel>{categoryLabel}</CategoryLabel>
@@ -92,16 +94,16 @@ export function TransactionRow({
   )
 }
 
-const Row = styled.Pressable({
+const Row = styled.Pressable(({ theme }) => ({
   minHeight: 78,
   flexDirection: "row",
   alignItems: "center",
   gap: mobileTheme.spacing[3],
   marginHorizontal: mobileTheme.spacing[4],
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
+  borderBottomColor: theme.colors.border,
   paddingVertical: mobileTheme.spacing[3],
-})
+}))
 
 const TransactionCopy = styled.View`
   min-width: 0;
@@ -109,7 +111,7 @@ const TransactionCopy = styled.View`
 `
 
 const Title = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
@@ -123,32 +125,32 @@ const MetadataRow = styled.View({
   marginTop: mobileTheme.spacing[1],
 })
 
-const CategoryChip = styled.View({
+const CategoryChip = styled.View(({ theme }) => ({
   borderWidth: 1,
   borderLeftWidth: 3,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   paddingVertical: 3,
   paddingHorizontal: 6,
-})
+}))
 
 const CategoryLabel = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 10px;
   font-weight: 600;
   line-height: 14px;
 `
 
 const Metadata = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 10px;
   line-height: 15px;
 `
 
 const AuditInfo = styled(AppText)`
   margin-top: ${mobileTheme.spacing[1]}px;
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 10px;
   line-height: 15px;
 `
@@ -163,8 +165,8 @@ const BadgeRow = styled.View({
 const StructureBadge = styled(AppText)`
   align-self: flex-start;
   border-radius: ${mobileTheme.radii.round}px;
-  background-color: ${mobileTheme.colors.tealSoft};
-  color: ${mobileTheme.colors.teal};
+  background-color: ${({ theme }) => theme.colors.tealSoft};
+  color: ${({ theme }) => theme.colors.teal};
   padding: 2px ${mobileTheme.spacing[2]}px;
   font-size: 9px;
   font-weight: 700;
@@ -173,8 +175,8 @@ const StructureBadge = styled(AppText)`
 
 const Amount = styled(AppText)<{ $type: Transaction["type"] }>`
   max-width: 40%;
-  color: ${({ $type }) =>
-    $type === "income" ? mobileTheme.colors.green : mobileTheme.colors.ink};
+  color: ${({ theme, $type }) =>
+    $type === "income" ? theme.colors.green : theme.colors.ink};
   font-size: 12px;
   font-weight: 600;
   line-height: 20px;

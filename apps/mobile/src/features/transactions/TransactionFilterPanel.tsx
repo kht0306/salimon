@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { getCategoryLabel } from "@salimon/domain"
 import type { Category, LedgerMember, PaymentMethod } from "@salimon/types"
@@ -66,6 +67,7 @@ export function TransactionFilterPanel({
   onChange,
   onReset,
 }: TransactionFilterPanelProps) {
+  const theme = useTheme()
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
   const categoriesById = useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
@@ -114,7 +116,7 @@ export function TransactionFilterPanel({
                 keyboardType="numbers-and-punctuation"
                 maxLength={10}
                 placeholder="YYYY-MM-DD"
-                placeholderTextColor={mobileTheme.colors.subtle}
+                placeholderTextColor={theme.colors.subtle}
                 value={filters.startDate}
                 onChangeText={(startDate) =>
                   onChange({ ...filters, startDate })
@@ -127,7 +129,7 @@ export function TransactionFilterPanel({
                 keyboardType="numbers-and-punctuation"
                 maxLength={10}
                 placeholder="YYYY-MM-DD"
-                placeholderTextColor={mobileTheme.colors.subtle}
+                placeholderTextColor={theme.colors.subtle}
                 value={filters.endDate}
                 onChangeText={(endDate) => onChange({ ...filters, endDate })}
               />
@@ -309,14 +311,14 @@ function FilterGroup<T extends string>({
 
 const chipContentStyle = { gap: 8, paddingRight: 8 } as const
 
-const Panel = styled.View({
+const Panel = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[4],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[4],
-})
+}))
 
 const PanelHeading = styled.View({
   flexDirection: "row",
@@ -324,11 +326,11 @@ const PanelHeading = styled.View({
   justifyContent: "space-between",
 })
 
-const PanelTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const PanelTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 14,
   fontWeight: "600",
-})
+}))
 
 const ResetButton = styled.Pressable({
   minHeight: mobileTheme.controls.touch,
@@ -336,19 +338,19 @@ const ResetButton = styled.Pressable({
   paddingHorizontal: mobileTheme.spacing[2],
 })
 
-const ResetLabel = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const ResetLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
 const Group = styled.View({ gap: mobileTheme.spacing[2] })
 
-const GroupLabel = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const GroupLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 10,
   fontWeight: "700",
-})
+}))
 
 const DateRangeRow = styled.View({
   flexDirection: "row",
@@ -356,39 +358,37 @@ const DateRangeRow = styled.View({
   gap: mobileTheme.spacing[2],
 })
 
-const DateInput = styled.TextInput({
+const DateInput = styled.TextInput(({ theme }) => ({
   minHeight: 46,
   minWidth: 0,
   flex: 1,
   borderWidth: 1,
-  borderColor: mobileTheme.colors.borderStrong,
+  borderColor: theme.colors.borderStrong,
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.panel,
-  color: mobileTheme.colors.ink,
+  backgroundColor: theme.colors.panel,
+  color: theme.colors.ink,
   fontFamily: "Pretendard",
   fontSize: 12,
   paddingHorizontal: mobileTheme.spacing[3],
-})
+}))
 
-const DateRangeSeparator = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const DateRangeSeparator = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
-})
+}))
 
 const CategorySelector = styled.Pressable<{ $selected: boolean }>(
-  ({ $selected }) => ({
+  ({ theme, $selected }) => ({
     minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
     gap: mobileTheme.spacing[3],
     borderWidth: 1,
-    borderColor: $selected
-      ? mobileTheme.colors.teal
-      : mobileTheme.colors.border,
+    borderColor: $selected ? theme.colors.teal : theme.colors.border,
     borderRadius: mobileTheme.radii.md,
     backgroundColor: $selected
-      ? mobileTheme.colors.tealSoft
-      : mobileTheme.colors.panelSubtle,
+      ? theme.colors.tealSoft
+      : theme.colors.panelSubtle,
     paddingVertical: mobileTheme.spacing[3],
     paddingHorizontal: mobileTheme.spacing[4],
   }),
@@ -397,48 +397,44 @@ const CategorySelector = styled.Pressable<{ $selected: boolean }>(
 const CategorySelectorCopy = styled.View({ minWidth: 0, flex: 1 })
 
 const CategorySelectorLabel = styled(AppText)<{ $selected: boolean }>(
-  ({ $selected }) => ({
-    color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+  ({ theme, $selected }) => ({
+    color: $selected ? theme.colors.teal : theme.colors.ink,
     fontSize: 12,
     fontWeight: "600",
     lineHeight: 18,
   }),
 )
 
-const CategorySelectorHint = styled(AppText)({
+const CategorySelectorHint = styled(AppText)(({ theme }) => ({
   marginTop: mobileTheme.spacing[1],
-  color: mobileTheme.colors.muted,
+  color: theme.colors.muted,
   fontSize: 9,
   lineHeight: 14,
-})
+}))
 
-const CategorySelectorAction = styled(AppText)({
+const CategorySelectorAction = styled(AppText)(({ theme }) => ({
   flexShrink: 0,
-  color: mobileTheme.colors.teal,
+  color: theme.colors.teal,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
 const FilterChip = styled.Pressable<{ $selected: boolean }>(
-  ({ $selected }) => ({
+  ({ theme, $selected }) => ({
     minHeight: mobileTheme.controls.touch,
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: $selected
-      ? mobileTheme.colors.teal
-      : mobileTheme.colors.border,
+    borderColor: $selected ? theme.colors.teal : theme.colors.border,
     borderRadius: mobileTheme.radii.round,
-    backgroundColor: $selected
-      ? mobileTheme.colors.tealSoft
-      : mobileTheme.colors.panel,
+    backgroundColor: $selected ? theme.colors.tealSoft : theme.colors.panel,
     paddingHorizontal: mobileTheme.spacing[3],
   }),
 )
 
 const FilterChipLabel = styled(AppText)<{ $selected: boolean }>(
-  ({ $selected }) => ({
+  ({ theme, $selected }) => ({
     maxWidth: 180,
-    color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+    color: $selected ? theme.colors.teal : theme.colors.ink,
     fontSize: 11,
     fontWeight: "600",
   }),

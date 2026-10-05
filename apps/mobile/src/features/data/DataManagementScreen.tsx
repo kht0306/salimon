@@ -239,17 +239,17 @@ export const DataManagementScreen = observer(function DataManagementScreen() {
   )
 })
 
-const DangerCard = styled.View({
+const DangerCard = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[3],
   borderWidth: 1,
   borderLeftWidth: 3,
-  borderColor: mobileTheme.colors.coral,
-  backgroundColor: mobileTheme.colors.panel,
+  borderColor: theme.colors.coral,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[4],
-})
+}))
 
-const DangerDescription = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const DangerDescription = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
-})
+}))
