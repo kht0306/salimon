@@ -112,31 +112,31 @@ const HeadingRow = styled.View({
 
 const HeadingCopy = styled.View({ flex: 1, gap: mobileTheme.spacing[2] })
 
-const MonthControl = styled.View({
+const MonthControl = styled.View(({ theme }) => ({
   minHeight: 56,
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
   borderTopWidth: 1,
-  borderTopColor: mobileTheme.colors.border,
+  borderTopColor: theme.colors.border,
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
+  borderBottomColor: theme.colors.border,
   paddingHorizontal: mobileTheme.spacing[4],
-})
+}))
 
 const SearchRow = styled.View({
   flexDirection: "row",
   gap: mobileTheme.spacing[2],
 })
 
-const TotalsCard = styled.View({
+const TotalsCard = styled.View(({ theme }) => ({
   flexDirection: "row",
   borderTopWidth: 1,
-  borderTopColor: mobileTheme.colors.border,
+  borderTopColor: theme.colors.border,
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
-  backgroundColor: mobileTheme.colors.panel,
-})
+  borderBottomColor: theme.colors.border,
+  backgroundColor: theme.colors.panel,
+}))
 
 const TotalSkeleton = styled.View({
   flex: 1,
@@ -145,32 +145,32 @@ const TotalSkeleton = styled.View({
   padding: mobileTheme.spacing[3],
 })
 
-const TotalDivider = styled.View({
+const TotalDivider = styled.View(({ theme }) => ({
   width: 1,
-  backgroundColor: mobileTheme.colors.border,
-})
+  backgroundColor: theme.colors.border,
+}))
 
-const DateHeaderSkeleton = styled.View({
+const DateHeaderSkeleton = styled.View(({ theme }) => ({
   minHeight: 48,
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
+  borderBottomColor: theme.colors.border,
   paddingHorizontal: mobileTheme.spacing[4],
-})
+}))
 
-const RowSkeleton = styled.View({
+const RowSkeleton = styled.View(({ theme }) => ({
   minHeight: 72,
   flexDirection: "row",
   alignItems: "center",
   gap: mobileTheme.spacing[3],
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
-  backgroundColor: mobileTheme.colors.panel,
+  borderBottomColor: theme.colors.border,
+  backgroundColor: theme.colors.panel,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[4],
-})
+}))
 
 const RowCopy = styled.View({ flex: 1, gap: mobileTheme.spacing[2] })
 
@@ -179,14 +179,14 @@ const SkeletonBlock = styled.View<{
   $height: number
   $radius?: number
   $width?: number | `${number}%`
-}>(({ $flex, $height, $radius = mobileTheme.radii.xs, $width }) => ({
+}>(({ theme, $flex, $height, $radius = mobileTheme.radii.xs, $width }) => ({
   height: $height,
   flex: $flex ? 1 : undefined,
   width: $width,
   borderRadius: $radius,
-  backgroundColor: mobileTheme.colors.border,
+  backgroundColor: theme.colors.border,
 }))
 
-const SkeletonLight = styled(SkeletonBlock)({
-  backgroundColor: mobileTheme.colors.border,
-})
+const SkeletonLight = styled(SkeletonBlock)(({ theme }) => ({
+  backgroundColor: theme.colors.border,
+}))

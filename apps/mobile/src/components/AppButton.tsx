@@ -33,20 +33,20 @@ export function AppButton({
 
 const Button = styled.Pressable<{
   $tone: NonNullable<AppButtonProps["tone"]>
-}>(({ $tone, disabled }) => ({
+}>(({ theme, $tone, disabled }) => ({
   minHeight: mobileTheme.controls.prominent,
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 1,
   borderColor:
-    $tone === "secondary" ? mobileTheme.colors.borderStrong : "transparent",
+    $tone === "secondary" ? theme.colors.borderStrong : "transparent",
   borderRadius: mobileTheme.radii.md,
   backgroundColor:
     $tone === "kakao"
       ? "#fee500"
       : $tone === "primary"
-        ? mobileTheme.colors.teal
-        : mobileTheme.colors.panel,
+        ? theme.colors.teal
+        : theme.colors.panel,
   paddingVertical: mobileTheme.spacing[2],
   paddingHorizontal: mobileTheme.spacing[4],
   opacity: disabled ? 0.45 : 1,
@@ -55,8 +55,12 @@ const Button = styled.Pressable<{
 const ButtonLabel = styled(AppText)<{
   $tone: NonNullable<AppButtonProps["tone"]>
 }>`
-  color: ${({ $tone }) =>
-    $tone === "primary" ? mobileTheme.colors.panel : mobileTheme.colors.ink};
+  color: ${({ theme, $tone }) =>
+    $tone === "kakao"
+      ? theme.colors.onKakao
+      : $tone === "primary"
+        ? theme.colors.onAccent
+        : theme.colors.ink};
   font-size: 15px;
   font-weight: 600;
 `

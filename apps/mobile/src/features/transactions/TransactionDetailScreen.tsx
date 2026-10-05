@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { formatKrw, getCategoryLabel, toMonthKey } from "@salimon/domain"
 import type { InstallmentDeleteScope, Transaction } from "@salimon/types"
@@ -23,6 +24,7 @@ const scrollContentStyle = { paddingBottom: 32 } as const
 
 export const TransactionDetailScreen = observer(
   function TransactionDetailScreen() {
+    const theme = useTheme()
     const store = useMobileAppStore()
     const { id } = useLocalSearchParams<{ id: string }>()
 
@@ -252,7 +254,7 @@ export const TransactionDetailScreen = observer(
                       <SplitMarker
                         style={{
                           backgroundColor:
-                            category?.color ?? mobileTheme.colors.subtle,
+                            category?.color ?? theme.colors.subtle,
                         }}
                       />
                       <SplitName>
@@ -470,22 +472,30 @@ function formatTransactionDateTime(value: string): string {
   }).format(new Date(value))
 }
 
-function typeSoftColor(type: Transaction["type"]): string {
-  if (type === "income") return mobileTheme.colors.greenSoft
-  if (type === "saving") return mobileTheme.colors.tealSoft
-  return mobileTheme.colors.panel
+function typeSoftColor(
+  type: Transaction["type"],
+  theme: typeof mobileTheme,
+): string {
+  if (type === "income") return theme.colors.greenSoft
+  if (type === "saving") return theme.colors.tealSoft
+  return theme.colors.panel
 }
 
-function typeColor(type: Transaction["type"]): string {
-  if (type === "income") return mobileTheme.colors.green
-  if (type === "saving") return mobileTheme.colors.teal
-  return mobileTheme.colors.border
+function typeColor(
+  type: Transaction["type"],
+  theme: typeof mobileTheme,
+): string {
+  if (type === "income") return theme.colors.green
+  if (type === "saving") return theme.colors.teal
+  return theme.colors.border
 }
 
-const Page = styled(SafeAreaView)({
-  flex: 1,
-  backgroundColor: mobileTheme.colors.canvas,
-})
+const Page = styled(SafeAreaView)(
+  ({ theme }: { theme: typeof mobileTheme }) => ({
+    flex: 1,
+    backgroundColor: theme.colors.canvas,
+  }),
+)
 
 const Content = styled.View({
   width: "100%",
@@ -508,156 +518,158 @@ const BackButton = styled.Pressable({
   justifyContent: "center",
 })
 
-const BackLabel = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const BackLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 13,
   fontWeight: "600",
-})
+}))
 
-const ScreenLabel = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const ScreenLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 15,
   fontWeight: "600",
-})
+}))
 
 const TopBarSpacer = styled.View({ width: 56 })
 
-const AmountCard = styled.View<{ $type: Transaction["type"] }>(({ $type }) => ({
-  gap: mobileTheme.spacing[2],
-  borderWidth: 1,
-  borderColor: typeColor($type),
-  borderRadius: mobileTheme.radii.md,
-  backgroundColor: typeSoftColor($type),
-  padding: mobileTheme.spacing[5],
-}))
+const AmountCard = styled.View<{ $type: Transaction["type"] }>(
+  ({ theme, $type }) => ({
+    gap: mobileTheme.spacing[2],
+    borderWidth: 1,
+    borderColor: typeColor($type, theme),
+    borderRadius: mobileTheme.radii.md,
+    backgroundColor: typeSoftColor($type, theme),
+    padding: mobileTheme.spacing[5],
+  }),
+)
 
 const TypeLabel = styled(AppText)<{ $type: Transaction["type"] }>(
-  ({ $type }) => ({
-    color: typeColor($type),
+  ({ theme, $type }) => ({
+    color: typeColor($type, theme),
     fontSize: 11,
     fontWeight: "600",
   }),
 )
 
-const Amount = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const Amount = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 30,
   fontWeight: "700",
   letterSpacing: -0.8,
   lineHeight: 39,
-})
+}))
 
-const TransactionTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const TransactionTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 16,
   fontWeight: "600",
   lineHeight: 23,
-})
+}))
 
-const TransactionDate = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const TransactionDate = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
-})
+}))
 
-const StructureNotice = styled.View({
+const StructureNotice = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[1],
   borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.teal,
-  backgroundColor: mobileTheme.colors.tealSoft,
+  borderLeftColor: theme.colors.teal,
+  backgroundColor: theme.colors.tealSoft,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[4],
-})
+}))
 
-const StructureTitle = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const StructureTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 12,
   fontWeight: "600",
-})
+}))
 
-const StructureDescription = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const StructureDescription = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
-})
+}))
 
 const ActionRow = styled.View({
   flexDirection: "row",
   gap: mobileTheme.spacing[2],
 })
 
-const EditButton = styled.Pressable(({ disabled }) => ({
+const EditButton = styled.Pressable(({ theme, disabled }) => ({
   minHeight: 46,
   flex: 1,
   alignItems: "center",
   justifyContent: "center",
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.teal,
+  backgroundColor: theme.colors.teal,
   opacity: disabled ? 0.45 : 1,
 }))
 
-const EditButtonLabel = styled(AppText)({
-  color: mobileTheme.colors.panel,
+const EditButtonLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.onAccent,
   fontSize: 13,
   fontWeight: "600",
-})
-
-const CopyButton = styled.Pressable(({ disabled }) => ({
-  minHeight: 46,
-  flex: 1,
-  alignItems: "center",
-  justifyContent: "center",
-  borderWidth: 1,
-  borderColor: mobileTheme.colors.teal,
-  borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.panel,
-  opacity: disabled ? 0.45 : 1,
 }))
 
-const CopyButtonLabel = styled(AppText)({
-  color: mobileTheme.colors.teal,
-  fontSize: 13,
-  fontWeight: "600",
-})
-
-const DeleteButton = styled.Pressable(({ disabled }) => ({
+const CopyButton = styled.Pressable(({ theme, disabled }) => ({
   minHeight: 46,
   flex: 1,
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 1,
-  borderColor: mobileTheme.colors.coral,
+  borderColor: theme.colors.teal,
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   opacity: disabled ? 0.45 : 1,
 }))
 
-const DeleteButtonLabel = styled(AppText)({
-  color: mobileTheme.colors.coral,
+const CopyButtonLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 13,
   fontWeight: "600",
-})
+}))
 
-const MutationError = styled(AppText)({
+const DeleteButton = styled.Pressable(({ theme, disabled }) => ({
+  minHeight: 46,
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 1,
+  borderColor: theme.colors.coral,
+  borderRadius: mobileTheme.radii.sm,
+  backgroundColor: theme.colors.panel,
+  opacity: disabled ? 0.45 : 1,
+}))
+
+const DeleteButtonLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.coral,
+  fontSize: 13,
+  fontWeight: "600",
+}))
+
+const MutationError = styled(AppText)(({ theme }) => ({
   borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.coral,
-  backgroundColor: mobileTheme.colors.coralSoft,
-  color: mobileTheme.colors.coral,
+  borderLeftColor: theme.colors.coral,
+  backgroundColor: theme.colors.coralSoft,
+  color: theme.colors.coral,
   fontSize: 11,
   fontWeight: "700",
   lineHeight: 17,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[4],
-})
+}))
 
-const Section = styled.View({
+const Section = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[3],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[4],
-})
+}))
 
 const SectionHeading = styled.View({
   flexDirection: "row",
@@ -665,17 +677,17 @@ const SectionHeading = styled.View({
   justifyContent: "space-between",
 })
 
-const SectionTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const SectionTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 14,
   fontWeight: "600",
-})
+}))
 
-const SectionCount = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const SectionCount = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 10,
   fontWeight: "600",
-})
+}))
 
 const DetailRowContainer = styled.View({
   minHeight: 30,
@@ -685,29 +697,31 @@ const DetailRowContainer = styled.View({
   gap: mobileTheme.spacing[4],
 })
 
-const DetailLabel = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const DetailLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   lineHeight: 18,
-})
-
-const DetailValue = styled(AppText)<{ $subdued: boolean }>(({ $subdued }) => ({
-  minWidth: 0,
-  flex: 1,
-  color: $subdued ? mobileTheme.colors.subtle : mobileTheme.colors.ink,
-  fontSize: $subdued ? 9 : 11,
-  fontWeight: $subdued ? "400" : "600",
-  lineHeight: 18,
-  textAlign: "right",
 }))
+
+const DetailValue = styled(AppText)<{ $subdued: boolean }>(
+  ({ theme, $subdued }) => ({
+    minWidth: 0,
+    flex: 1,
+    color: $subdued ? theme.colors.subtle : theme.colors.ink,
+    fontSize: $subdued ? 9 : 11,
+    fontWeight: $subdued ? "400" : "600",
+    lineHeight: 18,
+    textAlign: "right",
+  }),
+)
 
 const LongDetailContainer = styled.View({ gap: mobileTheme.spacing[1] })
 
-const LongDetailValue = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const LongDetailValue = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 13,
   lineHeight: 20,
-})
+}))
 
 const SplitRow = styled.View({
   minHeight: 32,
@@ -722,19 +736,19 @@ const SplitMarker = styled.View({
   borderRadius: mobileTheme.radii.round,
 })
 
-const SplitName = styled(AppText)({
+const SplitName = styled(AppText)(({ theme }) => ({
   minWidth: 0,
   flex: 1,
-  color: mobileTheme.colors.ink,
+  color: theme.colors.ink,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
-const SplitAmount = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const SplitAmount = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   fontWeight: "700",
-})
+}))
 
 const TagList = styled.View({
   flexDirection: "row",
@@ -742,15 +756,15 @@ const TagList = styled.View({
   gap: mobileTheme.spacing[2],
 })
 
-const Tag = styled(AppText)({
+const Tag = styled(AppText)(({ theme }) => ({
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.tealSoft,
-  color: mobileTheme.colors.teal,
+  backgroundColor: theme.colors.tealSoft,
+  color: theme.colors.teal,
   fontSize: 10,
   fontWeight: "700",
   paddingVertical: mobileTheme.spacing[1],
   paddingHorizontal: mobileTheme.spacing[2],
-})
+}))
 
 const StateContent = styled.View({
   width: "100%",
@@ -762,24 +776,24 @@ const StateContent = styled.View({
   padding: mobileTheme.spacing[4],
 })
 
-const StateMessage = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const StateMessage = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 14,
   lineHeight: 21,
   textAlign: "center",
-})
+}))
 
-const StateButton = styled.Pressable({
+const StateButton = styled.Pressable(({ theme }) => ({
   minHeight: 48,
   alignItems: "center",
   justifyContent: "center",
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.teal,
+  backgroundColor: theme.colors.teal,
   paddingHorizontal: mobileTheme.spacing[4],
-})
+}))
 
-const StateButtonLabel = styled(AppText)({
-  color: mobileTheme.colors.panel,
+const StateButtonLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.onAccent,
   fontSize: 13,
   fontWeight: "600",
-})
+}))

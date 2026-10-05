@@ -26,7 +26,7 @@ const Row = styled.View`
   align-items: center;
   gap: ${mobileTheme.spacing[3]}px;
   border-bottom-width: 1px;
-  border-bottom-color: ${mobileTheme.colors.border};
+  border-bottom-color: ${({ theme }) => theme.colors.border};
   padding: ${mobileTheme.spacing[3]}px ${mobileTheme.spacing[4]}px;
 `
 
@@ -34,7 +34,7 @@ const StatusDot = styled.View`
   width: 8px;
   height: 8px;
   border-radius: 4px;
-  background-color: ${mobileTheme.colors.green};
+  background-color: ${({ theme }) => theme.colors.green};
 `
 
 const StatusCopy = styled.View`
@@ -43,20 +43,20 @@ const StatusCopy = styled.View`
 `
 
 const StatusLabel = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 14px;
   font-weight: 600;
 `
 
 const StatusDetail = styled(AppText)`
   margin-top: 3px;
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 12px;
   line-height: 17px;
 `
 
 const ReadyLabel = styled(AppText)`
-  color: ${mobileTheme.colors.green};
+  color: ${({ theme }) => theme.colors.green};
   font-size: 11px;
   font-weight: 700;
 `

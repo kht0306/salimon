@@ -110,12 +110,12 @@ export function DateSummaryStrip({
   )
 }
 
-const Section = styled.View({
+const Section = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[3],
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
+  borderBottomColor: theme.colors.border,
   paddingBottom: mobileTheme.spacing[4],
-})
+}))
 
 const SectionHeading = styled.View({
   flexDirection: "row",
@@ -124,42 +124,44 @@ const SectionHeading = styled.View({
   gap: mobileTheme.spacing[3],
 })
 
-const SectionTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const SectionTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   ...mobileTheme.typography.section,
-})
+}))
 
-const SectionHint = styled(AppText)({
+const SectionHint = styled(AppText)(({ theme }) => ({
   flexShrink: 1,
-  color: mobileTheme.colors.muted,
+  color: theme.colors.muted,
   fontSize: 10,
   lineHeight: 15,
   textAlign: "right",
-})
+}))
 
-const CalendarPanel = styled.View({
+const CalendarPanel = styled.View(({ theme }) => ({
   overflow: "hidden",
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
-})
+  backgroundColor: theme.colors.panel,
+}))
 
-const WeekHeader = styled.View({
+const WeekHeader = styled.View(({ theme }) => ({
   flexDirection: "row",
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
-  backgroundColor: mobileTheme.colors.panelSubtle,
-})
-
-const Weekday = styled(AppText)<{ $weekend: boolean }>(({ $weekend }) => ({
-  width: `${100 / 7}%`,
-  color: $weekend ? mobileTheme.colors.subtle : mobileTheme.colors.muted,
-  fontSize: 10,
-  fontWeight: "600",
-  lineHeight: 30,
-  textAlign: "center",
+  borderBottomColor: theme.colors.border,
+  backgroundColor: theme.colors.panelSubtle,
 }))
+
+const Weekday = styled(AppText)<{ $weekend: boolean }>(
+  ({ theme, $weekend }) => ({
+    width: `${100 / 7}%`,
+    color: $weekend ? theme.colors.subtle : theme.colors.muted,
+    fontSize: 10,
+    fontWeight: "600",
+    lineHeight: 30,
+    textAlign: "center",
+  }),
+)
 
 const CalendarGrid = styled.View({ flexDirection: "row", flexWrap: "wrap" })
 
@@ -169,36 +171,34 @@ interface CalendarCellStyleProps {
 }
 
 const BlankCell = styled.View<CalendarCellStyleProps>(
-  ({ $lastColumn, $lastRow }) => ({
+  ({ theme, $lastColumn, $lastRow }) => ({
     width: `${100 / 7}%`,
     minHeight: 54,
     borderRightWidth: $lastColumn ? 0 : 1,
-    borderRightColor: mobileTheme.colors.border,
+    borderRightColor: theme.colors.border,
     borderBottomWidth: $lastRow ? 0 : 1,
-    borderBottomColor: mobileTheme.colors.border,
-    backgroundColor: mobileTheme.colors.panelSubtle,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.panelSubtle,
   }),
 )
 
 const DayButton = styled.Pressable<
   CalendarCellStyleProps & { $selected: boolean }
->(({ $lastColumn, $lastRow, $selected }) => ({
+>(({ theme, $lastColumn, $lastRow, $selected }) => ({
   width: `${100 / 7}%`,
   minHeight: 54,
   gap: mobileTheme.spacing[2],
   borderRightWidth: $lastColumn ? 0 : 1,
-  borderRightColor: mobileTheme.colors.border,
+  borderRightColor: theme.colors.border,
   borderBottomWidth: $lastRow ? 0 : 1,
-  borderBottomColor: mobileTheme.colors.border,
-  backgroundColor: $selected
-    ? mobileTheme.colors.tealSoft
-    : mobileTheme.colors.panel,
+  borderBottomColor: theme.colors.border,
+  backgroundColor: $selected ? theme.colors.tealSoft : theme.colors.panel,
   paddingVertical: mobileTheme.spacing[2],
   paddingHorizontal: mobileTheme.spacing[2],
   ...($selected
     ? {
         borderWidth: 1,
-        borderColor: mobileTheme.colors.teal,
+        borderColor: theme.colors.teal,
       }
     : {}),
 }))
@@ -210,15 +210,17 @@ const DayTop = styled.View({
   gap: 2,
 })
 
-const DayNumber = styled(AppText)<{ $selected: boolean }>(({ $selected }) => ({
-  color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
-  fontSize: 12,
-  fontWeight: "600",
-}))
+const DayNumber = styled(AppText)<{ $selected: boolean }>(
+  ({ theme, $selected }) => ({
+    color: $selected ? theme.colors.teal : theme.colors.ink,
+    fontSize: 12,
+    fontWeight: "600",
+  }),
+)
 
 const TransactionCount = styled(AppText)<{ $selected: boolean }>(
-  ({ $selected }) => ({
-    color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.muted,
+  ({ theme, $selected }) => ({
+    color: $selected ? theme.colors.teal : theme.colors.muted,
     fontSize: 9,
     fontWeight: "700",
   }),
@@ -233,16 +235,16 @@ const AmountDots = styled.View({
 
 const AmountDot = styled.View<{
   $tone: "expense" | "income" | "saving"
-}>(({ $tone }) => ({
+}>(({ theme, $tone }) => ({
   width: 5,
   height: 5,
   borderRadius: mobileTheme.radii.round,
   backgroundColor:
     $tone === "income"
-      ? mobileTheme.colors.green
+      ? theme.colors.green
       : $tone === "saving"
-        ? mobileTheme.colors.teal
-        : mobileTheme.colors.ink,
+        ? theme.colors.teal
+        : theme.colors.ink,
 }))
 
 const SelectedSummary = styled.View({
@@ -252,9 +254,8 @@ const SelectedSummary = styled.View({
 })
 
 const SelectedSummaryItem = styled(AppText)<{ $tone?: "income" }>(
-  ({ $tone }) => ({
-    color:
-      $tone === "income" ? mobileTheme.colors.green : mobileTheme.colors.muted,
+  ({ theme, $tone }) => ({
+    color: $tone === "income" ? theme.colors.green : theme.colors.muted,
     fontSize: 10,
     fontWeight: "600",
   }),

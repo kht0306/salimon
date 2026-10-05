@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { formatKrw, getCategoryLabel } from "@salimon/domain"
 import type { LocalSmsCandidate, PaymentMethod } from "@salimon/types"
@@ -92,6 +93,7 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
   onDefer,
   onExclude,
 }: CandidateEditorProps) {
+  const theme = useTheme()
   const store = useMobileAppStore()
   const [draft, setDraft] = useState<CandidateRegistrationDraft>(() =>
     createCandidateRegistrationDraft(candidate, {
@@ -419,7 +421,7 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
                     accessibilityLabel="후보 거래 금액"
                     keyboardType="number-pad"
                     placeholder={originalCurrencyAmount ? "원화 금액" : "0"}
-                    placeholderTextColor={mobileTheme.colors.subtle}
+                    placeholderTextColor={theme.colors.subtle}
                     value={formatCandidateAmountInput(draft.amount)}
                     editable={!isPending}
                     onChangeText={(value) =>
@@ -440,7 +442,7 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
                       keyboardType="numbers-and-punctuation"
                       maxLength={10}
                       placeholder="YYYY-MM-DD"
-                      placeholderTextColor={mobileTheme.colors.subtle}
+                      placeholderTextColor={theme.colors.subtle}
                       value={draft.date}
                       editable={!isPending}
                       onChangeText={(date) => updateDraft({ ...draft, date })}
@@ -454,7 +456,7 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
                       keyboardType="numbers-and-punctuation"
                       maxLength={5}
                       placeholder="HH:mm"
-                      placeholderTextColor={mobileTheme.colors.subtle}
+                      placeholderTextColor={theme.colors.subtle}
                       value={draft.time}
                       editable={!isPending}
                       onChangeText={(time) => updateDraft({ ...draft, time })}
@@ -510,7 +512,7 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
                   <Input
                     accessibilityLabel="후보 거래 가맹점"
                     placeholder="예: 동네마트"
-                    placeholderTextColor={mobileTheme.colors.subtle}
+                    placeholderTextColor={theme.colors.subtle}
                     value={draft.merchantName}
                     editable={!isPending}
                     onChangeText={(merchantName) =>
@@ -524,7 +526,7 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
                     accessibilityLabel="후보 거래 메모"
                     multiline
                     placeholder="거래에 남길 메모"
-                    placeholderTextColor={mobileTheme.colors.subtle}
+                    placeholderTextColor={theme.colors.subtle}
                     textAlignVertical="top"
                     value={draft.memo}
                     editable={!isPending}
@@ -537,7 +539,7 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
                     accessibilityLabel="후보 거래 태그"
                     autoCapitalize="none"
                     placeholder="쉼표로 구분 · 예: 가족, 생활비"
-                    placeholderTextColor={mobileTheme.colors.subtle}
+                    placeholderTextColor={theme.colors.subtle}
                     value={draft.tagsInput}
                     editable={!isPending}
                     onChangeText={(tagsInput) =>
@@ -652,10 +654,12 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: mobileTheme.spacing[8] },
 })
 
-const Page = styled(SafeAreaView)({
-  flex: 1,
-  backgroundColor: mobileTheme.colors.canvas,
-})
+const Page = styled(SafeAreaView)(
+  ({ theme }: { theme: typeof mobileTheme }) => ({
+    flex: 1,
+    backgroundColor: theme.colors.canvas,
+  }),
+)
 const Content = styled.View({
   width: "100%",
   maxWidth: 720,
@@ -674,16 +678,16 @@ const TopBarButton = styled.Pressable({
   minHeight: mobileTheme.controls.touch,
   justifyContent: "center",
 })
-const TopBarLabel = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const TopBarLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 13,
   fontWeight: "600",
-})
-const ScreenLabel = styled(AppText)({
-  color: mobileTheme.colors.ink,
+}))
+const ScreenLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 15,
   fontWeight: "600",
-})
+}))
 const TopBarSpacer = styled.View({ width: 56 })
 const Intro = styled.View({ gap: mobileTheme.spacing[1] })
 const IntroMeta = styled.View({
@@ -691,97 +695,99 @@ const IntroMeta = styled.View({
   alignItems: "center",
   gap: mobileTheme.spacing[2],
 })
-const Eyebrow = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const Eyebrow = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 11,
   fontWeight: "600",
-})
-const EventBadge = styled.View<{ $cancelled: boolean }>(({ $cancelled }) => ({
-  borderRadius: mobileTheme.radii.round,
-  backgroundColor: $cancelled
-    ? mobileTheme.colors.coralSoft
-    : mobileTheme.colors.panelSubtle,
-  paddingVertical: mobileTheme.spacing[1],
-  paddingHorizontal: mobileTheme.spacing[2],
 }))
+const EventBadge = styled.View<{ $cancelled: boolean }>(
+  ({ theme, $cancelled }) => ({
+    borderRadius: mobileTheme.radii.round,
+    backgroundColor: $cancelled
+      ? theme.colors.coralSoft
+      : theme.colors.panelSubtle,
+    paddingVertical: mobileTheme.spacing[1],
+    paddingHorizontal: mobileTheme.spacing[2],
+  }),
+)
 const EventLabel = styled(AppText)<{ $cancelled: boolean }>(
-  ({ $cancelled }) => ({
-    color: $cancelled ? mobileTheme.colors.coral : mobileTheme.colors.muted,
+  ({ theme, $cancelled }) => ({
+    color: $cancelled ? theme.colors.coral : theme.colors.muted,
     fontSize: 10,
     fontWeight: "600",
   }),
 )
-const IntroTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const IntroTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   ...mobileTheme.typography.title,
-})
-const IntroDescription = styled(AppText)({
-  color: mobileTheme.colors.muted,
+}))
+const IntroDescription = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 12,
   lineHeight: 18,
-})
-const PendingNotice = styled(AppText)({
+}))
+const PendingNotice = styled(AppText)(({ theme }) => ({
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.amberSoft,
-  color: mobileTheme.colors.amber,
+  backgroundColor: theme.colors.amberSoft,
+  color: theme.colors.amber,
   fontSize: 12,
   lineHeight: 19,
   padding: mobileTheme.spacing[3],
-})
-const ForeignAmountNotice = styled.View({
+}))
+const ForeignAmountNotice = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[1],
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.tealSoft,
+  backgroundColor: theme.colors.tealSoft,
   padding: mobileTheme.spacing[3],
-})
-const ForeignAmountTitle = styled(AppText)({
-  color: mobileTheme.colors.teal,
+}))
+const ForeignAmountTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 14,
   fontWeight: "600",
-})
-const ForeignAmountDescription = styled(AppText)({
-  color: mobileTheme.colors.muted,
+}))
+const ForeignAmountDescription = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
-})
-const ErrorNotice = styled(AppText)({
+}))
+const ErrorNotice = styled(AppText)(({ theme }) => ({
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.coralSoft,
-  color: mobileTheme.colors.coral,
+  backgroundColor: theme.colors.coralSoft,
+  color: theme.colors.coral,
   fontSize: 12,
   lineHeight: 19,
   padding: mobileTheme.spacing[3],
-})
-const Section = styled.View({
+}))
+const Section = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[3],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[4],
-})
-const SectionTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+}))
+const SectionTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 16,
   fontWeight: "600",
-})
+}))
 const Field = styled.View({ gap: mobileTheme.spacing[2] })
-const FieldLabel = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const FieldLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   fontWeight: "600",
-})
-const Input = styled.TextInput({
+}))
+const Input = styled.TextInput(({ theme }) => ({
   minHeight: 48,
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panelSubtle,
-  color: mobileTheme.colors.ink,
+  backgroundColor: theme.colors.panelSubtle,
+  color: theme.colors.ink,
   fontFamily: "Pretendard",
   fontSize: 15,
   paddingHorizontal: mobileTheme.spacing[3],
-})
+}))
 const AmountInput = styled(Input)({
   minHeight: 60,
   fontSize: 28,
@@ -792,73 +798,73 @@ const MultilineInput = styled(Input)({
   paddingTop: mobileTheme.spacing[3],
   paddingBottom: mobileTheme.spacing[3],
 })
-const AmountPreview = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const AmountPreview = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 12,
   fontWeight: "600",
-})
+}))
 const DateTimeRow = styled.View({
   flexDirection: "row",
   gap: mobileTheme.spacing[3],
 })
 const DateTimeField = styled.View({ flex: 1, gap: mobileTheme.spacing[2] })
-const SelectionButton = styled.Pressable(({ disabled }) => ({
+const SelectionButton = styled.Pressable(({ theme, disabled }) => ({
   minHeight: 52,
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
   gap: mobileTheme.spacing[3],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panelSubtle,
+  backgroundColor: theme.colors.panelSubtle,
   paddingHorizontal: mobileTheme.spacing[3],
   opacity: disabled ? 0.62 : 1,
 }))
 const SelectionValue = styled(AppText)<{ $placeholder: boolean }>(
-  ({ $placeholder }) => ({
+  ({ theme, $placeholder }) => ({
     minWidth: 0,
     flex: 1,
-    color: $placeholder ? mobileTheme.colors.subtle : mobileTheme.colors.ink,
+    color: $placeholder ? theme.colors.subtle : theme.colors.ink,
     fontSize: 14,
     fontWeight: $placeholder ? "400" : "600",
   }),
 )
-const SelectionAction = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const SelectionAction = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 11,
   fontWeight: "600",
-})
-const MaskedCard = styled.View({
+}))
+const MaskedCard = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[2],
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panelSubtle,
+  backgroundColor: theme.colors.panelSubtle,
   padding: mobileTheme.spacing[4],
-})
-const MaskedText = styled(AppText)({
-  color: mobileTheme.colors.ink,
+}))
+const MaskedText = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 12,
   lineHeight: 19,
-})
+}))
 const Actions = styled.View({ gap: mobileTheme.spacing[2] })
-const DangerButton = styled.Pressable(({ disabled }) => ({
+const DangerButton = styled.Pressable(({ theme, disabled }) => ({
   minHeight: 48,
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 1,
-  borderColor: mobileTheme.colors.coral,
+  borderColor: theme.colors.coral,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   opacity: disabled ? 0.45 : 1,
 }))
-const DangerLabel = styled(AppText)({
-  color: mobileTheme.colors.coral,
+const DangerLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.coral,
   fontSize: 14,
   fontWeight: "600",
-})
-const SubmitHint = styled(AppText)({
-  color: mobileTheme.colors.muted,
+}))
+const SubmitHint = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
   textAlign: "center",
-})
+}))

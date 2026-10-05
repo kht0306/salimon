@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { useMemo, useState } from "react"
 import { FlatList, Modal, StyleSheet } from "react-native"
@@ -34,6 +35,7 @@ export function TransactionOptionPickerModal({
   onClose,
   onSelect,
 }: TransactionOptionPickerModalProps) {
+  const theme = useTheme()
   const [query, setQuery] = useState("")
   const filteredOptions = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR")
@@ -87,7 +89,7 @@ export function TransactionOptionPickerModal({
             accessibilityLabel={`${title} 검색`}
             autoCorrect={false}
             placeholder="이름 검색"
-            placeholderTextColor={mobileTheme.colors.subtle}
+            placeholderTextColor={theme.colors.subtle}
             returnKeyType="search"
             value={query}
             onChangeText={setQuery}
@@ -163,11 +165,11 @@ const styles = StyleSheet.create({
   listContent: { paddingBottom: mobileTheme.spacing[4] },
 })
 
-const ModalRoot = styled.View({
+const ModalRoot = styled.View(({ theme }) => ({
   flex: 1,
   justifyContent: "flex-end",
-  backgroundColor: "rgba(24, 24, 27, 0.38)",
-})
+  backgroundColor: theme.colors.scrim,
+}))
 
 const Backdrop = styled.Pressable({
   position: "absolute",
@@ -177,23 +179,25 @@ const Backdrop = styled.Pressable({
   left: 0,
 })
 
-const Sheet = styled(SafeAreaView)({
-  width: "100%",
-  height: "74%",
-  borderTopLeftRadius: 20,
-  borderTopRightRadius: 20,
-  backgroundColor: mobileTheme.colors.panel,
-  paddingTop: mobileTheme.spacing[2],
-  paddingHorizontal: mobileTheme.spacing[4],
-})
+const Sheet = styled(SafeAreaView)(
+  ({ theme }: { theme: typeof mobileTheme }) => ({
+    width: "100%",
+    height: "74%",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: theme.colors.panel,
+    paddingTop: mobileTheme.spacing[2],
+    paddingHorizontal: mobileTheme.spacing[4],
+  }),
+)
 
-const SheetHandle = styled.View({
+const SheetHandle = styled.View(({ theme }) => ({
   width: 36,
   height: 4,
   alignSelf: "center",
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.borderStrong,
-})
+  backgroundColor: theme.colors.borderStrong,
+}))
 
 const SheetHeader = styled.View({
   minHeight: 64,
@@ -203,11 +207,11 @@ const SheetHeader = styled.View({
   gap: mobileTheme.spacing[3],
 })
 
-const SheetTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const SheetTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 20,
   fontWeight: "700",
-})
+}))
 
 const CloseButton = styled.Pressable({
   minWidth: 52,
@@ -216,50 +220,50 @@ const CloseButton = styled.Pressable({
   justifyContent: "center",
 })
 
-const CloseButtonLabel = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const CloseButtonLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 13,
   fontWeight: "600",
-})
+}))
 
-const SearchInput = styled.TextInput({
+const SearchInput = styled.TextInput(({ theme }) => ({
   minHeight: 48,
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panelSubtle,
-  color: mobileTheme.colors.ink,
+  backgroundColor: theme.colors.panelSubtle,
+  color: theme.colors.ink,
   fontFamily: "Pretendard",
   fontSize: 14,
   paddingHorizontal: mobileTheme.spacing[4],
   marginBottom: mobileTheme.spacing[3],
-})
+}))
 
 const OptionList = styled(FlatList<TransactionOption>)({ flex: 1 })
 
-const OptionGroup = styled.View({ backgroundColor: mobileTheme.colors.panel })
+const OptionGroup = styled.View(({ theme }) => ({
+  backgroundColor: theme.colors.panel,
+}))
 
-const OptionGroupLabel = styled(AppText)({
+const OptionGroupLabel = styled(AppText)(({ theme }) => ({
   minHeight: 32,
-  color: mobileTheme.colors.muted,
+  color: theme.colors.muted,
   fontSize: 11,
   fontWeight: "700",
   lineHeight: 32,
   paddingHorizontal: mobileTheme.spacing[3],
-  backgroundColor: mobileTheme.colors.panelSubtle,
-})
+  backgroundColor: theme.colors.panelSubtle,
+}))
 
 const OptionButton = styled.Pressable<{ $selected: boolean }>(
-  ({ $selected }) => ({
+  ({ theme, $selected }) => ({
     minHeight: 64,
     flexDirection: "row",
     alignItems: "center",
     gap: mobileTheme.spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: mobileTheme.colors.border,
-    backgroundColor: $selected
-      ? mobileTheme.colors.tealSoft
-      : mobileTheme.colors.panel,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: $selected ? theme.colors.tealSoft : theme.colors.panel,
     paddingVertical: mobileTheme.spacing[3],
     paddingHorizontal: mobileTheme.spacing[3],
   }),
@@ -274,30 +278,30 @@ const OptionMarker = styled.View({
 const OptionCopy = styled.View({ minWidth: 0, flex: 1, gap: 2 })
 
 const OptionLabel = styled(AppText)<{ $selected: boolean }>(
-  ({ $selected }) => ({
-    color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+  ({ theme, $selected }) => ({
+    color: $selected ? theme.colors.teal : theme.colors.ink,
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 20,
   }),
 )
 
-const OptionDescription = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const OptionDescription = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 10,
   lineHeight: 15,
-})
+}))
 
-const SelectedMark = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const SelectedMark = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 10,
   fontWeight: "600",
-})
+}))
 
-const EmptyMessage = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const EmptyMessage = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 13,
   lineHeight: 20,
   textAlign: "center",
   paddingVertical: mobileTheme.spacing[8],
-})
+}))

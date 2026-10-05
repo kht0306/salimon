@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { Redirect, Tabs } from "expo-router"
 import { observer } from "mobx-react-lite"
@@ -11,6 +12,7 @@ import { mobileTheme } from "../../theme"
 const safeAreaEdges = ["top", "bottom"] as const
 
 export default observer(function MainTabsLayout() {
+  const theme = useTheme()
   const store = useMobileAppStore()
   const { fontScale, width } = useWindowDimensions()
   const showTabLabels = fontScale < 1.3 && width >= 360
@@ -38,9 +40,9 @@ export default observer(function MainTabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveBackgroundColor: mobileTheme.colors.panel,
-        tabBarActiveTintColor: mobileTheme.colors.teal,
-        tabBarInactiveTintColor: mobileTheme.colors.muted,
+        tabBarActiveBackgroundColor: theme.colors.panel,
+        tabBarActiveTintColor: theme.colors.teal,
+        tabBarInactiveTintColor: theme.colors.muted,
         tabBarLabelStyle: {
           fontFamily: "Pretendard",
           fontSize: 12,
@@ -50,8 +52,8 @@ export default observer(function MainTabsLayout() {
         tabBarShowLabel: showTabLabels,
         tabBarStyle: {
           height: tabBarHeight,
-          backgroundColor: mobileTheme.colors.panel,
-          borderTopColor: mobileTheme.colors.border,
+          backgroundColor: theme.colors.panel,
+          borderTopColor: theme.colors.border,
           paddingHorizontal: 8,
           paddingTop: 8,
           paddingBottom: 6,
@@ -91,8 +93,8 @@ export default observer(function MainTabsLayout() {
               ? store.notificationCandidateCount
               : undefined,
           tabBarBadgeStyle: {
-            backgroundColor: mobileTheme.colors.teal,
-            color: mobileTheme.colors.panel,
+            backgroundColor: theme.colors.teal,
+            color: theme.colors.onAccent,
             fontSize: 10,
           },
           tabBarIcon: ({ focused }) => (
@@ -128,12 +130,13 @@ const LoadingPage = styled(SafeAreaView)`
   flex: 1;
   align-items: center;
   justify-content: center;
-  background-color: ${mobileTheme.colors.canvas};
+  background-color: ${({ theme }: { theme: typeof mobileTheme }) =>
+    theme.colors.canvas};
   padding: ${mobileTheme.spacing[5]}px;
 `
 
 const LoadingText = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 15px;
   line-height: 23px;
   text-align: center;

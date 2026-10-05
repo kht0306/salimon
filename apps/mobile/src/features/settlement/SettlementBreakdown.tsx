@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { formatKoreanTime, formatKrw, getCategoryLabel } from "@salimon/domain"
 import type {
@@ -49,6 +50,7 @@ export function SettlementBreakdown({
   onMonthNoteSave,
   onTransactionPress,
 }: SettlementBreakdownProps) {
+  const theme = useTheme()
   const maxMemberExpense = Math.max(
     1,
     ...summary.memberRows.map((row) => row.actorExpense),
@@ -209,8 +211,8 @@ export function SettlementBreakdown({
                     <CategoryFill
                       style={{
                         backgroundColor: overBudget
-                          ? mobileTheme.colors.amber
-                          : mobileTheme.colors.teal,
+                          ? theme.colors.amber
+                          : theme.colors.teal,
                         width: `${Math.min(
                           100,
                           (row.spent / comparisonBase) * 100,
@@ -372,13 +374,13 @@ function formatTransactionDay(value: string): string {
   }).format(new Date(value))
 }
 
-const SectionCard = styled.View({
+const SectionCard = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[4],
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
-  backgroundColor: mobileTheme.colors.panel,
+  borderBottomColor: theme.colors.border,
+  backgroundColor: theme.colors.panel,
   paddingVertical: mobileTheme.spacing[4],
-})
+}))
 
 const SectionHeading = styled.View({
   flexDirection: "row",
@@ -389,22 +391,22 @@ const SectionHeading = styled.View({
 
 const SectionHeadingCopy = styled.View({ minWidth: 0, flex: 1, gap: 3 })
 
-const SectionTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const SectionTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   ...mobileTheme.typography.label,
-})
+}))
 
-const SectionDescription = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const SectionDescription = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 10,
   lineHeight: 15,
-})
+}))
 
-const SectionCount = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const SectionCount = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 10,
   fontWeight: "700",
-})
+}))
 
 const MemberList = styled.View({ gap: mobileTheme.spacing[4] })
 
@@ -426,80 +428,80 @@ const MemberIdentity = styled.View({
   gap: mobileTheme.spacing[2],
 })
 
-const MemberAvatar = styled.View({
+const MemberAvatar = styled.View(({ theme }) => ({
   width: 32,
   height: 32,
   alignItems: "center",
   justifyContent: "center",
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.tealSoft,
-})
+  backgroundColor: theme.colors.tealSoft,
+}))
 
-const MemberInitial = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const MemberInitial = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 12,
   fontWeight: "600",
-})
+}))
 
 const MemberCopy = styled.View({ minWidth: 0, flex: 1, gap: 2 })
 
-const MemberName = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const MemberName = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 12,
   fontWeight: "600",
-})
+}))
 
-const MemberMeta = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const MemberMeta = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 9,
   lineHeight: 14,
-})
+}))
 
-const MemberAmount = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const MemberAmount = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 12,
   fontWeight: "600",
-})
+}))
 
-const ProgressTrack = styled.View({
+const ProgressTrack = styled.View(({ theme }) => ({
   height: 5,
   overflow: "hidden",
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.border,
-})
+  backgroundColor: theme.colors.border,
+}))
 
-const ProgressFill = styled.View({
+const ProgressFill = styled.View(({ theme }) => ({
   height: "100%",
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.teal,
-})
+  backgroundColor: theme.colors.teal,
+}))
 
-const Explanation = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const Explanation = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 9,
   lineHeight: 14,
-})
+}))
 
-const PrivacyNotice = styled.View({
+const PrivacyNotice = styled.View(({ theme }) => ({
   gap: 3,
   borderLeftWidth: 3,
-  borderLeftColor: mobileTheme.colors.teal,
-  backgroundColor: mobileTheme.colors.tealSoft,
+  borderLeftColor: theme.colors.teal,
+  backgroundColor: theme.colors.tealSoft,
   paddingVertical: mobileTheme.spacing[3],
   paddingHorizontal: mobileTheme.spacing[3],
-})
+}))
 
-const PrivacyTitle = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const PrivacyTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 10,
   fontWeight: "600",
-})
+}))
 
-const PrivacyDescription = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const PrivacyDescription = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 9,
   lineHeight: 14,
-})
+}))
 
 const BreakdownList = styled.View({ gap: mobileTheme.spacing[4] })
 
@@ -520,25 +522,25 @@ const BreakdownNameRow = styled.View({
   gap: mobileTheme.spacing[2],
 })
 
-const CategoryMarker = styled.View({
+const CategoryMarker = styled.View(({ theme }) => ({
   width: 8,
   height: 8,
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.teal,
-})
+  backgroundColor: theme.colors.teal,
+}))
 
-const BreakdownName = styled(AppText)({
+const BreakdownName = styled(AppText)(({ theme }) => ({
   minWidth: 0,
   flex: 1,
-  color: mobileTheme.colors.ink,
+  color: theme.colors.ink,
   fontSize: 11,
   fontWeight: "600",
   lineHeight: 17,
-})
+}))
 
 const BreakdownValue = styled(AppText)<{ $warning: boolean }>(
-  ({ $warning }) => ({
-    color: $warning ? mobileTheme.colors.amber : mobileTheme.colors.muted,
+  ({ theme, $warning }) => ({
+    color: $warning ? theme.colors.amber : theme.colors.muted,
     fontSize: 10,
     fontWeight: "600",
     lineHeight: 17,
@@ -546,72 +548,72 @@ const BreakdownValue = styled(AppText)<{ $warning: boolean }>(
   }),
 )
 
-const BreakdownTrack = styled.View({
+const BreakdownTrack = styled.View(({ theme }) => ({
   height: 6,
   overflow: "hidden",
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.border,
-})
+  backgroundColor: theme.colors.border,
+}))
 
 const CategoryFill = styled.View({
   height: "100%",
   borderRadius: mobileTheme.radii.round,
 })
 
-const WeekFill = styled.View({
+const WeekFill = styled.View(({ theme }) => ({
   height: "100%",
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.teal,
-})
+  backgroundColor: theme.colors.teal,
+}))
 
-const TrendFill = styled.View({
+const TrendFill = styled.View(({ theme }) => ({
   height: "100%",
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.green,
-})
+  backgroundColor: theme.colors.green,
+}))
 
-const WarningLabel = styled(AppText)({
-  color: mobileTheme.colors.amber,
+const WarningLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.amber,
   fontSize: 9,
   fontWeight: "700",
   textAlign: "right",
-})
+}))
 
-const EmptyText = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const EmptyText = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   lineHeight: 17,
   textAlign: "center",
   paddingVertical: mobileTheme.spacing[4],
-})
+}))
 
-const ReadOnlyLabel = styled(AppText)({
-  color: mobileTheme.colors.teal,
+const ReadOnlyLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.teal,
   fontSize: 9,
   fontWeight: "600",
-})
+}))
 
-const MonthNoteInput = styled.TextInput({
+const MonthNoteInput = styled.TextInput(({ theme }) => ({
   minHeight: 68,
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.panelSubtle,
-  color: mobileTheme.colors.ink,
+  backgroundColor: theme.colors.panelSubtle,
+  color: theme.colors.ink,
   fontFamily: "Pretendard",
   fontSize: 11,
   lineHeight: 18,
   padding: mobileTheme.spacing[3],
-})
+}))
 
 const RecentList = styled.View({ gap: mobileTheme.spacing[2] })
 
-const RecentTransaction = styled.Pressable({
+const RecentTransaction = styled.Pressable(({ theme }) => ({
   minHeight: 72,
   borderTopWidth: 1,
-  borderTopColor: mobileTheme.colors.border,
+  borderTopColor: theme.colors.border,
   paddingVertical: mobileTheme.spacing[3],
-})
+}))
 
 const RecentCopy = styled.View({ gap: 3 })
 
@@ -622,25 +624,24 @@ const RecentTopLine = styled.View({
   gap: mobileTheme.spacing[3],
 })
 
-const RecentTitle = styled(AppText)({
+const RecentTitle = styled(AppText)(({ theme }) => ({
   minWidth: 0,
   flex: 1,
-  color: mobileTheme.colors.ink,
+  color: theme.colors.ink,
   fontSize: 12,
   fontWeight: "600",
-})
+}))
 
 const RecentAmount = styled(AppText)<{ $type: Transaction["type"] }>(
-  ({ $type }) => ({
-    color:
-      $type === "income" ? mobileTheme.colors.green : mobileTheme.colors.ink,
+  ({ theme, $type }) => ({
+    color: $type === "income" ? theme.colors.green : theme.colors.ink,
     fontSize: 11,
     fontWeight: "600",
   }),
 )
 
-const RecentMeta = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const RecentMeta = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 9,
   lineHeight: 14,
-})
+}))

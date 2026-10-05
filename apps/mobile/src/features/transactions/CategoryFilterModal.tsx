@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import type { Category } from "@salimon/types"
 import { Minus, Plus } from "lucide-react-native"
@@ -28,6 +29,7 @@ export function CategoryFilterModal({
   onApply,
   onClose,
 }: CategoryFilterModalProps) {
+  const theme = useTheme()
   const [draftCategoryIds, setDraftCategoryIds] = useState(() => [
     ...selectedCategoryIds,
   ])
@@ -117,7 +119,7 @@ export function CategoryFilterModal({
             accessibilityLabel="카테고리 검색"
             autoCorrect={false}
             placeholder="카테고리 이름 검색"
-            placeholderTextColor={mobileTheme.colors.subtle}
+            placeholderTextColor={theme.colors.subtle}
             returnKeyType="search"
             value={query}
             onChangeText={setQuery}
@@ -174,13 +176,13 @@ export function CategoryFilterModal({
                       >
                         {expanded ? (
                           <Minus
-                            color={mobileTheme.colors.teal}
+                            color={theme.colors.teal}
                             size={16}
                             strokeWidth={2}
                           />
                         ) : (
                           <Plus
-                            color={mobileTheme.colors.teal}
+                            color={theme.colors.teal}
                             size={16}
                             strokeWidth={2}
                           />
@@ -200,7 +202,7 @@ export function CategoryFilterModal({
                     <CategoryMarker
                       style={{
                         backgroundColor:
-                          item.category.color ?? mobileTheme.colors.subtle,
+                          item.category.color ?? theme.colors.subtle,
                       }}
                     />
                     <CategoryCopy>
@@ -227,11 +229,11 @@ const styles = StyleSheet.create({
   listContent: { paddingBottom: mobileTheme.spacing[4] },
 })
 
-const ModalRoot = styled.View({
+const ModalRoot = styled.View(({ theme }) => ({
   flex: 1,
   justifyContent: "flex-end",
-  backgroundColor: "rgba(24, 24, 27, 0.38)",
-})
+  backgroundColor: theme.colors.scrim,
+}))
 
 const Backdrop = styled.Pressable({
   position: "absolute",
@@ -241,23 +243,25 @@ const Backdrop = styled.Pressable({
   left: 0,
 })
 
-const Sheet = styled(SafeAreaView)({
-  width: "100%",
-  height: "86%",
-  borderTopLeftRadius: 20,
-  borderTopRightRadius: 20,
-  backgroundColor: mobileTheme.colors.panel,
-  paddingTop: mobileTheme.spacing[2],
-  paddingHorizontal: mobileTheme.spacing[4],
-})
+const Sheet = styled(SafeAreaView)(
+  ({ theme }: { theme: typeof mobileTheme }) => ({
+    width: "100%",
+    height: "86%",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: theme.colors.panel,
+    paddingTop: mobileTheme.spacing[2],
+    paddingHorizontal: mobileTheme.spacing[4],
+  }),
+)
 
-const SheetHandle = styled.View({
+const SheetHandle = styled.View(({ theme }) => ({
   width: 36,
   height: 4,
   alignSelf: "center",
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.borderStrong,
-})
+  backgroundColor: theme.colors.borderStrong,
+}))
 
 const SheetHeader = styled.View({
   flexDirection: "row",
@@ -269,17 +273,17 @@ const SheetHeader = styled.View({
 
 const SheetHeading = styled.View({ minWidth: 0, flex: 1, gap: 2 })
 
-const SheetTitle = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const SheetTitle = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 20,
   fontWeight: "700",
-})
+}))
 
-const SheetDescription = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const SheetDescription = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 10,
   lineHeight: 15,
-})
+}))
 
 const HeaderActions = styled.View({
   flexDirection: "row",
@@ -294,49 +298,49 @@ const CloseButton = styled.Pressable({
   justifyContent: "center",
 })
 
-const CloseButtonLabel = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const CloseButtonLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
-const ApplyButton = styled.Pressable({
+const ApplyButton = styled.Pressable(({ theme }) => ({
   minWidth: 54,
   minHeight: mobileTheme.controls.touch,
   alignItems: "center",
   justifyContent: "center",
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.teal,
+  backgroundColor: theme.colors.teal,
   paddingHorizontal: mobileTheme.spacing[3],
-})
+}))
 
-const ApplyButtonLabel = styled(AppText)({
-  color: mobileTheme.colors.panel,
+const ApplyButtonLabel = styled(AppText)(({ theme }) => ({
+  color: theme.colors.onAccent,
   fontSize: 11,
   fontWeight: "600",
-})
+}))
 
-const SearchInput = styled.TextInput({
+const SearchInput = styled.TextInput(({ theme }) => ({
   minHeight: 48,
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panelSubtle,
-  color: mobileTheme.colors.ink,
+  backgroundColor: theme.colors.panelSubtle,
+  color: theme.colors.ink,
   fontFamily: "Pretendard",
   fontSize: 13,
   paddingHorizontal: mobileTheme.spacing[4],
   marginBottom: mobileTheme.spacing[3],
-})
+}))
 
 const CategoryList = styled(FlatList<CategoryTreeOption>)({ flex: 1 })
 
-const CategoryRow = styled.View<{ $depth: number }>(({ $depth }) => ({
+const CategoryRow = styled.View<{ $depth: number }>(({ theme, $depth }) => ({
   minHeight: 58,
   flexDirection: "row",
   alignItems: "stretch",
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
+  borderBottomColor: theme.colors.border,
   paddingLeft: Math.min($depth, 3) * mobileTheme.spacing[4],
 }))
 
@@ -353,18 +357,18 @@ const TreeControlSpacer = styled.View({
   flexShrink: 0,
 })
 
-const TreeControlIcon = styled.View({
+const TreeControlIcon = styled.View(({ theme }) => ({
   width: 24,
   height: 24,
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 1,
-  borderColor: mobileTheme.colors.borderStrong,
+  borderColor: theme.colors.borderStrong,
   borderRadius: mobileTheme.radii.xs,
-})
+}))
 
 const CategoryChoice = styled.Pressable<{ $selected: boolean }>(
-  ({ $selected }) => ({
+  ({ theme, $selected }) => ({
     minWidth: 0,
     minHeight: 58,
     flex: 1,
@@ -372,9 +376,7 @@ const CategoryChoice = styled.Pressable<{ $selected: boolean }>(
     alignItems: "center",
     gap: mobileTheme.spacing[3],
     borderRadius: mobileTheme.radii.sm,
-    backgroundColor: $selected
-      ? mobileTheme.colors.tealSoft
-      : mobileTheme.colors.panel,
+    backgroundColor: $selected ? theme.colors.tealSoft : theme.colors.panel,
     paddingVertical: mobileTheme.spacing[3],
     paddingHorizontal: mobileTheme.spacing[3],
   }),
@@ -390,24 +392,24 @@ const CategoryMarker = styled.View({
 const CategoryCopy = styled.View({ minWidth: 0, flex: 1 })
 
 const CategoryName = styled(AppText)<{ $selected: boolean }>(
-  ({ $selected }) => ({
-    color: $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink,
+  ({ theme, $selected }) => ({
+    color: $selected ? theme.colors.teal : theme.colors.ink,
     fontSize: 13,
     fontWeight: "600",
     lineHeight: 19,
   }),
 )
 
-const CategoryStatus = styled(AppText)({
+const CategoryStatus = styled(AppText)(({ theme }) => ({
   marginTop: mobileTheme.spacing[1],
-  color: mobileTheme.colors.muted,
+  color: theme.colors.muted,
   fontSize: 10,
   lineHeight: 15,
-})
+}))
 
-const EmptyMessage = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const EmptyMessage = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 12,
   textAlign: "center",
   paddingVertical: mobileTheme.spacing[8],
-})
+}))

@@ -68,18 +68,20 @@ export function TransactionListRow({
   )
 }
 
-const Row = styled.Pressable<{ $excluded: boolean }>(({ $excluded }) => ({
-  minHeight: 72,
-  flexDirection: "row",
-  alignItems: "center",
-  gap: mobileTheme.spacing[3],
-  borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
-  backgroundColor: mobileTheme.colors.panel,
-  paddingVertical: mobileTheme.spacing[3],
-  paddingHorizontal: mobileTheme.spacing[4],
-  opacity: $excluded ? 0.62 : 1,
-}))
+const Row = styled.Pressable<{ $excluded: boolean }>(
+  ({ theme, $excluded }) => ({
+    minHeight: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: mobileTheme.spacing[3],
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.panel,
+    paddingVertical: mobileTheme.spacing[3],
+    paddingHorizontal: mobileTheme.spacing[4],
+    opacity: $excluded ? 0.62 : 1,
+  }),
+)
 
 const MainCopy = styled.View({
   minWidth: 0,
@@ -87,18 +89,18 @@ const MainCopy = styled.View({
   gap: mobileTheme.spacing[1],
 })
 
-const Title = styled(AppText)({
-  color: mobileTheme.colors.ink,
+const Title = styled(AppText)(({ theme }) => ({
+  color: theme.colors.ink,
   fontSize: 13,
   fontWeight: "600",
   lineHeight: 19,
-})
+}))
 
-const Metadata = styled(AppText)({
-  color: mobileTheme.colors.muted,
+const Metadata = styled(AppText)(({ theme }) => ({
+  color: theme.colors.muted,
   fontSize: 10,
   lineHeight: 15,
-})
+}))
 
 const BadgeRow = styled.View({
   flexDirection: "row",
@@ -106,27 +108,29 @@ const BadgeRow = styled.View({
   gap: mobileTheme.spacing[1],
 })
 
-const Badge = styled(AppText)({
+const Badge = styled(AppText)(({ theme }) => ({
   alignSelf: "flex-start",
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.panelSubtle,
-  color: mobileTheme.colors.muted,
+  backgroundColor: theme.colors.panelSubtle,
+  color: theme.colors.muted,
   fontSize: 9,
   fontWeight: "700",
   paddingVertical: 2,
   paddingHorizontal: mobileTheme.spacing[2],
-})
-
-const WarningBadge = styled(Badge)({
-  backgroundColor: mobileTheme.colors.coralSoft,
-  color: mobileTheme.colors.coral,
-})
-
-const Amount = styled(AppText)<{ $type: Transaction["type"] }>(({ $type }) => ({
-  maxWidth: "38%",
-  color: $type === "income" ? mobileTheme.colors.green : mobileTheme.colors.ink,
-  fontSize: 12,
-  fontWeight: "600",
-  lineHeight: 19,
-  textAlign: "right",
 }))
+
+const WarningBadge = styled(Badge)(({ theme }) => ({
+  backgroundColor: theme.colors.coralSoft,
+  color: theme.colors.coral,
+}))
+
+const Amount = styled(AppText)<{ $type: Transaction["type"] }>(
+  ({ theme, $type }) => ({
+    maxWidth: "38%",
+    color: $type === "income" ? theme.colors.green : theme.colors.ink,
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 19,
+    textAlign: "right",
+  }),
+)

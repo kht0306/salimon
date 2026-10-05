@@ -93,12 +93,12 @@ export function BudgetOverview({
   )
 }
 
-const Panel = styled.View({
+const Panel = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[3],
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
+  borderBottomColor: theme.colors.border,
   paddingBottom: mobileTheme.spacing[4],
-})
+}))
 
 const PanelHeading = styled.View({
   flexDirection: "row",
@@ -108,14 +108,14 @@ const PanelHeading = styled.View({
 })
 
 const PanelTitle = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: ${mobileTheme.typography.section.fontSize}px;
   font-weight: ${mobileTheme.typography.section.fontWeight};
   line-height: ${mobileTheme.typography.section.lineHeight}px;
 `
 
 const BudgetCount = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 10px;
   font-weight: 600;
 `
@@ -127,7 +127,7 @@ const PanelMeta = styled.View({
 })
 
 const EmptyText = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 12px;
   line-height: 18px;
 `
@@ -145,7 +145,7 @@ const BudgetHeading = styled.View({
 
 const BudgetName = styled(AppText)`
   flex-shrink: 1;
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 12px;
   font-weight: 600;
 `
@@ -158,26 +158,26 @@ const BudgetAmounts = styled.View({
 })
 
 const BudgetSpent = styled(AppText)<{ $over: boolean }>`
-  color: ${({ $over }) =>
-    $over ? mobileTheme.colors.coral : mobileTheme.colors.muted};
+  color: ${({ theme, $over }) =>
+    $over ? theme.colors.coral : theme.colors.muted};
   font-size: 10px;
   font-weight: ${({ $over }) => ($over ? 700 : 500)};
   line-height: 15px;
 `
 
 const BudgetLimit = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 10px;
   font-weight: 500;
   line-height: 15px;
 `
 
-const ProgressTrack = styled.View({
+const ProgressTrack = styled.View(({ theme }) => ({
   height: 5,
   overflow: "hidden",
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.border,
-})
+  backgroundColor: theme.colors.border,
+}))
 
 const ProgressFill = styled.View({
   height: "100%",
@@ -193,7 +193,7 @@ const ExpandButton = styled.Pressable({
 })
 
 const ExpandLabel = styled(AppText)`
-  color: ${mobileTheme.colors.teal};
+  color: ${({ theme }) => theme.colors.teal};
   font-size: 10px;
   font-weight: 600;
 `

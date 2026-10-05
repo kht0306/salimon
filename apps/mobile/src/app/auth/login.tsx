@@ -79,7 +79,8 @@ export default observer(function LoginScreen() {
 
 const Page = styled(SafeAreaView)`
   flex: 1;
-  background-color: ${mobileTheme.colors.canvas};
+  background-color: ${({ theme }: { theme: typeof mobileTheme }) =>
+    theme.colors.canvas};
 `
 
 const Content = styled.View({
@@ -108,30 +109,30 @@ const BrandLockup = styled.View({
   gap: mobileTheme.spacing[2],
 })
 
-const BrandMark = styled.View({
+const BrandMark = styled.View(({ theme }) => ({
   width: 34,
   height: 34,
   alignItems: "center",
   justifyContent: "center",
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.teal,
-})
+  backgroundColor: theme.colors.teal,
+}))
 
 const BrandInitial = styled(AppText)`
-  color: ${mobileTheme.colors.panel};
+  color: ${({ theme }) => theme.colors.onAccent};
   font-size: 16px;
   font-weight: 700;
 `
 
 const BrandName = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.3px;
 `
 
 const ProductLabel = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 11px;
   font-weight: 700;
 `
@@ -139,13 +140,13 @@ const ProductLabel = styled(AppText)`
 const Hero = styled.View({ gap: mobileTheme.spacing[3] })
 
 const Eyebrow = styled(AppText)`
-  color: ${mobileTheme.colors.teal};
+  color: ${({ theme }) => theme.colors.teal};
   font-size: 14px;
   font-weight: 600;
 `
 
 const Title = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: ${mobileTheme.typography.display.fontSize}px;
   font-weight: ${mobileTheme.typography.display.fontWeight};
   letter-spacing: -0.7px;
@@ -153,7 +154,7 @@ const Title = styled(AppText)`
 `
 
 const Description = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: ${mobileTheme.typography.body.fontSize}px;
   font-weight: ${mobileTheme.typography.body.fontWeight};
   line-height: ${mobileTheme.typography.body.lineHeight}px;
@@ -170,46 +171,46 @@ const BenefitRow = styled.View({
   gap: mobileTheme.spacing[2],
 })
 
-const BenefitDot = styled.View({
+const BenefitDot = styled.View(({ theme }) => ({
   width: 6,
   height: 6,
   borderRadius: mobileTheme.radii.round,
-  backgroundColor: mobileTheme.colors.teal,
-})
+  backgroundColor: theme.colors.teal,
+}))
 
 const BenefitText = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 12px;
   font-weight: 600;
   line-height: 18px;
 `
 
-const ActionArea = styled.View({
+const ActionArea = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[3],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[5],
-})
+}))
 
 const CardTitle = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 16px;
   font-weight: 600;
 `
 
 const CardDescription = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 13px;
   line-height: 20px;
 `
 
-const ErrorText = styled(AppText)({
+const ErrorText = styled(AppText)(({ theme }) => ({
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: mobileTheme.colors.coralSoft,
-  color: mobileTheme.colors.coral,
+  backgroundColor: theme.colors.coralSoft,
+  color: theme.colors.coral,
   fontSize: 12,
   lineHeight: 18,
   padding: mobileTheme.spacing[3],
-})
+}))

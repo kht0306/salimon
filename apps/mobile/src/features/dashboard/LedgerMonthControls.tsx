@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { observer } from "mobx-react-lite"
 import { ActivityIndicator, ScrollView } from "react-native"
@@ -7,6 +8,7 @@ import { useMobileAppStore } from "../../stores/MobileStoreProvider"
 import { mobileTheme } from "../../theme"
 
 export const LedgerMonthControls = observer(function LedgerMonthControls() {
+  const theme = useTheme()
   const store = useMobileAppStore()
   const [year, month] = store.selectedMonth.split("-").map(Number)
 
@@ -50,11 +52,7 @@ export const LedgerMonthControls = observer(function LedgerMonthControls() {
           accessibilityRole="button"
           onPress={() => void store.moveSelectedMonth(-1)}
         >
-          <ChevronLeft
-            color={mobileTheme.colors.ink}
-            size={20}
-            strokeWidth={1.8}
-          />
+          <ChevronLeft color={theme.colors.ink} size={20} strokeWidth={1.8} />
         </MonthButton>
         <MonthLabelGroup>
           <MonthLabel accessibilityRole="header">
@@ -63,7 +61,7 @@ export const LedgerMonthControls = observer(function LedgerMonthControls() {
           {store.dataStatus === "refreshing" ? (
             <ActivityIndicator
               accessibilityLabel="선택한 월을 불러오는 중"
-              color={mobileTheme.colors.teal}
+              color={theme.colors.teal}
               size="small"
             />
           ) : null}
@@ -73,11 +71,7 @@ export const LedgerMonthControls = observer(function LedgerMonthControls() {
           accessibilityRole="button"
           onPress={() => void store.moveSelectedMonth(1)}
         >
-          <ChevronRight
-            color={mobileTheme.colors.ink}
-            size={20}
-            strokeWidth={1.8}
-          />
+          <ChevronRight color={theme.colors.ink} size={20} strokeWidth={1.8} />
         </MonthButton>
       </MonthRow>
     </ControlsPanel>
@@ -91,7 +85,7 @@ const ControlsPanel = styled.View({ gap: mobileTheme.spacing[3] })
 const LedgerSection = styled.View({ gap: mobileTheme.spacing[2] })
 
 const ControlLabel = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 10px;
   font-weight: 700;
 `
@@ -101,49 +95,45 @@ const LedgerScroll = styled(ScrollView)`
 `
 
 const LedgerButton = styled.Pressable<{ $selected: boolean }>(
-  ({ $selected }) => ({
+  ({ theme, $selected }) => ({
     minHeight: mobileTheme.controls.touch,
     flexDirection: "row",
     alignItems: "center",
     gap: mobileTheme.spacing[2],
     borderWidth: 1,
-    borderColor: $selected
-      ? mobileTheme.colors.teal
-      : mobileTheme.colors.border,
+    borderColor: $selected ? theme.colors.teal : theme.colors.border,
     borderRadius: mobileTheme.radii.sm,
-    backgroundColor: $selected
-      ? mobileTheme.colors.tealSoft
-      : mobileTheme.colors.panel,
+    backgroundColor: $selected ? theme.colors.tealSoft : theme.colors.panel,
     paddingVertical: mobileTheme.spacing[1],
     paddingHorizontal: mobileTheme.spacing[3],
   }),
 )
 
 const LedgerName = styled(AppText)<{ $selected: boolean }>`
-  color: ${({ $selected }) =>
-    $selected ? mobileTheme.colors.teal : mobileTheme.colors.ink};
+  color: ${({ theme, $selected }) =>
+    $selected ? theme.colors.teal : theme.colors.ink};
   font-size: 13px;
   font-weight: 600;
 `
 
 const DefaultLabel = styled(AppText)<{ $selected: boolean }>`
-  color: ${({ $selected }) =>
-    $selected ? mobileTheme.colors.teal : mobileTheme.colors.muted};
+  color: ${({ theme, $selected }) =>
+    $selected ? theme.colors.teal : theme.colors.muted};
   font-size: 10px;
   font-weight: 700;
 `
 
-const MonthRow = styled.View({
+const MonthRow = styled.View(({ theme }) => ({
   minHeight: 56,
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
   borderTopWidth: 1,
-  borderTopColor: mobileTheme.colors.border,
+  borderTopColor: theme.colors.border,
   borderBottomWidth: 1,
-  borderBottomColor: mobileTheme.colors.border,
+  borderBottomColor: theme.colors.border,
   paddingVertical: mobileTheme.spacing[1],
-})
+}))
 
 const MonthButton = styled.Pressable({
   width: 44,
@@ -155,7 +145,7 @@ const MonthButton = styled.Pressable({
 
 const MonthLabel = styled(AppText)`
   flex-shrink: 1;
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 17px;
   font-weight: 600;
   line-height: 25px;

@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
 import { Check } from "lucide-react-native"
 import { useState } from "react"
@@ -20,6 +21,7 @@ export function NotificationDisclosureModal({
   onAccept,
   onClose,
 }: NotificationDisclosureModalProps) {
+  const theme = useTheme()
   const [confirmed, setConfirmed] = useState(false)
 
   return (
@@ -83,7 +85,7 @@ export function NotificationDisclosureModal({
             >
               {confirmed ? (
                 <Check
-                  color={mobileTheme.colors.panel}
+                  color={theme.colors.onAccent}
                   size={16}
                   strokeWidth={2.2}
                 />
@@ -111,7 +113,8 @@ export function NotificationDisclosureModal({
 
 const Page = styled(SafeAreaView)`
   flex: 1;
-  background-color: ${mobileTheme.colors.canvas};
+  background-color: ${({ theme }: { theme: typeof mobileTheme }) =>
+    theme.colors.canvas};
 `
 
 const styles = StyleSheet.create({
@@ -125,65 +128,61 @@ const styles = StyleSheet.create({
 const Content = styled.ScrollView``
 
 const Eyebrow = styled(AppText)`
-  color: ${mobileTheme.colors.teal};
+  color: ${({ theme }) => theme.colors.teal};
   font-size: 12px;
   font-weight: 600;
 `
 
 const Title = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: ${mobileTheme.typography.title.fontSize}px;
   font-weight: ${mobileTheme.typography.title.fontWeight};
   line-height: ${mobileTheme.typography.title.lineHeight}px;
 `
 
 const Description = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 14px;
   line-height: 22px;
 `
 
-const DisclosureList = styled.View({
+const DisclosureList = styled.View(({ theme }) => ({
   gap: mobileTheme.spacing[3],
   borderWidth: 1,
-  borderColor: mobileTheme.colors.border,
+  borderColor: theme.colors.border,
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.panel,
+  backgroundColor: theme.colors.panel,
   padding: mobileTheme.spacing[4],
-})
+}))
 
 const DisclosureItem = styled(AppText)`
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 13px;
   line-height: 21px;
 `
 
-const ConfirmRow = styled.Pressable({
+const ConfirmRow = styled.Pressable(({ theme }) => ({
   minHeight: 56,
   flexDirection: "row",
   alignItems: "center",
   gap: mobileTheme.spacing[3],
   borderRadius: mobileTheme.radii.md,
-  backgroundColor: mobileTheme.colors.tealSoft,
+  backgroundColor: theme.colors.tealSoft,
   padding: mobileTheme.spacing[3],
-})
+}))
 
-const Checkbox = styled.View<{ $checked: boolean }>(({ $checked }) => ({
+const Checkbox = styled.View<{ $checked: boolean }>(({ theme, $checked }) => ({
   width: 24,
   height: 24,
   borderWidth: 2,
-  borderColor: $checked
-    ? mobileTheme.colors.teal
-    : mobileTheme.colors.borderStrong,
+  borderColor: $checked ? theme.colors.teal : theme.colors.borderStrong,
   borderRadius: mobileTheme.radii.sm,
-  backgroundColor: $checked
-    ? mobileTheme.colors.teal
-    : mobileTheme.colors.panel,
+  backgroundColor: $checked ? theme.colors.teal : theme.colors.panel,
 }))
 
 const ConfirmText = styled(AppText)`
   flex: 1;
-  color: ${mobileTheme.colors.ink};
+  color: ${({ theme }) => theme.colors.ink};
   font-size: 13px;
   font-weight: 600;
   line-height: 20px;

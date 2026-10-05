@@ -67,16 +67,18 @@ function firstValue(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value
 }
 
-const Page = styled(SafeAreaView)({
-  flex: 1,
-  alignItems: "center",
-  justifyContent: "center",
-  backgroundColor: mobileTheme.colors.canvas,
-  padding: mobileTheme.spacing[4],
-})
+const Page = styled(SafeAreaView)(
+  ({ theme }: { theme: typeof mobileTheme }) => ({
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.canvas,
+    padding: mobileTheme.spacing[4],
+  }),
+)
 
 const Progress = styled(AppText)`
-  color: ${mobileTheme.colors.muted};
+  color: ${({ theme }) => theme.colors.muted};
   font-size: 15px;
   line-height: 23px;
   text-align: center;

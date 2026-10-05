@@ -1,3 +1,4 @@
+import { useTheme } from "@emotion/react"
 import {
   HandCoins,
   Home,
@@ -6,7 +7,6 @@ import {
   SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react-native"
-import { mobileTheme } from "../theme"
 
 interface AppTabIconProps {
   active: boolean
@@ -22,12 +22,13 @@ const icons: Record<AppTabIconProps["name"], LucideIcon> = {
 }
 
 export function AppTabIcon({ active, name }: AppTabIconProps) {
+  const theme = useTheme()
   const Icon = icons[name]
 
   return (
     <Icon
       accessibilityElementsHidden
-      color={active ? mobileTheme.colors.teal : mobileTheme.colors.muted}
+      color={active ? theme.colors.teal : theme.colors.muted}
       importantForAccessibility="no-hide-descendants"
       size={21}
       strokeWidth={active ? 2.2 : 1.8}

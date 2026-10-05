@@ -1,10 +1,10 @@
+import { useTheme } from "@emotion/react"
 import type { LedgerMember, LedgerRole, LedgerType } from "@salimon/types"
 import { observer } from "mobx-react-lite"
 import { useEffect, useState } from "react"
 import { Alert, Switch } from "react-native"
 import { AppButton } from "../../components/AppButton"
 import { useMobileAppStore } from "../../stores/MobileStoreProvider"
-import { mobileTheme } from "../../theme"
 import {
   ChoiceButton,
   ChoiceLabel,
@@ -36,6 +36,7 @@ const roleOptions: { label: string; value: GrantableRole }[] = [
 
 export const LedgerManagementScreen = observer(
   function LedgerManagementScreen() {
+    const theme = useTheme()
     const store = useMobileAppStore()
     const ledger = store.currentLedger
     const [renameValue, setRenameValue] = useState(ledger?.name ?? "")
@@ -242,8 +243,8 @@ export const LedgerManagementScreen = observer(
             <Switch
               accessibilityLabel="새 가계부를 기본으로 설정"
               trackColor={{
-                false: mobileTheme.colors.borderStrong,
-                true: mobileTheme.colors.teal,
+                false: theme.colors.borderStrong,
+                true: theme.colors.teal,
               }}
               value={createDefault}
               onValueChange={setCreateDefault}
