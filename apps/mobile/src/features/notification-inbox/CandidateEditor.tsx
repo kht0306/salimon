@@ -30,6 +30,8 @@ import {
 } from "../transactions/TransactionOptionPickerModal"
 import { CategoryPickerModal } from "../transactions/CategoryPickerModal"
 import { InstallmentAmountTypeSelect } from "../transactions/InstallmentAmountTypeSelect"
+import { InstallmentSchedulePreview } from "../transactions/InstallmentSchedulePreview"
+import { TransactionDateTimeFields } from "../transactions/TransactionDateTimeFields"
 import {
   createCandidateRegistrationDraft,
   formatCandidateAmountInput,
@@ -525,44 +527,31 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
                     </IntroDescription>
                   ) : null}
                 </Field>
-                <DateTimeRow>
-                  <DateTimeField>
-                    <FieldLabel>
-                      {draft.recurringType === "installment"
-                        ? "카드 구매일 *"
-                        : "날짜 *"}
-                    </FieldLabel>
-                    <Input
-                      accessibilityLabel="후보 거래 날짜"
-                      autoCapitalize="none"
-                      keyboardType="numbers-and-punctuation"
-                      maxLength={10}
-                      placeholder="YYYY-MM-DD"
-                      placeholderTextColor={theme.colors.subtle}
-                      value={draft.date}
-                      editable={!isPending}
-                      onChangeText={(date) => updateDraft({ ...draft, date })}
-                    />
-                  </DateTimeField>
-                  <DateTimeField>
-                    <FieldLabel>
-                      {draft.recurringType === "installment"
-                        ? "카드 구매시간 *"
-                        : "시간 *"}
-                    </FieldLabel>
-                    <Input
-                      accessibilityLabel="후보 거래 시간"
-                      autoCapitalize="none"
-                      keyboardType="numbers-and-punctuation"
-                      maxLength={5}
-                      placeholder="HH:mm"
-                      placeholderTextColor={theme.colors.subtle}
-                      value={draft.time}
-                      editable={!isPending}
-                      onChangeText={(time) => updateDraft({ ...draft, time })}
-                    />
-                  </DateTimeField>
-                </DateTimeRow>
+                <TransactionDateTimeFields
+                  accessibilityPrefix="후보 거래"
+                  date={draft.date}
+                  time={draft.time}
+                  dateLabel={
+                    draft.recurringType === "installment"
+                      ? "카드 구매일 *"
+                      : "날짜 *"
+                  }
+                  timeLabel={
+                    draft.recurringType === "installment"
+                      ? "카드 구매시간 *"
+                      : "시간 *"
+                  }
+                  disabled={isPending || isSaving}
+                  onDateChange={(date) => updateDraft({ ...draft, date })}
+                  onTimeChange={(time) => updateDraft({ ...draft, time })}
+                />
+                {draft.recurringType === "installment" ? (
+                  <InstallmentSchedulePreview
+                    installmentMonths={draft.installmentMonths}
+                    paymentMethod={selectedPaymentMethod}
+                    purchaseDate={draft.date}
+                  />
+                ) : null}
               </Section>
 
               <Section>
@@ -913,11 +902,6 @@ const AmountPreview = styled(AppText)(({ theme }) => ({
   fontSize: 12,
   fontWeight: "600",
 }))
-const DateTimeRow = styled.View({
-  flexDirection: "row",
-  gap: mobileTheme.spacing[3],
-})
-const DateTimeField = styled.View({ flex: 1, gap: mobileTheme.spacing[2] })
 const SelectionButton = styled.Pressable(({ theme, disabled }) => ({
   minHeight: 52,
   flexDirection: "row",
