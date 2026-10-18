@@ -53,6 +53,8 @@ import {
 } from "./TransactionOptionPickerModal"
 import { CategoryPickerModal } from "./CategoryPickerModal"
 import { InstallmentAmountTypeSelect } from "./InstallmentAmountTypeSelect"
+import { InstallmentSchedulePreview } from "./InstallmentSchedulePreview"
+import { TransactionDateTimeFields } from "./TransactionDateTimeFields"
 
 interface TransactionEditorScreenProps {
   copyTransactionId?: string
@@ -293,7 +295,8 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
     Number.isSafeInteger(amount) &&
     Number.isSafeInteger(installmentMonths) &&
     amount > 0 &&
-    installmentMonths > 0
+    installmentMonths >= 2 &&
+    installmentMonths <= 120
       ? splitInstallmentPrincipal(amount, installmentMonths)
       : []
 
@@ -769,36 +772,24 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                 </AmountRow>
                 <AmountPreview>{amountPreview}</AmountPreview>
               </Field>
-              <DateTimeRow>
-                <DateTimeField>
-                  <FieldLabel>날짜 *</FieldLabel>
-                  <Input
-                    accessibilityLabel="거래 날짜"
-                    autoCapitalize="none"
-                    keyboardType="numbers-and-punctuation"
-                    maxLength={10}
-                    editable={!transaction?.recurringType}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={theme.colors.subtle}
-                    value={draft.date}
-                    onChangeText={(date) => updateDraft({ ...draft, date })}
-                  />
-                </DateTimeField>
-                <DateTimeField>
-                  <FieldLabel>시간 *</FieldLabel>
-                  <Input
-                    accessibilityLabel="거래 시간"
-                    autoCapitalize="none"
-                    keyboardType="numbers-and-punctuation"
-                    maxLength={5}
-                    editable={!transaction?.recurringType}
-                    placeholder="HH:mm"
-                    placeholderTextColor={theme.colors.subtle}
-                    value={draft.time}
-                    onChangeText={(time) => updateDraft({ ...draft, time })}
-                  />
-                </DateTimeField>
-              </DateTimeRow>
+              <TransactionDateTimeFields
+                accessibilityPrefix="거래"
+                date={draft.date}
+                time={draft.time}
+                dateLabel={
+                  draft.recurringType === "installment"
+                    ? "카드 구매일 *"
+                    : "날짜 *"
+                }
+                timeLabel={
+                  draft.recurringType === "installment"
+                    ? "카드 구매시간 *"
+                    : "시간 *"
+                }
+                disabled={Boolean(transaction?.recurringType) || isSaving}
+                onDateChange={(date) => updateDraft({ ...draft, date })}
+                onTimeChange={(time) => updateDraft({ ...draft, time })}
+              />
               <QuickDateButton
                 accessibilityRole="button"
                 disabled={Boolean(transaction?.recurringType)}
@@ -806,6 +797,15 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
               >
                 <QuickDateLabel>오늘 · 현재 시각으로 설정</QuickDateLabel>
               </QuickDateButton>
+              {draft.recurringType === "installment" &&
+              transaction?.recurringType !== "installment" ? (
+                <InstallmentSchedulePreview
+                  installmentMonths={draft.installmentMonths}
+                  isConversion={Boolean(transaction)}
+                  paymentMethod={paymentMethod}
+                  purchaseDate={draft.date}
+                />
+              ) : null}
             </Section>
 
             <Section>
@@ -1329,13 +1329,6 @@ const AmountPreview = styled(AppText)(({ theme }) => ({
   fontWeight: "600",
   textAlign: "right",
 }))
-
-const DateTimeRow = styled.View({
-  flexDirection: "row",
-  gap: mobileTheme.spacing[3],
-})
-
-const DateTimeField = styled.View({ minWidth: 0, flex: 1, gap: 8 })
 
 const QuickDateButton = styled.Pressable(({ theme }) => ({
   minHeight: mobileTheme.controls.touch,

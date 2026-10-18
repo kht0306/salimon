@@ -1,4 +1,5 @@
 export * from "./categories"
 export * from "./date"
 export * from "./money"
+export * from "./installments"
 export * from "./parser"

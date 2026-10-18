@@ -2,6 +2,7 @@
 
 import styled from "@emotion/styled"
 import {
+  buildInstallmentSchedulePreview,
   formatKoreanDate,
   formatMoneyInput,
   formatKrw,
@@ -12,7 +13,6 @@ import { colors, radii } from "@salimon/ui-tokens"
 import { observer } from "mobx-react-lite"
 import { useAppStore } from "../StoreProvider"
 import { Field, Input, RequiredMark, Select } from "../styles"
-import { buildInstallmentSchedulePreview } from "./installmentSchedule"
 import type { TransactionEditorDraft } from "./transactionEditorDraft"
 import {
   getPaymentMethodTypeLabel,

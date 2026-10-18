@@ -1,0 +1,8 @@
+<resources>
+  <style name="SalimonDateTimePicker.Light" parent="android:style/Theme.Material.Light.Dialog.Alert">
+    <item name="android:colorAccent">#2d6a4f</item>
+  </style>
+  <style name="SalimonDateTimePicker.Dark" parent="android:style/Theme.Material.Dialog.Alert">
+    <item name="android:colorAccent">#5eead4</item>
+  </style>
+</resources>
