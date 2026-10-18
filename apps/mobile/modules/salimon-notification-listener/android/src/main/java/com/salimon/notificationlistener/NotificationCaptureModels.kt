@@ -41,25 +41,35 @@ internal data class NotificationCaptureRecord(
 internal data class NotificationRegistrationState(
   val amount: Long,
   val categoryId: String,
+  val installmentAmountType: String = "",
+  val installmentMonths: Int = 0,
   val merchantName: String,
   val memo: String = "",
   val paymentMethodId: String,
+  val recurringType: String = "",
+  val requestId: String = "",
   val targetLedgerId: String,
   val tags: List<String> = emptyList(),
   val transactionAt: String,
   val updatedAt: Long,
 ) {
-  fun toBridgeMap(): Map<String, Any> = mapOf(
-    "amount" to amount,
-    "categoryId" to categoryId,
-    "merchantName" to merchantName,
-    "memo" to memo,
-    "paymentMethodId" to paymentMethodId,
-    "targetLedgerId" to targetLedgerId,
-    "tags" to tags,
-    "transactionAt" to transactionAt,
-    "updatedAt" to updatedAt,
-  )
+  fun toBridgeMap(): Map<String, Any> = buildMap {
+    put("amount", amount)
+    put("categoryId", categoryId)
+    put("merchantName", merchantName)
+    put("memo", memo)
+    put("paymentMethodId", paymentMethodId)
+    put("targetLedgerId", targetLedgerId)
+    put("tags", tags)
+    put("transactionAt", transactionAt)
+    put("updatedAt", updatedAt)
+    if (recurringType == "installment") {
+      put("recurringType", recurringType)
+      put("installmentAmountType", installmentAmountType)
+      put("installmentMonths", installmentMonths)
+    }
+    if (requestId.isNotBlank()) put("requestId", requestId)
+  }
 }
 
 internal data class NotificationCapturePreferencesSnapshot(

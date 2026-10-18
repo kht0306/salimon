@@ -287,6 +287,10 @@ describe("notification inbox candidate", () => {
         registrationState: {
           amount: 43_000,
           categoryId: "category-1",
+          recurringType: "installment",
+          installmentAmountType: "principal",
+          installmentMonths: 3,
+          requestId: "00000000-0000-4000-8000-000000000001",
           merchantName: "수정한 상점",
           paymentMethodId: "card-1",
           targetLedgerId: "ledger-2",
@@ -306,6 +310,12 @@ describe("notification inbox candidate", () => {
     expect(candidate.parsed.amount).toBe(43_000)
     expect(candidate.parsed.merchantName).toBe("수정한 상점")
     expect(candidate.registrationState?.categoryId).toBe("category-1")
+    expect(candidate.registrationState).toMatchObject({
+      recurringType: "installment",
+      installmentAmountType: "principal",
+      installmentMonths: 3,
+      requestId: "00000000-0000-4000-8000-000000000001",
+    })
     expect(candidateStatusLabel(candidate)).toBe("등록 대기")
   })
 })

@@ -196,6 +196,10 @@ class NotificationCaptureInstrumentation : Instrumentation() {
         registrationState = NotificationRegistrationState(
           amount = 12_000,
           categoryId = "category-1",
+          recurringType = "installment",
+          installmentAmountType = "principal",
+          installmentMonths = 3,
+          requestId = "00000000-0000-4000-8000-000000000001",
           merchantName = "암호화 테스트상점",
           paymentMethodId = "card-1",
           targetLedgerId = "ledger-1",
@@ -207,6 +211,11 @@ class NotificationCaptureInstrumentation : Instrumentation() {
     val pendingRecord = store.readRecords(sessionFingerprint, now).single()
     check(pendingRecord.registrationState?.amount == 12_000L)
     check(pendingRecord.registrationState?.categoryId == "category-1")
+    check(pendingRecord.registrationState?.recurringType == "installment")
+    check(pendingRecord.registrationState?.installmentAmountType == "principal")
+    check(pendingRecord.registrationState?.installmentMonths == 3)
+    check(pendingRecord.registrationState?.requestId == "00000000-0000-4000-8000-000000000001")
+    check(pendingRecord.registrationState?.toBridgeMap()?.get("installmentMonths") == 3)
     checkEncryptedFilesDoNotContainPlaintext(context)
 
     store.capture(

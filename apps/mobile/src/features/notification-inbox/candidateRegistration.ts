@@ -1,4 +1,7 @@
-import type { RemoteTransactionInput } from "@salimon/api-client"
+import {
+  createTransactionRequestId,
+  type RemoteTransactionInput,
+} from "@salimon/api-client"
 import { getDateTimeLocalValue } from "@salimon/domain"
 import type {
   Category,
@@ -21,10 +24,13 @@ export interface CandidateRegistrationDraft {
   candidateId: string
   categoryId: string
   date: string
+  installmentAmountType: "monthly" | "principal"
+  installmentMonths: string
   ledgerId: string
   merchantName: string
   memo: string
   paymentMethodId: string
+  recurringType: "" | "installment"
   tagsInput: string
   time: string
 }
@@ -101,6 +107,9 @@ export function createCandidateRegistrationDraft(
     candidateId: candidate.id,
     categoryId: registrationState?.categoryId ?? defaults.categoryId,
     date,
+    installmentAmountType:
+      registrationState?.installmentAmountType ?? "principal",
+    installmentMonths: String(registrationState?.installmentMonths ?? 2),
     ledgerId,
     merchantName:
       registrationState?.merchantName ?? candidate.parsed.merchantName ?? "",
@@ -113,6 +122,7 @@ export function createCandidateRegistrationDraft(
           defaults.paymentMethodId,
         ),
     tagsInput: registrationState?.tags?.join(", ") ?? "",
+    recurringType: registrationState?.recurringType ?? "",
     time: dateTime.slice(0, 5),
   }
 }
@@ -230,12 +240,12 @@ export function validateCandidateRegistrationDraft(
     categoryId: draft.categoryId,
     date: draft.date,
     incomeKind: "side_income",
-    installmentAmountType: "monthly",
-    installmentMonths: "2",
+    installmentAmountType: draft.installmentAmountType,
+    installmentMonths: draft.installmentMonths,
     merchantName: draft.merchantName,
     memo: draft.memo,
     paymentMethodId: draft.paymentMethodId,
-    recurringType: "",
+    recurringType: draft.recurringType,
     applyChangesToFuture: true,
     splits: [],
     status: "confirmed",
@@ -258,6 +268,8 @@ export function validateCandidateRegistrationDraft(
 
   const input: RemoteTransactionInput = {
     ...validation.input,
+    requestId:
+      candidate.registrationState?.requestId ?? createTransactionRequestId(),
     parseConfidence: candidate.parsed.confidence,
     sourceApp: candidate.sourceApp,
     sourceHash: candidate.sourceHash,
@@ -275,6 +287,10 @@ export function validateCandidateRegistrationDraft(
         merchantName: input.merchantName,
         memo: input.memo,
         paymentMethodId: input.paymentMethodId,
+        recurringType: draft.recurringType || undefined,
+        installmentAmountType: input.installmentAmountType,
+        installmentMonths: input.installmentMonths,
+        requestId: input.requestId,
         targetLedgerId: input.ledgerId,
         tags: input.tags,
         transactionAt: input.transactionAt,
@@ -323,6 +339,10 @@ function matchesPendingRegistration(
     draft.merchantName.trim() === (state.merchantName ?? "") &&
     draft.memo.trim() === (state.memo ?? "") &&
     draft.paymentMethodId === (state.paymentMethodId ?? "") &&
+    draft.recurringType === (state.recurringType ?? "") &&
+    (!draft.recurringType ||
+      (draft.installmentAmountType === state.installmentAmountType &&
+        Number(draft.installmentMonths) === state.installmentMonths)) &&
     draft.tagsInput
       .split(",")
       .map((tag) => tag.trim())

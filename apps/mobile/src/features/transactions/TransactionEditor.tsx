@@ -52,6 +52,7 @@ import {
   type TransactionOption,
 } from "./TransactionOptionPickerModal"
 import { CategoryPickerModal } from "./CategoryPickerModal"
+import { InstallmentAmountTypeSelect } from "./InstallmentAmountTypeSelect"
 
 interface TransactionEditorScreenProps {
   copyTransactionId?: string
@@ -287,6 +288,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
   const installmentMonths = Number(draft.installmentMonths)
   const installmentAmounts =
     draft.recurringType === "installment" &&
+    transaction?.recurringType !== "installment" &&
     draft.installmentAmountType === "principal" &&
     Number.isSafeInteger(amount) &&
     Number.isSafeInteger(installmentMonths) &&
@@ -690,7 +692,7 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                     <FieldLabel>할부 개월 *</FieldLabel>
                     <Input
                       accessibilityLabel="할부 개월"
-                      editable={!transaction}
+                      editable={transaction?.recurringType !== "installment"}
                       keyboardType="number-pad"
                       maxLength={3}
                       placeholder="2"
@@ -705,42 +707,6 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
                       }
                     />
                   </Field>
-                  {!transaction ? (
-                    <SegmentedRow>
-                      {(
-                        [
-                          { label: "월 납입액", value: "monthly" },
-                          { label: "총 원금", value: "principal" },
-                        ] as const
-                      ).map((option) => (
-                        <SegmentButton
-                          key={option.value}
-                          $selected={
-                            draft.installmentAmountType === option.value
-                          }
-                          accessibilityRole="radio"
-                          accessibilityState={{
-                            selected:
-                              draft.installmentAmountType === option.value,
-                          }}
-                          onPress={() =>
-                            updateDraft({
-                              ...draft,
-                              installmentAmountType: option.value,
-                            })
-                          }
-                        >
-                          <SegmentLabel
-                            $selected={
-                              draft.installmentAmountType === option.value
-                            }
-                          >
-                            {option.label}
-                          </SegmentLabel>
-                        </SegmentButton>
-                      ))}
-                    </SegmentedRow>
-                  ) : null}
                   {installmentAmounts[0] ? (
                     <InlineNotice>
                       첫 달 {formatKrw(installmentAmounts[0])} · 마지막 달에
@@ -776,26 +742,31 @@ const TransactionEditorForm = observer(function TransactionEditorForm({
             <Section>
               <SectionTitle>금액과 일시</SectionTitle>
               <Field>
-                <FieldLabel>
+                <FieldLabel>금액 *</FieldLabel>
+                <AmountRow>
                   {draft.recurringType === "installment" &&
-                  draft.installmentAmountType === "principal" &&
-                  !transaction
-                    ? "할부 총 원금 *"
-                    : "금액 *"}
-                </FieldLabel>
-                <AmountInput
-                  accessibilityLabel="거래 금액"
-                  keyboardType="number-pad"
-                  placeholder="0"
-                  placeholderTextColor={theme.colors.subtle}
-                  value={formatAmountInput(draft.amount)}
-                  onChangeText={(value) =>
-                    updateDraft({
-                      ...draft,
-                      amount: normalizeAmountInput(value),
-                    })
-                  }
-                />
+                  transaction?.recurringType !== "installment" ? (
+                    <InstallmentAmountTypeSelect
+                      value={draft.installmentAmountType}
+                      onChange={(installmentAmountType) =>
+                        updateDraft({ ...draft, installmentAmountType })
+                      }
+                    />
+                  ) : null}
+                  <AmountInput
+                    accessibilityLabel="거래 금액"
+                    keyboardType="number-pad"
+                    placeholder="0"
+                    placeholderTextColor={theme.colors.subtle}
+                    value={formatAmountInput(draft.amount)}
+                    onChangeText={(value) =>
+                      updateDraft({
+                        ...draft,
+                        amount: normalizeAmountInput(value),
+                      })
+                    }
+                  />
+                </AmountRow>
                 <AmountPreview>{amountPreview}</AmountPreview>
               </Field>
               <DateTimeRow>
@@ -1338,7 +1309,14 @@ const Input = styled.TextInput(({ theme }) => ({
   paddingHorizontal: mobileTheme.spacing[3],
 }))
 
+const AmountRow = styled.View({
+  flexDirection: "row",
+  gap: mobileTheme.spacing[2],
+})
+
 const AmountInput = styled(Input)({
+  flex: 1,
+  minWidth: 0,
   minHeight: 56,
   fontSize: 24,
   fontWeight: "700",

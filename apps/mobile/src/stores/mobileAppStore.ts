@@ -886,9 +886,13 @@ export class MobileAppStore {
         clearTimeout(timeoutId)
         timeoutId = undefined
       }
-      const savedTransactionId = requestInput.recurringType
-        ? requestInput.id
-        : (transactionId ?? requestInput.id ?? requestInput.requestId)
+      const savedTransactionId =
+        requestInput.recurringType === "installment" &&
+        !requestInput.recurringRuleId
+          ? undefined
+          : requestInput.recurringType
+            ? requestInput.id
+            : (transactionId ?? requestInput.id ?? requestInput.requestId)
       const transactionMonth = toMonthKey(new Date(requestInput.transactionAt))
 
       runInAction(() => {
@@ -2139,6 +2143,14 @@ export class MobileAppStore {
           merchantName: registrationState.merchantName ?? "",
           memo: registrationState.memo ?? "",
           paymentMethodId: registrationState.paymentMethodId ?? "",
+          ...(registrationState.recurringType === "installment"
+            ? {
+                installmentAmountType: registrationState.installmentAmountType,
+                installmentMonths: registrationState.installmentMonths,
+                recurringType: registrationState.recurringType,
+              }
+            : {}),
+          requestId: registrationState.requestId,
           targetLedgerId: registrationState.targetLedgerId,
           tags: registrationState.tags ?? [],
           transactionAt: registrationState.transactionAt,
@@ -2244,6 +2256,7 @@ export class MobileAppStore {
         this.notificationRegistrationErrorMessage = undefined
         if (
           transactionId &&
+          !input.recurringType &&
           toMonthKey(new Date(input.transactionAt)) === this.selectedMonth
         ) {
           this.applyOptimisticTransaction(transactionId, input, userId)

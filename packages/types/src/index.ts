@@ -293,9 +293,13 @@ export interface LocalSmsCandidate {
 export interface SmsCandidateRegistrationState {
   amount: number
   categoryId: string
+  installmentAmountType?: "monthly" | "principal"
+  installmentMonths?: number
   merchantName?: string
   memo?: string
   paymentMethodId?: string
+  recurringType?: "installment"
+  requestId?: string
   targetLedgerId: string
   tags?: string[]
   transactionAt: string

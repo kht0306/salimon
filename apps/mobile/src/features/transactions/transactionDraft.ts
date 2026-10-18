@@ -315,13 +315,17 @@ export function validateMobileTransactionDraft(
     if (!paymentMethod || paymentMethod.type !== "card") {
       return { valid: false, message: "할부에 사용할 카드를 선택해 주세요." }
     }
-    if (!context.editingTransaction && !paymentMethod.paymentDay) {
+    if (
+      context.editingTransaction?.recurringType !== "installment" &&
+      !paymentMethod.paymentDay
+    ) {
       return {
         valid: false,
         message: "결제일이 설정된 카드만 새 할부에 사용할 수 있습니다.",
       }
     }
     if (
+      context.editingTransaction?.recurringType !== "installment" &&
       draft.installmentAmountType === "principal" &&
       amount < installmentMonths
     ) {

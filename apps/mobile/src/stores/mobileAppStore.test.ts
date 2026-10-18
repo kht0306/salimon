@@ -561,6 +561,9 @@ describe("MobileAppStore authentication", () => {
     const result = await store.registerNotificationCandidate({
       amount: "45000",
       candidateId: "a".repeat(64),
+      installmentAmountType: "principal" as const,
+      installmentMonths: "2",
+      recurringType: "" as const,
       categoryId: "category-1",
       date: "2026-08-13",
       ledgerId: "ledger-1",
@@ -618,6 +621,9 @@ describe("MobileAppStore authentication", () => {
     const draft = {
       amount: "45000",
       candidateId: "a".repeat(64),
+      installmentAmountType: "principal" as const,
+      installmentMonths: "2",
+      recurringType: "" as const,
       categoryId: "category-1",
       date: "2026-08-13",
       ledgerId: "ledger-1",
@@ -650,6 +656,95 @@ describe("MobileAppStore authentication", () => {
     expect(deleteStoredNotificationRecord).toHaveBeenCalledOnce()
   })
 
+  it("restores a pending installment after restart and retries the same request", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-08-13T14:01:00+09:00"))
+    const data = createReadyFinanceData()
+    data.categories = [createExpenseCategory()]
+    data.paymentMethods = [
+      {
+        id: "card-1",
+        instrumentId: "installment-instrument",
+        ledgerId: "ledger-1",
+        name: "할부 카드",
+        type: "card",
+        visibility: "ledger",
+        isActive: true,
+        paymentDay: 15,
+      },
+    ]
+    const repository = createRepository(data)
+    repository.saveTransaction.mockRejectedValueOnce(
+      new Error("network unavailable"),
+    )
+    mockCapturedNotification()
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+    await vi.waitFor(() => expect(store.notificationCandidateCount).toBe(1))
+    const candidate = store.notificationCandidates[0]!
+    const draft = {
+      ...createCandidateRegistrationDraft(candidate, {
+        categories: data.categories,
+        defaultLedgerId: "ledger-1",
+        ledgers: data.ledgers,
+        paymentMethods: data.paymentMethods,
+      }),
+      paymentMethodId: "card-1",
+      recurringType: "installment" as const,
+      installmentMonths: "3",
+    }
+
+    expect(await store.registerNotificationCandidate(draft)).toEqual({
+      status: "pending",
+    })
+    const persistedState = vi.mocked(saveStoredNotificationRegistrationState)
+      .mock.calls[0]![1]
+    expect(persistedState).toMatchObject({
+      recurringType: "installment",
+      installmentAmountType: "principal",
+      installmentMonths: 3,
+      requestId: expect.any(String),
+    })
+    const records = await readStoredNotificationRecords()
+    vi.mocked(readStoredNotificationRecords).mockResolvedValue([
+      {
+        ...records[0]!,
+        registrationState: { ...persistedState, updatedAt: Date.now() },
+      },
+    ])
+    const restartedStore = new MobileAppStore(repository, createAuthGateway())
+    await restartedStore.initializeAuth()
+    await vi.waitFor(() =>
+      expect(restartedStore.notificationCandidateCount).toBe(1),
+    )
+    const restoredDraft = createCandidateRegistrationDraft(
+      restartedStore.notificationCandidates[0]!,
+      {
+        categories: data.categories,
+        defaultLedgerId: "ledger-1",
+        ledgers: data.ledgers,
+        paymentMethods: data.paymentMethods,
+      },
+    )
+    expect(restoredDraft).toEqual(draft)
+    repository.saveTransaction.mockResolvedValueOnce("installment-rule")
+    expect(
+      await restartedStore.registerNotificationCandidate(restoredDraft),
+    ).toEqual({
+      status: "saved",
+      transactionId: "installment-rule",
+    })
+    expect(repository.saveTransaction.mock.calls[1]![1]).toEqual(
+      repository.saveTransaction.mock.calls[0]![1],
+    )
+    expect(deleteStoredNotificationRecord).toHaveBeenCalledOnce()
+    expect(
+      restartedStore.financeData.transactions.some(
+        (item) => item.id === "installment-rule",
+      ),
+    ).toBe(false)
+  })
+
   it("turns a source hash collision into already registered and cleans the candidate", async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date("2026-08-13T14:01:00+09:00"))
@@ -668,6 +763,9 @@ describe("MobileAppStore authentication", () => {
       store.registerNotificationCandidate({
         amount: "45000",
         candidateId: "a".repeat(64),
+        installmentAmountType: "principal",
+        installmentMonths: "2",
+        recurringType: "",
         categoryId: "category-1",
         date: "2026-08-13",
         ledgerId: "ledger-1",
@@ -967,6 +1065,29 @@ describe("MobileAppStore authentication", () => {
     )
     expect(repository.loadMonth).toHaveBeenCalledOnce()
     expect(store.transactionMutationState).toBe("idle")
+  })
+
+  it("returns to the list after converting a regular transaction to installments", async () => {
+    const repository = createRepository()
+    const store = new MobileAppStore(repository, createAuthGateway())
+    await store.initializeAuth()
+    const result = await store.saveGeneralTransaction({
+      id: "regular-transaction",
+      ledgerId: "ledger-1",
+      type: "expense",
+      status: "confirmed",
+      amount: 45000,
+      transactionAt: "2026-08-13T05:00:00.000Z",
+      recurringType: "installment",
+      installmentAmountType: "principal",
+      installmentMonths: 3,
+    })
+    expect(result).toEqual({ status: "saved" })
+    expect(
+      store.financeData.transactions.some(
+        (item) => item.id === "regular-transaction",
+      ),
+    ).toBe(false)
   })
 
   it("treats a fixed-rule save without a transaction id as successful", async () => {
