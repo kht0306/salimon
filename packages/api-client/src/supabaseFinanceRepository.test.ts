@@ -557,8 +557,41 @@ describe("saveTransaction", () => {
     expect(from).not.toHaveBeenCalled()
   })
 
+  it("does not request split permissions on a retired transaction after installment conversion", async () => {
+    rpc
+      .mockResolvedValueOnce({ data: "new-installment-rule", error: null })
+      .mockResolvedValueOnce({
+        data: null,
+        error: { message: "거래 분할을 저장할 권한이 없습니다." },
+      })
+    const repository = new SupabaseFinanceRepository()
+    await expect(
+      repository.saveTransaction("user-1", {
+        id: "notification-transaction",
+        ledgerId: "ledger-1",
+        type: "expense",
+        status: "confirmed",
+        amount: 45000,
+        transactionAt: "2026-08-13T05:00:00.000Z",
+        recurringType: "installment",
+        installmentAmountType: "principal",
+        installmentMonths: 3,
+        paymentMethodId: "card-1",
+        splits: [],
+      }),
+    ).resolves.toBe("notification-transaction")
+    expect(rpc).toHaveBeenCalledOnce()
+    expect(rpc).toHaveBeenCalledWith(
+      "update_transaction_with_recurrence_v3",
+      expect.objectContaining({
+        p_installment_amount_type: "principal",
+        p_installment_months: 3,
+      }),
+    )
+  })
+
   it.each(["fixed", "installment"] as const)(
-    "uses the transaction id when clearing splits after a %s edit",
+    "does not clear category splits after a %s edit",
     async (recurringType) => {
       rpc
         .mockResolvedValueOnce({ data: "rule-1", error: null })
@@ -577,10 +610,11 @@ describe("saveTransaction", () => {
         splits: [],
       })
 
-      expect(rpc).toHaveBeenNthCalledWith(2, "replace_transaction_splits", {
-        p_transaction_id: "transaction-1",
-        p_splits: [],
-      })
+      expect(rpc).toHaveBeenCalledOnce()
+      expect(rpc).not.toHaveBeenCalledWith(
+        "replace_transaction_splits",
+        expect.anything(),
+      )
     },
   )
 

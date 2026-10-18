@@ -1,6 +1,11 @@
 import { useTheme } from "@emotion/react"
 import styled from "@emotion/native"
-import { formatKrw, getCategoryLabel } from "@salimon/domain"
+import {
+  formatKrw,
+  getCategoryLabel,
+  isSplitCategory,
+  splitInstallmentPrincipal,
+} from "@salimon/domain"
 import type { LocalSmsCandidate, PaymentMethod } from "@salimon/types"
 import { observer } from "mobx-react-lite"
 import { useEffect, useRef, useState } from "react"
@@ -24,6 +29,7 @@ import {
   type TransactionOption,
 } from "../transactions/TransactionOptionPickerModal"
 import { CategoryPickerModal } from "../transactions/CategoryPickerModal"
+import { InstallmentAmountTypeSelect } from "../transactions/InstallmentAmountTypeSelect"
 import {
   createCandidateRegistrationDraft,
   formatCandidateAmountInput,
@@ -44,7 +50,7 @@ interface CandidateEditorProps {
   onExclude: () => void
 }
 
-type PickerKind = "category" | "ledger" | "payment"
+type PickerKind = "category" | "ledger" | "payment" | "recurring"
 
 const keyboardBehavior = Platform.OS === "ios" ? "padding" : "height"
 const safeAreaEdges = ["top", "bottom"] as const
@@ -115,6 +121,7 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
       (category) =>
         category.ledgerId === draft.ledgerId &&
         category.usageTypes.includes(candidate.parsed.type) &&
+        (draft.recurringType !== "installment" || !isSplitCategory(category)) &&
         !category.isArchived,
     )
     .sort((first, second) => first.sortOrder - second.sortOrder)
@@ -124,6 +131,10 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
         method.ledgerId === draft.ledgerId &&
         method.isActive &&
         !method.isDeleted,
+    )
+    .filter(
+      (method) =>
+        draft.recurringType !== "installment" || method.type === "card",
     )
     .sort(
       (first, second) =>
@@ -148,6 +159,17 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
       : "금액 미입력"
   const eventLabel = cardNotificationEventLabel(candidate)
   const originalCurrencyAmount = candidate.parsed.originalCurrencyAmount
+  const installmentMonths = Number(draft.installmentMonths)
+  const installmentAmounts =
+    draft.recurringType === "installment" &&
+    draft.installmentAmountType === "principal" &&
+    Number.isSafeInteger(amount) &&
+    Number.isSafeInteger(installmentMonths) &&
+    amount >= installmentMonths &&
+    installmentMonths >= 2 &&
+    installmentMonths <= 120
+      ? splitInstallmentPrincipal(amount, installmentMonths)
+      : []
 
   useEffect(() => {
     store.clearNotificationRegistrationError()
@@ -200,7 +222,9 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
 
     Alert.alert(
       isPending ? "등록을 다시 시도할까요?" : "거래로 등록할까요?",
-      `${selectedLedger?.name ?? "선택한 가계부"}에 ${amountPreview} ${transactionTypeLabel(candidate.parsed.type)}을(를) 등록합니다.`,
+      draft.recurringType === "installment"
+        ? `${selectedLedger?.name ?? "선택한 가계부"}에 ${draft.installmentAmountType === "principal" ? "할부 원금" : "월별 납입액"} ${amountPreview}, ${draft.installmentMonths}개월 할부를 등록합니다.`
+        : `${selectedLedger?.name ?? "선택한 가계부"}에 ${amountPreview} ${transactionTypeLabel(candidate.parsed.type)}을(를) 등록합니다.`,
       [
         { text: "취소", style: "cancel" },
         { text: "등록", onPress: () => void persistRegistration() },
@@ -247,6 +271,26 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
   }
 
   function renderPicker(): React.ReactNode {
+    if (picker === "recurring") {
+      return (
+        <TransactionOptionPickerModal
+          emptyMessage=""
+          options={[
+            { id: "general", label: "일반" },
+            { id: "installment", label: "할부" },
+          ]}
+          selectedId={draft.recurringType || "general"}
+          title="거래 방식"
+          onClose={() => setPicker(undefined)}
+          onSelect={(id) =>
+            updateDraft({
+              ...draft,
+              recurringType: id === "installment" ? "installment" : "",
+            })
+          }
+        />
+      )
+    }
     if (picker === "ledger") {
       const options: TransactionOption[] = ledgers.map((ledger) => ({
         description:
@@ -411,31 +455,83 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
 
               <Section>
                 <SectionTitle>금액과 일시</SectionTitle>
+                {candidate.parsed.type === "expense" ? (
+                  <SelectionField
+                    label="거래 방식"
+                    placeholder="일반"
+                    value={
+                      draft.recurringType === "installment" ? "할부" : "일반"
+                    }
+                    disabled={isPending}
+                    onPress={() => setPicker("recurring")}
+                  />
+                ) : null}
+                {draft.recurringType === "installment" ? (
+                  <Field>
+                    <FieldLabel>할부 개월 *</FieldLabel>
+                    <Input
+                      accessibilityLabel="후보 할부 개월"
+                      editable={!isPending}
+                      keyboardType="number-pad"
+                      maxLength={3}
+                      placeholder="2"
+                      placeholderTextColor={theme.colors.subtle}
+                      value={draft.installmentMonths}
+                      onChangeText={(value) =>
+                        updateDraft({
+                          ...draft,
+                          installmentMonths: normalizeAmountInput(value),
+                        })
+                      }
+                    />
+                  </Field>
+                ) : null}
                 <Field>
                   <FieldLabel>
                     {originalCurrencyAmount
                       ? "가계부 반영금액 (KRW) *"
                       : "금액 *"}
                   </FieldLabel>
-                  <AmountInput
-                    accessibilityLabel="후보 거래 금액"
-                    keyboardType="number-pad"
-                    placeholder={originalCurrencyAmount ? "원화 금액" : "0"}
-                    placeholderTextColor={theme.colors.subtle}
-                    value={formatCandidateAmountInput(draft.amount)}
-                    editable={!isPending}
-                    onChangeText={(value) =>
-                      updateDraft({
-                        ...draft,
-                        amount: normalizeAmountInput(value),
-                      })
-                    }
-                  />
+                  <AmountRow>
+                    {draft.recurringType === "installment" ? (
+                      <InstallmentAmountTypeSelect
+                        disabled={isPending}
+                        value={draft.installmentAmountType}
+                        onChange={(installmentAmountType) =>
+                          updateDraft({ ...draft, installmentAmountType })
+                        }
+                      />
+                    ) : null}
+                    <AmountInput
+                      accessibilityLabel="후보 거래 금액"
+                      keyboardType="number-pad"
+                      placeholder={originalCurrencyAmount ? "원화 금액" : "0"}
+                      placeholderTextColor={theme.colors.subtle}
+                      value={formatCandidateAmountInput(draft.amount)}
+                      editable={!isPending}
+                      onChangeText={(value) =>
+                        updateDraft({
+                          ...draft,
+                          amount: normalizeAmountInput(value),
+                        })
+                      }
+                    />
+                  </AmountRow>
                   <AmountPreview>{amountPreview}</AmountPreview>
+                  {installmentAmounts[0] ? (
+                    <IntroDescription>
+                      월 {formatKrw(installmentAmounts[0])} · 마지막 회차에 잔액
+                      반영
+                    </IntroDescription>
+                  ) : null}
                 </Field>
                 <DateTimeRow>
                   <DateTimeField>
-                    <FieldLabel>날짜 *</FieldLabel>
+                    <FieldLabel>
+                      {draft.recurringType === "installment"
+                        ? "카드 구매일 *"
+                        : "날짜 *"}
+                    </FieldLabel>
                     <Input
                       accessibilityLabel="후보 거래 날짜"
                       autoCapitalize="none"
@@ -449,7 +545,11 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
                     />
                   </DateTimeField>
                   <DateTimeField>
-                    <FieldLabel>시간 *</FieldLabel>
+                    <FieldLabel>
+                      {draft.recurringType === "installment"
+                        ? "카드 구매시간 *"
+                        : "시간 *"}
+                    </FieldLabel>
                     <Input
                       accessibilityLabel="후보 거래 시간"
                       autoCapitalize="none"
@@ -480,7 +580,11 @@ const CandidateEditorForm = observer(function CandidateEditorForm({
                 />
                 {candidate.parsed.type !== "income" ? (
                   <SelectionField
-                    label="결제수단"
+                    label={
+                      draft.recurringType === "installment"
+                        ? "결제수단 *"
+                        : "결제수단"
+                    }
                     placeholder="현금 · 결제수단 없음"
                     value={
                       selectedPaymentMethod
@@ -789,9 +893,15 @@ const Input = styled.TextInput(({ theme }) => ({
   paddingHorizontal: mobileTheme.spacing[3],
 }))
 const AmountInput = styled(Input)({
+  flex: 1,
+  minWidth: 0,
   minHeight: 60,
   fontSize: 28,
   fontWeight: "700",
+})
+const AmountRow = styled.View({
+  flexDirection: "row",
+  gap: mobileTheme.spacing[2],
 })
 const MultilineInput = styled(Input)({
   minHeight: 88,

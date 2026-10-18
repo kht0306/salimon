@@ -499,7 +499,7 @@ export class SupabaseFinanceRepository {
         const { error: tagError } = await tagRequest
         throwIfError(tagError)
       }
-      if (input.splits !== undefined) {
+      if (input.splits !== undefined && !input.recurringType) {
         await this.replaceTransactionSplits(
           transactionId,
           input.splits,

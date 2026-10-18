@@ -65,9 +65,13 @@ export interface NotificationRecordInput {
   registrationState?: {
     amount: number
     categoryId: string
+    installmentAmountType?: "monthly" | "principal"
+    installmentMonths?: number
     merchantName: string
     memo?: string
     paymentMethodId: string
+    recurringType?: "installment"
+    requestId?: string
     targetLedgerId: string
     tags?: string[]
     transactionAt: string
@@ -107,6 +111,11 @@ export function createCandidateFromNotificationRecord(input: {
     ? {
         amount: input.record.registrationState.amount,
         categoryId: input.record.registrationState.categoryId,
+        installmentAmountType:
+          input.record.registrationState.installmentAmountType,
+        installmentMonths: input.record.registrationState.installmentMonths,
+        recurringType: input.record.registrationState.recurringType,
+        requestId: input.record.registrationState.requestId,
         merchantName: input.record.registrationState.merchantName || undefined,
         memo: input.record.registrationState.memo || undefined,
         paymentMethodId:

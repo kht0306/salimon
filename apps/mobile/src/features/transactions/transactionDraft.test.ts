@@ -117,6 +117,57 @@ const paymentMethods: PaymentMethod[] = [
 ]
 
 describe("mobile transaction draft", () => {
+  it.each(["monthly", "principal"] as const)(
+    "converts a regular transaction to installments with a %s amount",
+    (installmentAmountType) => {
+      const transaction: Transaction = {
+        id: "notification-transaction",
+        ledgerId: "ledger-1",
+        createdBy: "user-1",
+        type: "expense",
+        status: "confirmed",
+        amount: 45000,
+        currency: "KRW",
+        transactionAt: "2026-08-13T05:00:00.000Z",
+        categoryId: "expense-category",
+        paymentMethodId: "card-1",
+        sourceType: "android_sms_notification",
+        createdAt: "2026-08-13T05:00:00.000Z",
+        updatedAt: "2026-08-13T05:00:00.000Z",
+      }
+      const draft = {
+        ...createEditingMobileTransactionDraft(transaction),
+        recurringType: "installment" as const,
+        installmentAmountType,
+        installmentMonths: "3",
+      }
+      const context = {
+        categories,
+        ledgerId: "ledger-1",
+        members,
+        paymentMethods,
+        editingTransaction: transaction,
+      }
+      const result = validateMobileTransactionDraft(draft, context)
+      expect(result.valid && result.input).toMatchObject({
+        id: transaction.id,
+        amount: 45000,
+        recurringType: "installment",
+        installmentAmountType,
+        installmentMonths: 3,
+      })
+      expect(
+        validateMobileTransactionDraft(draft, {
+          ...context,
+          paymentMethods: paymentMethods.map((method) => ({
+            ...method,
+            paymentDay: undefined,
+          })),
+        }).valid,
+      ).toBe(false)
+    },
+  )
+
   it.each([
     ["", "", ""],
     ["0", "0", "0"],

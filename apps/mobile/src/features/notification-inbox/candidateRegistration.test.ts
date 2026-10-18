@@ -76,6 +76,110 @@ const context: CandidateRegistrationContext = {
 }
 
 describe("candidate registration", () => {
+  const installmentCard: PaymentMethod = {
+    id: "installment-card",
+    instrumentId: "installment-instrument",
+    ledgerId: "ledger-1",
+    name: "할부 카드",
+    type: "card",
+    visibility: "ledger",
+    isActive: true,
+    paymentDay: 15,
+  }
+
+  it.each(["monthly", "principal"] as const)(
+    "registers installments using the %s amount and restores pending settings",
+    (installmentAmountType) => {
+      const installmentContext = {
+        ...context,
+        paymentMethods: [installmentCard],
+      }
+      const draft = {
+        ...createCandidateRegistrationDraft(candidate, installmentContext),
+        recurringType: "installment" as const,
+        installmentAmountType,
+        installmentMonths: "3",
+      }
+      const now = new Date("2026-08-13T06:00:00.000Z")
+      const result = validateCandidateRegistrationDraft(
+        draft,
+        candidate,
+        installmentContext,
+        now,
+      )
+      expect(result.valid).toBe(true)
+      if (!result.valid) throw new Error(result.message)
+      expect(result.value.input).toMatchObject({
+        amount: 45000,
+        recurringType: "installment",
+        installmentAmountType,
+        installmentMonths: 3,
+        paymentMethodId: installmentCard.id,
+        requestId: expect.any(String),
+      })
+
+      const pendingCandidate: LocalSmsCandidate = {
+        ...candidate,
+        status: "registration_pending",
+        registrationState: result.value.registrationState,
+      }
+      const restoredDraft = createCandidateRegistrationDraft(
+        pendingCandidate,
+        installmentContext,
+      )
+      expect(restoredDraft).toEqual(draft)
+      const retried = validateCandidateRegistrationDraft(
+        restoredDraft,
+        pendingCandidate,
+        installmentContext,
+        now,
+      )
+      expect(retried.valid && retried.value.input).toEqual(result.value.input)
+
+      for (const change of [
+        { installmentMonths: "6" },
+        {
+          installmentAmountType:
+            installmentAmountType === "monthly"
+              ? ("principal" as const)
+              : ("monthly" as const),
+        },
+        { recurringType: "" as const },
+      ]) {
+        expect(
+          validateCandidateRegistrationDraft(
+            { ...restoredDraft, ...change },
+            pendingCandidate,
+            installmentContext,
+            now,
+          ).valid,
+        ).toBe(false)
+      }
+    },
+  )
+
+  it.each([
+    { installmentMonths: "1" },
+    { installmentMonths: "121" },
+    { amount: "2", installmentMonths: "3" },
+    { paymentMethodId: "" },
+  ])("rejects invalid candidate installments: %j", (change) => {
+    const installmentContext = { ...context, paymentMethods: [installmentCard] }
+    expect(
+      validateCandidateRegistrationDraft(
+        {
+          ...createCandidateRegistrationDraft(candidate, installmentContext),
+          recurringType: "installment",
+          installmentMonths: "3",
+          ...change,
+        },
+        candidate,
+        installmentContext,
+        new Date("2026-08-13T06:00:00.000Z"),
+      ).valid,
+    ).toBe(false)
+  })
+
   const wooriCandidate: LocalSmsCandidate = {
     ...candidate,
     parsed: {

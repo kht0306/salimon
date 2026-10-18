@@ -242,9 +242,13 @@ internal class EncryptedNotificationStore(context: Context) {
     JSONObject()
       .put("amount", amount)
       .put("categoryId", categoryId)
+      .put("installmentAmountType", installmentAmountType)
+      .put("installmentMonths", installmentMonths)
       .put("merchantName", merchantName)
       .put("memo", memo)
       .put("paymentMethodId", paymentMethodId)
+      .put("recurringType", recurringType)
+      .put("requestId", requestId)
       .put("targetLedgerId", targetLedgerId)
       .put("tags", tags)
       .put("transactionAt", transactionAt)
@@ -254,9 +258,13 @@ internal class EncryptedNotificationStore(context: Context) {
     NotificationRegistrationState(
       amount = getLong("amount"),
       categoryId = getString("categoryId"),
+      installmentAmountType = optString("installmentAmountType"),
+      installmentMonths = optInt("installmentMonths"),
       merchantName = optString("merchantName"),
       memo = optString("memo"),
       paymentMethodId = optString("paymentMethodId"),
+      recurringType = optString("recurringType"),
+      requestId = optString("requestId"),
       targetLedgerId = getString("targetLedgerId"),
       tags = optJSONArray("tags")?.let { values ->
         (0 until values.length()).map { index -> values.optString(index) }
