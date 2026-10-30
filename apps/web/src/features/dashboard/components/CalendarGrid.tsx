@@ -7,6 +7,7 @@ import {
   fromMonthKey,
   getCategoryLabel,
   toDateKey,
+  type TransactionRecurrenceFilter,
 } from "@salimon/domain"
 import { colors, radii } from "@salimon/ui-tokens"
 import {
@@ -202,6 +203,22 @@ export const CalendarGrid = observer(function CalendarGrid() {
             </IconButton>
           </MonthControls>
           <CalendarActions>
+            <RegistrantFilter>
+              <span>거래 구분</span>
+              <Select
+                aria-label="캘린더 거래 구분 필터"
+                value={store.calendarRecurrenceFilter}
+                onChange={(event) =>
+                  store.setCalendarRecurrenceFilter(
+                    event.target.value as TransactionRecurrenceFilter,
+                  )
+                }
+              >
+                <option value="all">전체 거래</option>
+                <option value="general">일반 거래</option>
+                <option value="recurring">반복 거래</option>
+              </Select>
+            </RegistrantFilter>
             <RegistrantFilter>
               <span>등록자</span>
               <Select

@@ -18,6 +18,12 @@ const transactionGroupingOptions = [
   { label: "구분 없음", value: "none" },
 ] as const
 
+const recurrenceFilterOptions = [
+  { label: "전체 거래", value: "all" },
+  { label: "일반 거래", value: "general" },
+  { label: "반복 거래", value: "recurring" },
+] as const
+
 interface DashboardHeaderProps {
   isWide: boolean
 }
@@ -80,6 +86,29 @@ export const DashboardHeader = observer(function DashboardHeader({
       ) : null}
 
       <LedgerMonthControls />
+
+      <GroupingControl accessibilityLabel="캘린더 거래 구분 필터">
+        <GroupingLabel>거래 구분</GroupingLabel>
+        <GroupingOptions>
+          {recurrenceFilterOptions.map((option) => {
+            const selected = store.calendarRecurrenceFilter === option.value
+            return (
+              <GroupingOption
+                key={option.value}
+                $selected={selected}
+                accessibilityLabel={option.label}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                onPress={() => store.setCalendarRecurrenceFilter(option.value)}
+              >
+                <GroupingOptionLabel $selected={selected}>
+                  {option.label}
+                </GroupingOptionLabel>
+              </GroupingOption>
+            )
+          })}
+        </GroupingOptions>
+      </GroupingControl>
 
       <OverviewColumns $isWide={isWide}>
         <OverviewColumn>

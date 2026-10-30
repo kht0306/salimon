@@ -20,10 +20,12 @@ import {
   getCategoryDepth,
   isSplitCategory,
   MAX_CATEGORY_DEPTH,
+  matchesTransactionRecurrence,
   moveMonth,
   toDateKey,
   toMonthKey,
   transactionAmountForCategoryIds,
+  type TransactionRecurrenceFilter,
 } from "@salimon/domain"
 import {
   CURRENT_PRIVACY_VERSION,
@@ -226,6 +228,7 @@ export class MobileAppStore {
   selectedDate: string
   selectedLedgerId = ""
   selectedMonth: string
+  calendarRecurrenceFilter: TransactionRecurrenceFilter = "all"
   dashboardTransactionGrouping: DashboardTransactionGrouping = "actor"
   collapsedDashboardTransactionGroupKeys =
     new Set<DashboardTransactionRecurrenceKey>()
@@ -437,15 +440,21 @@ export class MobileAppStore {
       )
   }
 
+  get calendarMonthTransactions(): Transaction[] {
+    return this.monthTransactions.filter((transaction) =>
+      matchesTransactionRecurrence(transaction, this.calendarRecurrenceFilter),
+    )
+  }
+
   get selectedDateTransactions(): Transaction[] {
-    return this.monthTransactions.filter(
+    return this.calendarMonthTransactions.filter(
       (transaction) =>
         toDateKey(new Date(transaction.transactionAt)) === this.selectedDate,
     )
   }
 
   get monthTotals(): TransactionTotals {
-    return calculateConfirmedTotals(this.monthTransactions)
+    return calculateConfirmedTotals(this.calendarMonthTransactions)
   }
 
   get monthlySummaryVisible(): boolean {
@@ -453,7 +462,10 @@ export class MobileAppStore {
   }
 
   get monthDaySummaries(): MonthDaySummary[] {
-    return buildMonthDaySummaries(this.selectedMonth, this.monthTransactions)
+    return buildMonthDaySummaries(
+      this.selectedMonth,
+      this.calendarMonthTransactions,
+    )
   }
 
   get selectedMonthBudgets(): MobileCategoryBudgetProgress[] {
@@ -1075,6 +1087,10 @@ export class MobileAppStore {
     if (this.monthDaySummaries.some((summary) => summary.date === date)) {
       this.selectedDate = date
     }
+  }
+
+  setCalendarRecurrenceFilter(filter: TransactionRecurrenceFilter): void {
+    this.calendarRecurrenceFilter = filter
   }
 
   async setMonthlySummaryVisibility(visible: boolean): Promise<boolean> {

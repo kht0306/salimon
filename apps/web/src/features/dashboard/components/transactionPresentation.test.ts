@@ -2,6 +2,7 @@ import type { Category, PaymentMethod, Transaction } from "@salimon/types"
 import { describe, expect, it } from "vitest"
 import {
   buildTransactionCategoryOptions,
+  compareTransactions,
   getInstallmentLabel,
   getPaymentLabel,
   getPaymentMetadataLabel,
@@ -46,6 +47,46 @@ const account: PaymentMethod = {
   type: "bank",
   issuer: "국민은행",
 }
+
+describe("transaction search sorting", () => {
+  const transactions: Transaction[] = [
+    {
+      ...transaction,
+      id: "old-small",
+      amount: 5000,
+      transactionAt: "2026-07-01T12:00:00+09:00",
+    },
+    {
+      ...transaction,
+      id: "new-large",
+      amount: 50000,
+      transactionAt: "2026-07-03T12:00:00+09:00",
+    },
+    {
+      ...transaction,
+      id: "middle-small",
+      amount: 5000,
+      transactionAt: "2026-07-02T12:00:00+09:00",
+    },
+  ]
+
+  it.each([
+    ["date_desc", ["new-large", "middle-small", "old-small"]],
+    ["date_asc", ["old-small", "middle-small", "new-large"]],
+    ["amount_desc", ["new-large", "middle-small", "old-small"]],
+    ["amount_asc", ["middle-small", "old-small", "new-large"]],
+  ] as const)(
+    "sorts the complete result by %s before pagination",
+    (order, expected) => {
+      expect(
+        [...transactions]
+          .sort((first, second) => compareTransactions(first, second, order))
+          .map((item) => item.id),
+      ).toEqual(expected)
+      expect(transactions[0].id).toBe("old-small")
+    },
+  )
+})
 
 describe("buildTransactionCategoryOptions", () => {
   it("shows only active categories for the selected usage in hierarchy order", () => {
