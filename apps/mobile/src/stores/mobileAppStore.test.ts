@@ -1455,6 +1455,101 @@ describe("MobileAppStore authentication", () => {
     )
   })
 
+  it("filters calendar rows, daily summaries, and monthly totals while preserving all month data", async () => {
+    const data = createReadyFinanceData()
+    data.transactions = [
+      createTransaction("general", "ledger-1", "expense", 12000, 10),
+      {
+        ...createTransaction("fixed", "ledger-1", "expense", 30000, 10),
+        recurringType: "fixed",
+      },
+      {
+        ...createTransaction("installment", "ledger-1", "expense", 20000, 10),
+        recurringType: "installment",
+      },
+      {
+        ...createTransaction("salary", "ledger-1", "income", 500000, 10),
+        recurringType: "fixed",
+      },
+      {
+        ...createTransaction("saving", "ledger-1", "saving", 50000, 10),
+        recurringType: "fixed",
+      },
+      {
+        ...createTransaction("excluded", "ledger-1", "expense", 999999, 10),
+        recurringType: "fixed",
+        status: "excluded",
+      },
+      {
+        ...createTransaction("deleted", "ledger-1", "expense", 999999, 10),
+        recurringType: "fixed",
+        deletedAt: "2026-08-10T12:00:00+09:00",
+      },
+      {
+        ...createTransaction("other-ledger", "ledger-2", "expense", 999999, 10),
+        recurringType: "fixed",
+      },
+      {
+        ...createTransaction("next-day", "ledger-1", "expense", 1000, 11),
+        recurringType: "fixed",
+      },
+    ]
+    const repository = createRepository(data)
+    const store = new MobileAppStore(
+      repository,
+      createAuthGateway(),
+      new Date("2026-08-10T12:00:00+09:00"),
+    )
+    await store.initializeAuth()
+
+    expect(store.calendarRecurrenceFilter).toBe("all")
+    expect(store.monthTotals).toEqual({
+      expense: 63000,
+      income: 500000,
+      saving: 50000,
+    })
+
+    store.setCalendarRecurrenceFilter("recurring")
+    expect(store.selectedDateTransactions.map((item) => item.id)).toEqual([
+      "fixed",
+      "installment",
+      "salary",
+      "saving",
+      "excluded",
+    ])
+    expect(store.monthTotals).toEqual({
+      expense: 51000,
+      income: 500000,
+      saving: 50000,
+    })
+    expect(
+      store.monthDaySummaries.find((day) => day.dayOfMonth === 10),
+    ).toMatchObject({ count: 5, expense: 50000, income: 500000, saving: 50000 })
+
+    store.setCalendarRecurrenceFilter("general")
+    expect(store.selectedDateTransactions.map((item) => item.id)).toEqual([
+      "general",
+    ])
+    expect(store.monthTotals).toEqual({ expense: 12000, income: 0, saving: 0 })
+    expect(
+      store.monthDaySummaries.find((day) => day.dayOfMonth === 10),
+    ).toMatchObject({ count: 1, expense: 12000, income: 0, saving: 0 })
+    expect(store.monthTransactions).toHaveLength(7)
+
+    store.selectDate("2026-08-11")
+    expect(store.selectedDateTransactions).toEqual([])
+    expect(
+      store.monthDaySummaries.find((day) => day.dayOfMonth === 11),
+    ).toMatchObject({ count: 0, expense: 0, income: 0, saving: 0 })
+
+    store.setCalendarRecurrenceFilter("all")
+    expect(store.selectedDateTransactions.map((item) => item.id)).toEqual([
+      "next-day",
+    ])
+    expect(store.monthTotals.expense).toBe(63000)
+    expect(repository.loadMonth).toHaveBeenCalledOnce()
+  })
+
   it("ignores an older month response that finishes after the latest request", async () => {
     const repository = createRepository()
     const store = new MobileAppStore(

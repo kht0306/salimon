@@ -27,12 +27,14 @@ import {
   getDescendantCategoryIds,
   isSplitCategory,
   maskSensitiveText,
+  matchesTransactionRecurrence,
   MAX_CATEGORY_DEPTH,
   moveMonth,
   parseCardSmsText,
   toDateKey,
   toMonthKey,
   transactionAmountForCategoryIds,
+  type TransactionRecurrenceFilter,
 } from "@salimon/domain"
 import { makeAutoObservable, runInAction } from "mobx"
 import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "@salimon/types"
@@ -117,6 +119,7 @@ export class AppStore {
   selectedMonth: string
   selectedDate: string
   calendarRegistrantId = ""
+  calendarRecurrenceFilter: TransactionRecurrenceFilter = "all"
   transactionGrouping: TransactionGrouping = "actor"
   collapsedTransactionGroupKeys = new Set<string>()
   transactionEditorOpen = false
@@ -342,9 +345,28 @@ export class AppStore {
   }
 
   get calendarMonthTransactions(): Transaction[] {
-    if (!this.calendarRegistrantId) return this.monthTransactions
     return this.monthTransactions.filter(
-      (transaction) => transaction.createdBy === this.calendarRegistrantId,
+      (transaction) =>
+        (!this.calendarRegistrantId ||
+          transaction.createdBy === this.calendarRegistrantId) &&
+        matchesTransactionRecurrence(
+          transaction,
+          this.calendarRecurrenceFilter,
+        ),
+    )
+  }
+
+  get calendarMonthTotals(): Record<Transaction["type"], number> {
+    return this.calendarMonthTransactions.reduce<
+      Record<Transaction["type"], number>
+    >(
+      (totals, transaction) => {
+        if (transaction.status === "confirmed") {
+          totals[transaction.type] += transaction.amount
+        }
+        return totals
+      },
+      { expense: 0, income: 0, saving: 0 },
     )
   }
 
@@ -617,6 +639,10 @@ export class AppStore {
 
   setCalendarRegistrant(registrantId: string): void {
     this.calendarRegistrantId = registrantId
+  }
+
+  setCalendarRecurrenceFilter(filter: TransactionRecurrenceFilter): void {
+    this.calendarRecurrenceFilter = filter
   }
 
   setTransactionGrouping(grouping: TransactionGrouping): void {

@@ -246,7 +246,11 @@ export const DashboardShell = observer(function DashboardShell({
                   $tone={store.monthlySummaryVisible ? "expense" : undefined}
                 >
                   {store.monthlySummaryVisible
-                    ? formatKrw(store.monthExpenseTotal)
+                    ? formatKrw(
+                        view === "calendar"
+                          ? store.calendarMonthTotals.expense
+                          : store.monthExpenseTotal,
+                      )
                     : "••••••"}
                 </MetricValue>
               </Metric>
@@ -256,7 +260,11 @@ export const DashboardShell = observer(function DashboardShell({
                   $tone={store.monthlySummaryVisible ? "income" : undefined}
                 >
                   {store.monthlySummaryVisible
-                    ? formatKrw(store.monthIncomeTotal)
+                    ? formatKrw(
+                        view === "calendar"
+                          ? store.calendarMonthTotals.income
+                          : store.monthIncomeTotal,
+                      )
                     : "••••••"}
                 </MetricValue>
               </Metric>
@@ -266,7 +274,11 @@ export const DashboardShell = observer(function DashboardShell({
                   $tone={store.monthlySummaryVisible ? "saving" : undefined}
                 >
                   {store.monthlySummaryVisible
-                    ? formatKrw(store.monthSavingTotal)
+                    ? formatKrw(
+                        view === "calendar"
+                          ? store.calendarMonthTotals.saving
+                          : store.monthSavingTotal,
+                      )
                     : "••••••"}
                 </MetricValue>
               </Metric>

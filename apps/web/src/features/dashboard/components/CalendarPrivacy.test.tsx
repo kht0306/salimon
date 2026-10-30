@@ -8,6 +8,7 @@ const store = vi.hoisted(() => ({
   monthlySummaryVisible: true,
   selectedMonth: "2026-09",
   selectedDate: "2026-09-16",
+  calendarRecurrenceFilter: "all",
   selectedMonthBudgets: [
     {
       category: { id: "food", name: "식비", color: "#123456" },

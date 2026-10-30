@@ -9,6 +9,26 @@ import type {
 
 const CATEGORY_OPTION_INDENT = "\u00a0\u00a0\u00a0"
 
+export type TransactionSortOrder =
+  | "date_desc"
+  | "date_asc"
+  | "amount_desc"
+  | "amount_asc"
+
+export function compareTransactions(
+  first: Transaction,
+  second: Transaction,
+  order: TransactionSortOrder,
+): number {
+  const newestFirst =
+    new Date(second.transactionAt).getTime() -
+    new Date(first.transactionAt).getTime()
+  if (order === "amount_desc")
+    return second.amount - first.amount || newestFirst
+  if (order === "amount_asc") return first.amount - second.amount || newestFirst
+  return order === "date_asc" ? -newestFirst : newestFirst
+}
+
 export interface TransactionCategoryOption {
   category: Category
   label: string

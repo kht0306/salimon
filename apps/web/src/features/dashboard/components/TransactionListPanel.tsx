@@ -7,7 +7,7 @@ import { ListFilter } from "lucide-react"
 import { observer } from "mobx-react-lite"
 import { useEffect, useMemo, useState } from "react"
 import { useAppStore } from "../StoreProvider"
-import { Panel, PanelHeader, PanelTitle } from "../styles"
+import { Panel, PanelHeader, PanelTitle, Select } from "../styles"
 import { TransactionListFilters } from "./TransactionListFilters"
 import { TransactionListResults } from "./TransactionListResults"
 import {
@@ -15,7 +15,11 @@ import {
   resolveTransactionRange,
   type PeriodPreset,
 } from "./transactionListRange"
-import { matchesPaymentMethodFilter } from "./transactionPresentation"
+import {
+  compareTransactions,
+  matchesPaymentMethodFilter,
+  type TransactionSortOrder,
+} from "./transactionPresentation"
 
 export const TransactionListPanel = observer(function TransactionListPanel() {
   const store = useAppStore()
@@ -29,6 +33,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
   const [paymentMethodIds, setPaymentMethodIds] = useState<string[]>([])
   const [keyword, setKeyword] = useState("")
   const [page, setPage] = useState(1)
+  const [sortOrder, setSortOrder] = useState<TransactionSortOrder>("date_desc")
   function togglePaymentMethod(paymentMethodId: string) {
     setPaymentMethodIds((current) =>
       current.includes(paymentMethodId)
@@ -101,11 +106,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
             .toLowerCase()
             .includes(query),
       )
-      .sort(
-        (a, b) =>
-          new Date(b.transactionAt).getTime() -
-          new Date(a.transactionAt).getTime(),
-      )
+      .sort((first, second) => compareTransactions(first, second, sortOrder))
   }, [
     actorUserId,
     categoryId,
@@ -115,6 +116,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
     paymentMethodIds,
     startDate,
     status,
+    sortOrder,
     store.data.transactions,
     store.data.transactionSplits,
     store.data.categories,
@@ -133,6 +135,7 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
     period,
     startDate,
     status,
+    sortOrder,
     store.selectedLedgerId,
     type,
   ])
@@ -167,6 +170,21 @@ export const TransactionListPanel = observer(function TransactionListPanel() {
         onTogglePaymentMethod={togglePaymentMethod}
         onKeywordChange={setKeyword}
       />
+      <SortControl>
+        <span>거래 정렬</span>
+        <Select
+          aria-label="거래 정렬"
+          value={sortOrder}
+          onChange={(event) =>
+            setSortOrder(event.target.value as TransactionSortOrder)
+          }
+        >
+          <option value="date_desc">최신순</option>
+          <option value="date_asc">과거순</option>
+          <option value="amount_desc">금액 높은순</option>
+          <option value="amount_asc">금액 낮은순</option>
+        </Select>
+      </SortControl>
       <TransactionListResults
         transactions={transactions}
         page={page}
@@ -182,6 +200,17 @@ const TitleIcon = styled.span`
   gap: 7px;
 `
 const ResultCount = styled.span`
+  color: ${colors.muted};
+  font-size: 12px;
+`
+
+const SortControl = styled.label`
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid ${colors.border};
   color: ${colors.muted};
   font-size: 12px;
 `
